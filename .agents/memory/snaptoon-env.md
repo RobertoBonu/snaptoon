@@ -1,23 +1,43 @@
 ---
-name: SnapToon env & preview quirks
-description: How the root Streamlit app runs/previews inside this pnpm-workspace artifact monorepo, plus alembic/pip gotchas
+name: SnapToon environment quirks
+description: Non-obvious env/routing/setup facts for the SnapToon Streamlit app in the pnpm-workspace artifact monorepo
 ---
 
-# SnapToon environment quirks
+# Streamlit reachability through the artifact proxy
+The workspace preview is served by a global reverse proxy on port 80 that routes
+ONLY by each artifact's `.replit-artifact/artifact.toml` `paths` (most-specific-first,
+paths are NOT rewritten). A bare Streamlit workflow on port 5000 is unreachable —
+the proxy has no route to it, so `/` returns 404 and the preview shows
+"We couldn't reach this app".
 
-SnapToon is a **root-level Streamlit app** (`app.py`, `pages/`, `db/`, `auth/`, ...) living inside a pnpm-workspace artifact monorepo that also contains template artifacts (`artifacts/api-server`, `artifacts/mockup-sandbox`).
+**Fix:** register the Streamlit app as a `kind = "web"` artifact at `artifacts/snaptoon`
+with a service `localPort = 5000`, `paths = ["/"]`. This makes the proxy route `/`
+(and Streamlit's `/_stcore/*`, `/static/*`) to 5000 while `/api` still hits the api-server.
 
-## Preview / routing
-- There is **no Streamlit artifact type** — SnapToon cannot be registered via `createArtifact`. It runs as a plain **webview workflow** ("Start application") via `streamlit run app.py --server.port 5000 ...`. The Run button (`runButton = "Project"`) drives this.
-- The public dev domain (`$REPLIT_DEV_DOMAIN`) `/` is served by the **artifact proxy → api-server (returns 404)**, NOT Streamlit. The Streamlit webview on port 5000 is only reachable through the workspace Run/preview, not the artifact dev-domain root.
-- **`screenshot` app_preview only targets registered artifacts** (api-server, mockup-sandbox). It CANNOT screenshot the Streamlit webview. To verify Streamlit, curl `localhost:5000/_stcore/health` (200) and check workflow logs; verify data/logic headlessly instead of via screenshot.
-- Use port **5000** (in supported workflow ports). `.streamlit/config.toml` pins 8501 which is NOT a supported workflow port — override with `--server.port 5000`.
+**Why:** there is no Streamlit/Python artifact type in `createArtifact`, but the proxy
+and `listArtifacts` read artifact.toml files from disk, so a hand-written web artifact.toml
+works.
 
-## Python deps
-- `pip install -r requirements.txt` via bash **times out / returns exit -1 with no output**. Use the package-management skill (`installLanguagePackages({language:"python", packages:[...]})`, uv-backed) instead. Installs land in `.pythonlibs/lib/python3.11/...`. Runtime is **Python 3.11**, not 3.13.
+**How to apply / gotchas:**
+- You cannot edit `artifact.toml` directly and cannot `createArtifact` a streamlit type.
+  Write the full TOML to a sibling temp file (e.g. `artifact.edit.toml`) in the SAME
+  `.replit-artifact/` dir (NOT /tmp), then call
+  `verifyAndReplaceArtifactToml({tempFilePath, artifactTomlPath})` with absolute paths.
+- The target `artifact.toml` must itself already be valid TOML before validation — a
+  placeholder like the literal word `placeholder` fails with ARTIFACT_SYNTAX_ERROR.
+- Artifact service `run` commands execute with cwd = the artifact dir
+  (`artifacts/snaptoon`), NOT repo root. `app.py` lives at repo root, so the run command
+  must `cd /home/runner/workspace` first, e.g.
+  `bash -lc 'cd /home/runner/workspace && exec streamlit run app.py --server.port 5000 ...'`.
+- Registering the web artifact auto-creates a workflow `artifacts/snaptoon: SnapToon`
+  that runs streamlit; remove any standalone `Start application` streamlit workflow to
+  avoid a double-bind on port 5000.
 
-## Alembic
-- Migrations live in `db/migrations` (`script_location = db/migrations` in `alembic.ini`); `env.py` imports `from db.base import Base`. Running `alembic` fails with `ModuleNotFoundError: No module named 'db'` unless you prefix `PYTHONPATH="$PWD"`. Always run: `PYTHONPATH="$PWD" alembic revision --autogenerate ...` / `upgrade head`.
-
-## Ownership boundary
-- Replit Agent owns ONLY the visual layer + `app.py` markup/wiring. NEVER modify `auth/`, `db/`, `billing/`, `storage/`, `snaptoon_core/`, `scripts/`, `requirements.txt` — only **call** their functions. See `docs/design/07_REPLIT_AGENT.md`. All git ops are blocked in the agent sandbox; the user runs git in Shell.
+# Other env facts
+- Runtime is Python 3.11 (NOT 3.13). Install deps via the package-management skill
+  (`installLanguagePackages`, uv-backed); raw `pip install` times out (exit -1).
+- Alembic needs repo root on PYTHONPATH: `PYTHONPATH="$PWD" alembic ...` or it fails
+  with `No module named 'db'`.
+- For ad hoc curl always use `http://localhost:80` (the proxy), never service ports directly.
+- `screenshot` app_preview only works for registered artifacts; verify Streamlit via
+  curl/logs (HTTP 200 on `/` and `/_stcore/health`) instead.
