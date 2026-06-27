@@ -1,0 +1,26 @@
+# SnapToon — Streamlit theme
+# Replit Agent: questo file è di tua competenza. Definisci qui palette, font,
+# layout. Vedi docs/design/05_STREAMLIT_CONSTRAINTS.md per riferimenti.
+
+[theme]
+# Replit Agent: scegli tu la palette completa.
+# Placeholder iniziali che puoi sostituire:
+primaryColor = "#000000"
+backgroundColor = "#ffffff"
+secondaryBackgroundColor = "#f5f5f5"
+textColor = "#111111"
+font = "sans serif"
+
+[server]
+port = 8080
+address = "0.0.0.0"
+headless = true
+maxUploadSize = 10
+runOnSave = false
+
+[browser]
+gatherUsageStats = false
+
+[client]
+toolbarMode = "minimal"
+showSidebarNavigation = true

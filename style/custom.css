@@ -1,0 +1,25 @@
+/*
+ * SnapToon — CSS custom injection
+ *
+ * REPLIT_AGENT: questo file è di tua competenza. Definisci qui tutti i tweak
+ * di stile non esprimibili nel theme nativo Streamlit (config.toml).
+ *
+ * Vedi docs/design/05_STREAMLIT_CONSTRAINTS.md per la lista dei selettori
+ * Streamlit testati.
+ *
+ * Vincoli da rispettare:
+ *   - Contrasto AA per testo
+ *   - Niente animazioni in loop infinito
+ *   - Niente transition > 300ms
+ *   - Niente position: fixed su elementi Streamlit-rendered
+ */
+
+/* Placeholder: rimuovere il footer "Made with Streamlit" */
+footer {
+    visibility: hidden;
+}
+
+/* Placeholder: nascondere il menu hamburger Streamlit */
+[data-testid="stToolbar"] {
+    display: none;
+}

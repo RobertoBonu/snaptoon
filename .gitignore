@@ -1,0 +1,64 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+.eggs/
+build/
+dist/
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+.tox/
+.cache/
+
+# Virtual env
+venv/
+.venv/
+env/
+ENV/
+
+# Streamlit
+.streamlit/secrets.toml
+
+# Replit
+.config/
+.upm/
+.cache/
+.local/
+
+# Env files
+.env
+.env.local
+.env.*.local
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Database locale (sviluppo)
+*.db
+*.sqlite
+*.sqlite3
+
+# Object Storage cache locale
+storage_cache/
+
+# Test artifacts
+.hypothesis/
+
+# Migrazione progetti di test (Creative Studio)
+seed_data/projects/
