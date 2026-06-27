@@ -1,0 +1,38 @@
+id: style-flat-03
+name: Style-Flat-03 (anime/cartoon contemporaneo)
+description: 'Stile anime/cartoon di tendenza, flat con shading minimale, palette accesa, linee pulite.
+  Riferimento al cinema d''animazione giapponese moderno e alle illustrazioni editoriali contemporanee.
+
+  '
+technique: 'Flat 2D digital illustration, anime/cartoon hybrid, vector-style clean linework, cel-shading
+  with at most two tone levels per surface (no soft gradients).
+
+  '
+aesthetic: 'Contemporary anime sensibility — readable silhouettes, expressive faces with large eyes but
+  proportioned (not chibi), cinematic framing. Inspired by modern Japanese animation and editorial illustration,
+  never generic "AI anime slop".
+
+  '
+palette: 'Saturated but balanced palette, ~6-8 dominant hues per scene. Strong primary accents (teal,
+  magenta, ochre) against neutral midtones. High value contrast between foreground subjects and background.
+
+  '
+lighting: 'Single dominant light source per scene, hard-edged shadows in one flat tone, occasional rim
+  light to separate the character from the background. No volumetric fog, no soft photographic depth-of-field.
+
+  '
+line_work: 'Clean ink-style outlines, constant ~2-3px weight, slightly thicker on silhouette edges. Inner
+  details (fingers, facial features) use thinner lines. No sketch marks, no hatching.
+
+  '
+typography_constraints: 'Testi all''interno dell''immagine renderizzati in lettering tipografico chiaro.
+  Usa virgolette tipografiche («») o balloon. MAI asterischi, MAI testo cancellato o barrato. Esplicita
+  sempre chi parla quando il balloon non punta chiaramente al personaggio (es. tail visibile e direzionata).
+
+  '
+negative_prompt: 'no photorealism, no 3D render, no soft watercolor, no realistic skin texture, no extra
+  fingers, no warped anatomy, no AI gradients (purple/blue washes), no generic Inter/Roboto sans-serif
+  UI fonts in image text, no cluttered backgrounds.
+
+  '
+characters: []

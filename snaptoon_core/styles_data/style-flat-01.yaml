@@ -1,0 +1,56 @@
+id: style-flat-01
+name: Style-Flat-01 (placeholder)
+description: 'TODO — descrivi qui in una riga l''identità di questo stile.
+
+  '
+technique: 'TODO — tecnica e medium (es. "watercolor traditional", "oil paint Caravaggesque", "vintage
+  Italian comics ink").
+
+  '
+aesthetic: 'TODO — mood, atmosfera, riferimenti culturali/storici/cinematografici.
+
+  '
+palette: 'TODO — palette dominante, saturazione, contrasto.
+
+  '
+lighting: 'TODO — tipo di illuminazione tipica (puoi lasciare vuoto se non rilevante).
+
+  '
+line_work: 'TODO — tratto, contorni, linee (puoi lasciare vuoto se non rilevante).
+
+  '
+typography_constraints: 'Testi all''interno dell''immagine: virgolette tipografiche, mai asterischi, mai
+  testo cancellato. Esplicita sempre chi parla.
+
+  '
+negative_prompt: 'TODO — cosa evitare (anatomie storte, gradienti AI, font generici, ecc).
+
+  '
+library_preset_id: flat
+category: kids
+page_background_color: '#ffffff'
+balloon_font_id: marker_felt
+balloon_font_size: 24
+balloon_text_color: '#000000'
+balloon_outline_color: '#1a1a1a'
+balloon_fumetto_fill: '#ffffff'
+balloon_pensiero_fill: '#f7f7f7'
+balloon_outline_width: 2
+balloon_speed_lines: true
+balloon_jitter: true
+balloon_padding: 14
+caption_font_id: helvetica
+caption_font_size: 18
+caption_text_color: '#ffffff'
+caption_outline_color: '#fbfbfb'
+caption_fill: '#064cb9'
+sfx_font_id: impact
+sfx_font_size: 56
+sfx_text_color: '#d32f2f'
+sfx_outline_color: '#7a1010'
+sfx_fill: '#f3df2c'
+publisher_logo_enabled: true
+publisher_logo_size_pct: 0.18
+publisher_logo_position: tl
+copyright_logo_size_pct: 0.18
+copyright_logo_position: bc
