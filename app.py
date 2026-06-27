@@ -13,6 +13,7 @@ docs/design/07_REPLIT_AGENT.md.
 
 from __future__ import annotations
 
+from pathlib import Path
 import streamlit as st
 
 st.set_page_config(
@@ -22,11 +23,18 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
+# Inject CSS design system
+def _inject_css() -> None:
+    css_path = Path("style/custom.css")
+    if css_path.exists():
+        st.markdown(f"<style>{css_path.read_text()}</style>", unsafe_allow_html=True)
+
+_inject_css()
+
 # ============================================================
-# PLACEHOLDER — Settimana 1
-# Questo file verrà popolato durante lo sviluppo del backend (auth, DB).
-# Per ora mostra solo un saluto in modo che Replit Agent possa cominciare
-# a lavorare sul theme.
+# PLACEHOLDER — snaptoon_core non ancora disponibile
+# Il file verrà popolato con auth + session quando snaptoon_core
+# sarà aggiunto al repo.
 # ============================================================
 
 st.title("SnapToon")
@@ -40,13 +48,19 @@ st.markdown(
 
     L'app è in fase di sviluppo iniziale.
 
-    - Backend (auth, DB, billing): in arrivo da Claude
-    - Design (theme, palette, layout): in arrivo da Replit Agent
+    - **Backend** (auth, DB, billing, snaptoon_core): in arrivo da Claude/Roberto
+    - **Design** (theme, palette, layout, componenti): ✅ pronto
 
     Vedi `docs/design/` per le specifiche complete.
     """
 )
 
 with st.sidebar:
-    st.markdown("**SnapToon**")
+    st.markdown("**SnapToon** 🟣")
     st.caption("MVP in costruzione")
+    st.divider()
+    st.caption("📝 Testo")
+    st.caption("🎨 Stile")
+    st.caption("👥 Personaggi")
+    st.caption("🖼 Genera")
+    st.caption("📐 Impagina")

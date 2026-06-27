@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 48" fill="none">
+  <!-- Wordmark SnapToon -->
+  <text
+    x="0" y="36"
+    font-family="'Inter', -apple-system, sans-serif"
+    font-size="36"
+    font-weight="800"
+    letter-spacing="-1.5"
+    fill="#F59E0B"
+  >SnapToon</text>
+  <!-- Decorative dot (accent viola) -->
+  <circle cx="194" cy="32" r="5" fill="#7C3AED"/>
+</svg>
