@@ -18,3 +18,8 @@ expertMode = true
 [postMerge]
 path = "scripts/post-merge.sh"
 timeoutMs = 20000
+
+[userenv]
+
+[userenv.shared]
+REPLIT_OBJECT_STORAGE_BUCKET = "replit-objstore-44e0e069-0f69-4c62-9ed2-929bba33dc83"
