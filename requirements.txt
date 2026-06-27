@@ -1,0 +1,33 @@
+# Streamlit + UI
+streamlit>=1.40.0
+streamlit-extras>=0.4.0
+streamlit-image-coordinates>=0.1.9
+
+# AI providers
+anthropic>=0.40.0
+openai>=1.60.0
+google-genai>=0.3.0
+
+# Image processing
+Pillow>=11.0.0
+
+# Data
+pydantic>=2.10.0
+PyYAML>=6.0.2
+
+# Database
+SQLAlchemy>=2.0.30
+alembic>=1.14.0
+psycopg2-binary>=2.9.10
+
+# Object storage (Replit)
+replit-object-storage>=1.0.0
+
+# Auth (password hashing)
+bcrypt>=4.2.0
+
+# Env
+python-dotenv>=1.0.0
+
+# PDF export
+reportlab>=4.2.0
