@@ -1,0 +1,1 @@
+- [SnapToon env & preview quirks](snaptoon-env.md) — root Streamlit app in artifact monorepo: runs as webview on :5000, dev-domain / hits api-server, no app_preview screenshot; pip times out (use pkg skill); alembic needs PYTHONPATH=$PWD; never touch auth/db/billing/storage.
