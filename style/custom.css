@@ -1,0 +1,1076 @@
+/* ============================================================
+   SnapToon — Custom CSS
+   design: tema base + componenti
+   ============================================================ */
+
+/* --- Google Font: Inter --- */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+
+/* ============================================================
+   RESET / BASE
+   ============================================================ */
+
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+html, body, .stApp {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif !important;
+}
+
+/* ============================================================
+   HIDE STREAMLIT CHROME
+   ============================================================ */
+
+[data-testid="stHeader"]          { display: none !important; }
+[data-testid="stToolbar"]         { display: none !important; }
+footer                            { display: none !important; }
+#MainMenu                         { display: none !important; }
+.viewerBadge_container__r5tak     { display: none !important; }
+
+/* ============================================================
+   SIDEBAR
+   ============================================================ */
+
+[data-testid="stSidebar"] {
+  background-color: #0A0E17 !important;
+  border-right: 1px solid #1E2436 !important;
+  min-width: 240px !important;
+  max-width: 240px !important;
+}
+
+[data-testid="stSidebarContent"] {
+  padding: 0 !important;
+}
+
+/* Sidebar nav links (Streamlit multipage) */
+[data-testid="stSidebarNav"] {
+  padding: 0 !important;
+  gap: 0 !important;
+}
+
+[data-testid="stSidebarNav"] a {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 20px;
+  border-radius: 6px;
+  margin: 2px 8px;
+  font-size: 14px;
+  font-weight: 500;
+  color: #94A3B8 !important;
+  text-decoration: none !important;
+  transition: background 150ms ease, color 150ms ease;
+}
+
+[data-testid="stSidebarNav"] a:hover {
+  background: #1E2436;
+  color: #E2E8F0 !important;
+}
+
+[data-testid="stSidebarNav"] a[aria-current="page"] {
+  background: #1A2035;
+  color: #F59E0B !important;
+  border-left: 3px solid #F59E0B;
+  padding-left: 17px;
+}
+
+/* ============================================================
+   MAIN CONTAINER
+   ============================================================ */
+
+.main .block-container {
+  padding: 2rem 2.5rem 3rem !important;
+  max-width: 1200px !important;
+}
+
+/* ============================================================
+   TYPOGRAPHY
+   ============================================================ */
+
+h1, .stHeading h1 {
+  font-size: 1.75rem !important;
+  font-weight: 700 !important;
+  letter-spacing: -0.02em !important;
+  color: #F1F5F9 !important;
+  margin-bottom: 0.25rem !important;
+}
+
+h2, .stHeading h2 {
+  font-size: 1.25rem !important;
+  font-weight: 600 !important;
+  color: #CBD5E1 !important;
+}
+
+h3, .stHeading h3 {
+  font-size: 1rem !important;
+  font-weight: 600 !important;
+  color: #94A3B8 !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.06em !important;
+}
+
+p, .stMarkdown p {
+  font-size: 14px !important;
+  line-height: 1.6 !important;
+  color: #CBD5E1 !important;
+}
+
+.stCaption, [data-testid="stCaptionContainer"] {
+  color: #64748B !important;
+  font-size: 12px !important;
+}
+
+/* Code / mono */
+code, pre, .stCode {
+  font-family: 'JetBrains Mono', 'Fira Code', monospace !important;
+  font-size: 13px !important;
+}
+
+/* ============================================================
+   DIVIDER
+   ============================================================ */
+
+hr, [data-testid="stHorizontalBlock"] hr {
+  border-color: #1E2436 !important;
+  margin: 1.5rem 0 !important;
+}
+
+/* ============================================================
+   BUTTONS
+   ============================================================ */
+
+.stButton button {
+  font-family: 'Inter', sans-serif !important;
+  font-size: 14px !important;
+  font-weight: 500 !important;
+  border-radius: 6px !important;
+  padding: 0.45rem 1rem !important;
+  transition: background 150ms ease, border-color 150ms ease, color 150ms ease, opacity 150ms ease !important;
+  cursor: pointer !important;
+}
+
+/* Primary */
+.stButton button[kind="primary"] {
+  background: #F59E0B !important;
+  border: 1px solid #F59E0B !important;
+  color: #0D1017 !important;
+}
+
+.stButton button[kind="primary"]:hover {
+  background: #FBBF24 !important;
+  border-color: #FBBF24 !important;
+}
+
+.stButton button[kind="primary"]:active {
+  background: #D97706 !important;
+  border-color: #D97706 !important;
+}
+
+/* Secondary */
+.stButton button[kind="secondary"] {
+  background: transparent !important;
+  border: 1px solid #2D3748 !important;
+  color: #CBD5E1 !important;
+}
+
+.stButton button[kind="secondary"]:hover {
+  background: #1E2436 !important;
+  border-color: #3D4F6A !important;
+  color: #E2E8F0 !important;
+}
+
+/* Danger / destructive (class applicata via st.markdown wrapper) */
+.snaptoon-btn-danger .stButton button {
+  background: transparent !important;
+  border: 1px solid #EF4444 !important;
+  color: #EF4444 !important;
+}
+
+.snaptoon-btn-danger .stButton button:hover {
+  background: rgba(239, 68, 68, 0.1) !important;
+}
+
+/* Disabled */
+.stButton button:disabled {
+  opacity: 0.4 !important;
+  cursor: not-allowed !important;
+}
+
+/* ============================================================
+   FORM INPUTS
+   ============================================================ */
+
+.stTextInput input,
+.stTextArea textarea,
+.stNumberInput input {
+  background: #161B26 !important;
+  border: 1px solid #2D3748 !important;
+  border-radius: 6px !important;
+  color: #E2E8F0 !important;
+  font-family: 'Inter', sans-serif !important;
+  font-size: 14px !important;
+  padding: 0.5rem 0.75rem !important;
+  transition: border-color 150ms ease !important;
+}
+
+.stTextInput input:focus,
+.stTextArea textarea:focus,
+.stNumberInput input:focus {
+  border-color: #F59E0B !important;
+  box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.12) !important;
+  outline: none !important;
+}
+
+.stTextInput input::placeholder,
+.stTextArea textarea::placeholder {
+  color: #475569 !important;
+}
+
+/* Labels */
+.stTextInput label,
+.stTextArea label,
+.stSelectbox label,
+.stNumberInput label,
+.stFileUploader label,
+.stSlider label,
+.stRadio label,
+.stToggle label,
+.stColorPicker label {
+  font-size: 13px !important;
+  font-weight: 500 !important;
+  color: #94A3B8 !important;
+  margin-bottom: 4px !important;
+}
+
+/* Selectbox */
+.stSelectbox > div > div {
+  background: #161B26 !important;
+  border: 1px solid #2D3748 !important;
+  border-radius: 6px !important;
+  color: #E2E8F0 !important;
+  font-size: 14px !important;
+}
+
+.stSelectbox > div > div:focus-within {
+  border-color: #F59E0B !important;
+}
+
+/* Multiselect */
+.stMultiSelect > div {
+  background: #161B26 !important;
+  border: 1px solid #2D3748 !important;
+  border-radius: 6px !important;
+}
+
+.stMultiSelect span[data-baseweb="tag"] {
+  background: #1E2F50 !important;
+  border-radius: 4px !important;
+}
+
+/* File uploader */
+[data-testid="stFileUploader"] {
+  background: #161B26 !important;
+  border: 1.5px dashed #2D3748 !important;
+  border-radius: 8px !important;
+  padding: 1.25rem !important;
+  transition: border-color 150ms ease !important;
+}
+
+[data-testid="stFileUploader"]:hover {
+  border-color: #F59E0B !important;
+}
+
+/* Toggle */
+.stToggle input[type="checkbox"] {
+  accent-color: #F59E0B !important;
+}
+
+/* Slider */
+.stSlider [data-testid="stSlider"] div[role="slider"] {
+  background: #F59E0B !important;
+}
+
+/* Color picker */
+.stColorPicker input {
+  background: #161B26 !important;
+  border: 1px solid #2D3748 !important;
+}
+
+/* Radio */
+.stRadio label {
+  color: #CBD5E1 !important;
+  font-size: 14px !important;
+  font-weight: 400 !important;
+}
+
+/* ============================================================
+   TABS
+   ============================================================ */
+
+.stTabs [data-baseweb="tab-list"] {
+  background: transparent !important;
+  border-bottom: 1px solid #1E2436 !important;
+  gap: 0 !important;
+  padding: 0 !important;
+}
+
+.stTabs [data-baseweb="tab"] {
+  background: transparent !important;
+  border: none !important;
+  border-bottom: 2px solid transparent !important;
+  border-radius: 0 !important;
+  padding: 0.65rem 1.1rem !important;
+  font-size: 14px !important;
+  font-weight: 500 !important;
+  color: #64748B !important;
+  transition: color 150ms ease, border-color 150ms ease !important;
+  margin-bottom: -1px !important;
+}
+
+.stTabs [data-baseweb="tab"]:hover {
+  color: #CBD5E1 !important;
+  background: transparent !important;
+}
+
+.stTabs [aria-selected="true"] {
+  color: #F59E0B !important;
+  border-bottom: 2px solid #F59E0B !important;
+  background: transparent !important;
+}
+
+.stTabs [data-baseweb="tab-panel"] {
+  padding: 1.5rem 0 !important;
+}
+
+/* ============================================================
+   EXPANDER
+   ============================================================ */
+
+[data-testid="stExpander"] {
+  background: #161B26 !important;
+  border: 1px solid #1E2436 !important;
+  border-radius: 8px !important;
+  overflow: hidden !important;
+  margin-bottom: 0.75rem !important;
+}
+
+[data-testid="stExpander"] summary {
+  padding: 0.85rem 1rem !important;
+  font-size: 14px !important;
+  font-weight: 500 !important;
+  color: #CBD5E1 !important;
+  background: #161B26 !important;
+  border-radius: 8px !important;
+  transition: background 150ms ease !important;
+}
+
+[data-testid="stExpander"] summary:hover {
+  background: #1A2035 !important;
+}
+
+[data-testid="stExpander"][open] summary {
+  border-bottom: 1px solid #1E2436 !important;
+  border-radius: 8px 8px 0 0 !important;
+}
+
+[data-testid="stExpander"] > div > div {
+  padding: 1rem !important;
+}
+
+/* ============================================================
+   CONTAINERS / CARDS
+   ============================================================ */
+
+[data-testid="stVerticalBlock"] > [data-testid="stVerticalBlockBorderWrapper"] {
+  background: #161B26 !important;
+  border: 1px solid #1E2436 !important;
+  border-radius: 8px !important;
+  padding: 1rem !important;
+}
+
+/* ============================================================
+   POPOVER
+   ============================================================ */
+
+[data-testid="stPopover"] button {
+  font-size: 13px !important;
+}
+
+[data-testid="stPopoverContent"] {
+  background: #161B26 !important;
+  border: 1px solid #2D3748 !important;
+  border-radius: 8px !important;
+  padding: 1rem !important;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5) !important;
+}
+
+/* ============================================================
+   METRICS
+   ============================================================ */
+
+[data-testid="stMetric"] {
+  background: #161B26 !important;
+  border: 1px solid #1E2436 !important;
+  border-radius: 8px !important;
+  padding: 1rem 1.25rem !important;
+}
+
+[data-testid="stMetricLabel"] {
+  font-size: 12px !important;
+  font-weight: 500 !important;
+  color: #64748B !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.06em !important;
+}
+
+[data-testid="stMetricValue"] {
+  font-size: 2rem !important;
+  font-weight: 700 !important;
+  color: #F1F5F9 !important;
+  line-height: 1.2 !important;
+}
+
+/* ============================================================
+   DATAFRAME / TABLE
+   ============================================================ */
+
+[data-testid="stDataFrame"] {
+  border: 1px solid #1E2436 !important;
+  border-radius: 8px !important;
+  overflow: hidden !important;
+}
+
+[data-testid="stDataFrame"] thead th {
+  background: #0A0E17 !important;
+  color: #64748B !important;
+  font-size: 12px !important;
+  font-weight: 600 !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.06em !important;
+  padding: 0.75rem 1rem !important;
+  border-bottom: 1px solid #1E2436 !important;
+}
+
+[data-testid="stDataFrame"] tbody tr {
+  transition: background 100ms ease !important;
+}
+
+[data-testid="stDataFrame"] tbody tr:hover {
+  background: #1A2035 !important;
+}
+
+[data-testid="stDataFrame"] tbody td {
+  border-color: #1E2436 !important;
+  color: #CBD5E1 !important;
+  font-size: 13px !important;
+  padding: 0.65rem 1rem !important;
+}
+
+/* ============================================================
+   ALERTS (success / info / warning / error)
+   ============================================================ */
+
+[data-testid="stAlert"] {
+  border-radius: 6px !important;
+  font-size: 14px !important;
+  padding: 0.75rem 1rem !important;
+}
+
+[data-testid="stAlert"][data-type="success"] {
+  background: rgba(16, 185, 129, 0.08) !important;
+  border-left: 3px solid #10B981 !important;
+}
+
+[data-testid="stAlert"][data-type="info"] {
+  background: rgba(59, 130, 246, 0.08) !important;
+  border-left: 3px solid #3B82F6 !important;
+}
+
+[data-testid="stAlert"][data-type="warning"] {
+  background: rgba(245, 158, 11, 0.08) !important;
+  border-left: 3px solid #F59E0B !important;
+}
+
+[data-testid="stAlert"][data-type="error"] {
+  background: rgba(239, 68, 68, 0.08) !important;
+  border-left: 3px solid #EF4444 !important;
+}
+
+/* ============================================================
+   PROGRESS BAR
+   ============================================================ */
+
+.stProgress > div > div > div > div {
+  background: #F59E0B !important;
+  border-radius: 4px !important;
+}
+
+.stProgress > div > div > div {
+  background: #1E2436 !important;
+  border-radius: 4px !important;
+}
+
+/* ============================================================
+   SPINNER
+   ============================================================ */
+
+.stSpinner > div {
+  border-top-color: #F59E0B !important;
+}
+
+/* ============================================================
+   TOAST
+   ============================================================ */
+
+[data-testid="stToast"] {
+  background: #1E2436 !important;
+  border: 1px solid #2D3748 !important;
+  border-radius: 8px !important;
+  color: #E2E8F0 !important;
+  font-size: 14px !important;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4) !important;
+}
+
+/* ============================================================
+   SNAPTOON — CUSTOM COMPONENTS
+   ============================================================ */
+
+/* --- Page Header --- */
+.snaptoon-page-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  padding-bottom: 1.25rem;
+  border-bottom: 1px solid #1E2436;
+  margin-bottom: 1.5rem;
+  gap: 1rem;
+}
+
+.snaptoon-page-header__left h1 {
+  margin: 0 0 0.2rem !important;
+}
+
+.snaptoon-page-header__subtitle {
+  font-size: 13px;
+  color: #64748B;
+  margin: 0;
+}
+
+.snaptoon-page-header__actions {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+/* --- Sidebar logo --- */
+.snaptoon-sidebar-logo {
+  padding: 1.25rem 1.25rem 0.5rem;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  border-bottom: 1px solid #1E2436;
+  margin-bottom: 0.75rem;
+}
+
+.snaptoon-sidebar-logo__wordmark {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: #F59E0B;
+  letter-spacing: -0.02em;
+}
+
+.snaptoon-sidebar-logo__dot {
+  width: 6px;
+  height: 6px;
+  background: #7C3AED;
+  border-radius: 50%;
+  display: inline-block;
+  margin-left: 1px;
+}
+
+/* --- Credit badge --- */
+.snaptoon-credit-badge {
+  padding: 0.75rem 1rem;
+  margin: 0 0.5rem 0.5rem;
+  background: #0A0E17;
+  border: 1px solid #1E2436;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: border-color 150ms ease;
+}
+
+.snaptoon-credit-badge:hover {
+  border-color: #2D3748;
+}
+
+.snaptoon-credit-badge__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 11px;
+  color: #475569;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-bottom: 0.4rem;
+}
+
+.snaptoon-credit-badge__value {
+  font-size: 1rem;
+  font-weight: 700;
+  color: #E2E8F0;
+  line-height: 1;
+  margin-bottom: 0.5rem;
+}
+
+.snaptoon-credit-badge__bar-track {
+  height: 3px;
+  background: #1E2436;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.snaptoon-credit-badge__bar-fill {
+  height: 100%;
+  border-radius: 4px;
+  transition: width 300ms ease;
+}
+
+.snaptoon-credit-badge__bar-fill--ok     { background: #10B981; }
+.snaptoon-credit-badge__bar-fill--low    { background: #F59E0B; }
+.snaptoon-credit-badge__bar-fill--empty  { background: #EF4444; }
+
+.snaptoon-credit-badge--low .snaptoon-credit-badge__value   { color: #F59E0B; }
+.snaptoon-credit-badge--empty .snaptoon-credit-badge__value { color: #EF4444; }
+
+/* --- Style card --- */
+.snaptoon-style-card {
+  background: #161B26;
+  border: 1.5px solid #1E2436;
+  border-radius: 8px;
+  padding: 0.85rem;
+  height: 100%;
+  transition: border-color 150ms ease;
+  position: relative;
+}
+
+.snaptoon-style-card:hover {
+  border-color: #2D3748;
+}
+
+.snaptoon-style-card--selected {
+  border-color: #F59E0B !important;
+  background: #1A1E2B;
+}
+
+.snaptoon-style-card__badge-active {
+  position: absolute;
+  top: 0.6rem;
+  right: 0.6rem;
+  background: #F59E0B;
+  color: #0D1017;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.snaptoon-style-card__title {
+  font-size: 13px;
+  font-weight: 600;
+  color: #E2E8F0;
+  margin-bottom: 0.25rem;
+}
+
+.snaptoon-style-card__category {
+  font-size: 11px;
+  color: #475569;
+  margin-bottom: 0.5rem;
+}
+
+.snaptoon-style-card__preview {
+  font-size: 12px;
+  color: #64748B;
+  line-height: 1.5;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* --- Character card --- */
+.snaptoon-char-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 12px;
+  font-weight: 500;
+  padding: 2px 8px;
+  border-radius: 4px;
+}
+
+.snaptoon-char-status--valid {
+  color: #10B981;
+  background: rgba(16, 185, 129, 0.1);
+}
+
+.snaptoon-char-status--corrupted {
+  color: #F59E0B;
+  background: rgba(245, 158, 11, 0.1);
+}
+
+.snaptoon-char-status--missing {
+  color: #64748B;
+  background: rgba(100, 116, 139, 0.1);
+}
+
+/* --- Panel card --- */
+.snaptoon-panel-card {
+  background: #161B26;
+  border: 1px solid #1E2436;
+  border-radius: 8px;
+  overflow: hidden;
+  transition: border-color 150ms ease;
+  height: 100%;
+}
+
+.snaptoon-panel-card:hover {
+  border-color: #2D3748;
+}
+
+.snaptoon-panel-card__header {
+  padding: 0.6rem 0.75rem;
+  background: #0A0E17;
+  border-bottom: 1px solid #1E2436;
+  font-size: 12px;
+  font-weight: 600;
+  color: #64748B;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.snaptoon-panel-card__image {
+  aspect-ratio: 4/3;
+  background: #0D1017;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #334155;
+  font-size: 13px;
+  font-style: italic;
+  border-bottom: 1px solid #1E2436;
+  overflow: hidden;
+}
+
+.snaptoon-panel-card__body {
+  padding: 0.75rem;
+}
+
+.snaptoon-panel-card__caption {
+  font-size: 12px;
+  color: #64748B;
+  line-height: 1.5;
+  margin-bottom: 0.5rem;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.snaptoon-panel-card__meta {
+  display: flex;
+  gap: 0.5rem;
+  font-size: 12px;
+  color: #475569;
+  flex-wrap: wrap;
+}
+
+/* --- Empty state --- */
+.snaptoon-empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 4rem 2rem;
+  gap: 0.75rem;
+}
+
+.snaptoon-empty-state__icon {
+  font-size: 3rem;
+  line-height: 1;
+  opacity: 0.4;
+  margin-bottom: 0.25rem;
+}
+
+.snaptoon-empty-state__title {
+  font-size: 1rem;
+  font-weight: 600;
+  color: #94A3B8;
+  margin: 0;
+}
+
+.snaptoon-empty-state__desc {
+  font-size: 14px;
+  color: #475569;
+  max-width: 360px;
+  margin: 0;
+  line-height: 1.6;
+}
+
+/* --- Confirm dialog --- */
+.snaptoon-confirm-dialog {
+  background: #161B26;
+  border: 1px solid #EF4444;
+  border-radius: 8px;
+  padding: 1.25rem;
+  margin-top: 0.75rem;
+}
+
+.snaptoon-confirm-dialog__title {
+  font-size: 1rem;
+  font-weight: 600;
+  color: #F1F5F9;
+  margin-bottom: 0.5rem;
+}
+
+.snaptoon-confirm-dialog__body {
+  font-size: 14px;
+  color: #CBD5E1;
+  margin-bottom: 0.5rem;
+  line-height: 1.6;
+}
+
+.snaptoon-confirm-dialog__warning {
+  font-size: 13px;
+  color: #94A3B8;
+  padding: 0.6rem 0.75rem;
+  background: rgba(239, 68, 68, 0.06);
+  border-radius: 4px;
+  margin-bottom: 1rem;
+}
+
+/* --- Cost preview --- */
+.snaptoon-cost-preview {
+  font-size: 12px;
+  color: #64748B;
+  margin-bottom: 0.5rem;
+  padding: 0.4rem 0.6rem;
+  background: #0A0E17;
+  border-radius: 4px;
+  display: inline-block;
+}
+
+.snaptoon-cost-preview--insufficient {
+  color: #EF4444;
+}
+
+/* --- Status global bar --- */
+.snaptoon-status-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.65rem 1rem;
+  background: #0A0E17;
+  border: 1px solid #1E2436;
+  border-radius: 6px;
+  font-size: 13px;
+  color: #94A3B8;
+  margin-bottom: 1rem;
+}
+
+.snaptoon-status-bar__count {
+  font-weight: 600;
+  color: #E2E8F0;
+}
+
+/* --- Section label --- */
+.snaptoon-section-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: #475569;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin-bottom: 0.75rem;
+  padding-bottom: 0.4rem;
+  border-bottom: 1px solid #1E2436;
+}
+
+/* --- Sidebar section divider --- */
+.snaptoon-sidebar-section {
+  padding: 0.5rem 1.25rem 0.25rem;
+  font-size: 10px;
+  font-weight: 600;
+  color: #334155;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+
+/* --- Badge / pill --- */
+.snaptoon-badge {
+  display: inline-flex;
+  align-items: center;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 4px;
+  letter-spacing: 0.03em;
+}
+
+.snaptoon-badge--amber  { background: rgba(245, 158, 11, 0.15); color: #F59E0B; }
+.snaptoon-badge--violet { background: rgba(124, 58, 237, 0.15); color: #A78BFA; }
+.snaptoon-badge--green  { background: rgba(16, 185, 129, 0.15); color: #34D399; }
+.snaptoon-badge--red    { background: rgba(239, 68, 68, 0.15);  color: #F87171; }
+.snaptoon-badge--gray   { background: rgba(100, 116, 139, 0.15); color: #94A3B8; }
+
+/* --- Login page --- */
+.snaptoon-login-wrapper {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 90vh;
+  gap: 0;
+}
+
+.snaptoon-login-card {
+  background: #161B26;
+  border: 1px solid #1E2436;
+  border-radius: 12px;
+  padding: 2.5rem 2rem;
+  width: 100%;
+  max-width: 380px;
+}
+
+.snaptoon-login-logo {
+  text-align: center;
+  margin-bottom: 0.5rem;
+}
+
+.snaptoon-login-logo__title {
+  font-size: 2rem;
+  font-weight: 800;
+  color: #F59E0B;
+  letter-spacing: -0.04em;
+}
+
+.snaptoon-login-logo__subtitle {
+  font-size: 13px;
+  color: #64748B;
+  margin-top: 0.25rem;
+  font-style: italic;
+}
+
+/* --- Admin user row --- */
+.snaptoon-admin-row {
+  display: grid;
+  grid-template-columns: 1fr auto auto auto auto auto;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid #1E2436;
+  font-size: 13px;
+  color: #CBD5E1;
+}
+
+.snaptoon-admin-row:hover {
+  background: #1A2035;
+}
+
+/* --- Onboarding overlay --- */
+.snaptoon-onboarding {
+  background: #161B26;
+  border: 1px solid #2D3748;
+  border-radius: 12px;
+  padding: 2.5rem;
+  max-width: 560px;
+  margin: 0 auto;
+  text-align: center;
+}
+
+.snaptoon-onboarding__step {
+  font-size: 11px;
+  font-weight: 600;
+  color: #475569;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  margin-bottom: 0.75rem;
+}
+
+.snaptoon-onboarding__title {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #F1F5F9;
+  margin-bottom: 0.75rem;
+  letter-spacing: -0.02em;
+}
+
+.snaptoon-onboarding__desc {
+  font-size: 15px;
+  color: #94A3B8;
+  line-height: 1.7;
+  margin-bottom: 2rem;
+}
+
+.snaptoon-onboarding__dots {
+  display: flex;
+  justify-content: center;
+  gap: 0.5rem;
+  margin-bottom: 2rem;
+}
+
+.snaptoon-onboarding__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #1E2436;
+  transition: background 200ms ease;
+}
+
+.snaptoon-onboarding__dot--active {
+  background: #F59E0B;
+}
+
+/* --- Grid picker --- */
+.snaptoon-grid-picker {
+  display: grid;
+  grid-template-columns: 140px 1fr;
+  gap: 1rem;
+  align-items: start;
+  padding: 0.75rem;
+  background: #0A0E17;
+  border-radius: 6px;
+  margin-bottom: 1rem;
+}
+
+.snaptoon-grid-picker__thumbnail {
+  width: 140px;
+  height: 198px;
+  background: #161B26;
+  border: 1px solid #1E2436;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #334155;
+  font-size: 11px;
+}
+
+/* ============================================================
+   UTILITY CLASSES
+   ============================================================ */
+
+.snaptoon-mt-sm   { margin-top: 0.5rem; }
+.snaptoon-mt-md   { margin-top: 1rem; }
+.snaptoon-mt-lg   { margin-top: 1.5rem; }
+.snaptoon-mb-sm   { margin-bottom: 0.5rem; }
+.snaptoon-mb-md   { margin-bottom: 1rem; }
+.snaptoon-text-muted { color: #64748B !important; font-size: 13px; }
+.snaptoon-text-danger { color: #EF4444 !important; }
+.snaptoon-text-success { color: #10B981 !important; }
+.snaptoon-text-warning { color: #F59E0B !important; }
+.snaptoon-mono { font-family: 'JetBrains Mono', monospace !important; font-size: 13px; }
