@@ -357,32 +357,44 @@ def _render_character_card(
                 )
 
         with col_form:
-            # Edit nome + descrizione
-            new_name = st.text_input(
-                "Nome",
-                value=char_name,
-                key=f"name_{char_id}",
-            )
-            new_desc = st.text_area(
-                "Descrizione visiva",
-                value=visual_description,
-                key=f"desc_{char_id}",
-                placeholder="Es. uomo sui 40, barba grigia corta, occhi nocciola, giacca di pelle marrone consumata",
-                height=120,
-            )
+            # Edit nome + descrizione dentro form (bottone salva sempre attivo)
+            with st.form(f"_edit_char_form_{char_id}", border=False):
+                new_name = st.text_input(
+                    "Nome",
+                    value=char_name,
+                )
+                new_desc = st.text_area(
+                    "Descrizione visiva",
+                    value=visual_description,
+                    placeholder="Es. uomo sui 40, barba grigia corta, occhi nocciola, giacca di pelle marrone consumata",
+                    height=120,
+                )
+                save_submitted = st.form_submit_button(
+                    "💾 Salva modifiche",
+                    type="secondary",
+                    use_container_width=True,
+                )
+                if save_submitted:
+                    changed = (new_name != char_name) or (new_desc != visual_description)
+                    if changed:
+                        try:
+                            with session_scope() as s:
+                                project = projects_repo.get_by_id(s, project_id)
+                                cs = next((c for c in project.character_sheets if c.id == char_id), None) if project else None
+                                if cs is not None:
+                                    if new_name != char_name:
+                                        characters_repo.rename_character(s, cs, new_name)
+                                    characters_repo.update_character(s, cs, visual_description=new_desc)
+                            st.toast("Personaggio salvato.", icon="✓")
+                            st.rerun()
+                        except ValueError as e:
+                            st.error(str(e))
+                    else:
+                        st.info("Nessuna modifica da salvare.")
 
-            # Salva edits se cambiati
-            if (new_name != char_name) or (new_desc != visual_description):
-                if st.button("💾 Salva modifiche", key=f"save_{char_id}", type="secondary"):
-                    with session_scope() as s:
-                        project = projects_repo.get_by_id(s, project_id)
-                        cs = next((c for c in project.character_sheets if c.id == char_id), None) if project else None
-                        if cs is not None:
-                            if new_name != char_name:
-                                characters_repo.rename_character(s, cs, new_name)
-                            characters_repo.update_character(s, cs, visual_description=new_desc)
-                    st.toast("Personaggio salvato.", icon="✓")
-                    st.rerun()
+            # Variabili usate sotto (genera/rigenera prendono i valori salvati DB)
+            new_desc = new_desc if save_submitted else visual_description
+            new_name = new_name if save_submitted else char_name
 
             st.markdown("---")
             cost = cost_for_operation("generate_reference")

@@ -49,7 +49,13 @@ from db.repos import projects as projects_repo
 from db.repos import scripts as scripts_repo
 from db.repos import usage as usage_repo
 from db.session import session_scope
-from snaptoon_core.models import Script as PydScript
+from snaptoon_core.models import (
+    Character,
+    Dialogue,
+    Page,
+    Panel,
+    Script as PydScript,
+)
 from snaptoon_core.script import adapt_text_to_script
 
 # Gate: serve essere loggati
@@ -319,8 +325,165 @@ def _execute_adapt_script(project_id, source_text: str, user) -> None:
 
 
 # ============================================================
-# TAB 2 — Sceneggiatura
+# TAB 2 — Sceneggiatura (editing completo)
 # ============================================================
+
+
+def _save_script(project_id, pyd_script: PydScript) -> None:
+    """Salva l'intero Pydantic Script nel DB JSONB."""
+    with session_scope() as s:
+        project = projects_repo.get_by_id(s, project_id)
+        if project is None:
+            return
+        orm_script = scripts_repo.get_or_create(s, project)
+        scripts_repo.save_pydantic(s, orm_script, pyd_script)
+
+
+def _renumber_pages(pyd_script: PydScript) -> None:
+    """Rinumera pagine 1..N e vignette 1..M dentro ciascuna pagina."""
+    for i, page in enumerate(pyd_script.pages, start=1):
+        page.number = i
+        for j, panel in enumerate(page.panels, start=1):
+            panel.number = j
+
+
+DIALOGUE_KINDS = ["FUMETTO", "PENSIERO", "DIDASCALIA", "SFX"]
+KIND_EMOJI = {
+    "FUMETTO": "💬",
+    "PENSIERO": "💭",
+    "DIDASCALIA": "📜",
+    "SFX": "💥",
+}
+
+
+def _render_dialogue_editor(
+    project_id,
+    pyd_script: PydScript,
+    page_idx: int,
+    panel_idx: int,
+    dlg_idx: int,
+) -> None:
+    """Mini form per editing di un singolo dialogo."""
+    dlg = pyd_script.pages[page_idx].panels[panel_idx].dialogues[dlg_idx]
+    key_prefix = f"dlg_p{page_idx}_v{panel_idx}_d{dlg_idx}"
+
+    with st.form(f"_form_{key_prefix}", border=True):
+        col_kind, col_speaker = st.columns([1, 2])
+        with col_kind:
+            new_kind = st.selectbox(
+                "Tipo",
+                options=DIALOGUE_KINDS,
+                index=DIALOGUE_KINDS.index(dlg.kind) if dlg.kind in DIALOGUE_KINDS else 0,
+                format_func=lambda k: f"{KIND_EMOJI.get(k, '')} {k}",
+            )
+        with col_speaker:
+            new_speaker = st.text_input(
+                "Speaker (lascia vuoto se non applicabile)",
+                value=dlg.speaker or "",
+                placeholder="es. Marco",
+            )
+
+        new_text = st.text_area(
+            "Testo",
+            value=dlg.text,
+            height=70,
+        )
+
+        col_save, col_del = st.columns(2)
+        with col_save:
+            save = st.form_submit_button(
+                "💾 Salva",
+                type="primary",
+                use_container_width=True,
+            )
+        with col_del:
+            delete = st.form_submit_button(
+                "🗑 Elimina dialogo",
+                use_container_width=True,
+            )
+
+    if save:
+        dlg.kind = new_kind
+        dlg.speaker = new_speaker.strip() or None
+        dlg.text = new_text
+        _save_script(project_id, pyd_script)
+        st.toast("Dialogo salvato.", icon="💬")
+        st.rerun()
+
+    if delete:
+        del pyd_script.pages[page_idx].panels[panel_idx].dialogues[dlg_idx]
+        _save_script(project_id, pyd_script)
+        st.toast("Dialogo eliminato.")
+        st.rerun()
+
+
+def _render_panel_editor(
+    project_id,
+    pyd_script: PydScript,
+    page_idx: int,
+    panel_idx: int,
+) -> None:
+    """Editor di una singola vignetta."""
+    panel = pyd_script.pages[page_idx].panels[panel_idx]
+
+    with st.container(border=True):
+        st.markdown(f"**Vignetta {panel.number}**")
+
+        # Form descrizione (separato dai dialoghi per non rerunnare tutto)
+        with st.form(f"_form_panel_p{page_idx}_v{panel_idx}", border=False):
+            new_desc = st.text_area(
+                "Descrizione visiva",
+                value=panel.description,
+                height=100,
+                placeholder="Cosa si vede nella vignetta...",
+            )
+            col_save_panel, col_del_panel = st.columns([3, 1])
+            with col_save_panel:
+                save_panel = st.form_submit_button(
+                    "💾 Salva descrizione",
+                    type="secondary",
+                    use_container_width=True,
+                )
+            with col_del_panel:
+                del_panel = st.form_submit_button(
+                    "🗑",
+                    help="Elimina questa vignetta",
+                    use_container_width=True,
+                )
+
+        if save_panel:
+            panel.description = new_desc
+            _save_script(project_id, pyd_script)
+            st.toast("Descrizione salvata.", icon="✓")
+            st.rerun()
+        if del_panel:
+            del pyd_script.pages[page_idx].panels[panel_idx]
+            _renumber_pages(pyd_script)
+            _save_script(project_id, pyd_script)
+            st.toast("Vignetta eliminata.")
+            st.rerun()
+
+        # Dialoghi
+        st.markdown(f"_Dialoghi ({len(panel.dialogues)})_")
+        for d_idx, dlg in enumerate(panel.dialogues):
+            speaker = f"**{dlg.speaker}**: " if dlg.speaker else ""
+            kind_label = KIND_EMOJI.get(dlg.kind, "")
+            with st.expander(
+                f"{kind_label} {speaker}_{dlg.text[:50]}{'…' if len(dlg.text) > 50 else ''}_",
+                expanded=False,
+            ):
+                _render_dialogue_editor(project_id, pyd_script, page_idx, panel_idx, d_idx)
+
+        # Aggiungi dialogo
+        if st.button(
+            "+ Aggiungi dialogo",
+            key=f"_add_dlg_p{page_idx}_v{panel_idx}",
+            use_container_width=True,
+        ):
+            panel.dialogues.append(Dialogue(kind="FUMETTO", text=""))
+            _save_script(project_id, pyd_script)
+            st.toast("Dialogo aggiunto.")
+            st.rerun()
 
 
 def _render_tab_sceneggiatura(project_id) -> None:
@@ -335,81 +498,152 @@ def _render_tab_sceneggiatura(project_id) -> None:
         pyd_script = scripts_repo.load_pydantic(project.script)
 
     # ============================================================
-    # Logline
+    # Logline (form per save sempre attivo)
     # ============================================================
     st.markdown("### Logline")
-    new_logline = st.text_area(
-        "Sintesi della storia in 1-2 righe",
-        value=pyd_script.logline,
-        height=80,
-        key="_script_logline",
-        label_visibility="collapsed",
-    )
-
-    if new_logline != pyd_script.logline:
-        if st.button("💾 Salva logline", key="_save_logline", type="secondary"):
-            pyd_script.logline = new_logline
-            with session_scope() as s:
-                project = projects_repo.get_by_id(s, project_id)
-                if project is not None:
-                    orm_script = scripts_repo.get_or_create(s, project)
-                    scripts_repo.save_pydantic(s, orm_script, pyd_script)
-            st.success("Logline salvata.")
-            st.rerun()
+    with st.form("_form_logline", border=False):
+        new_logline = st.text_area(
+            "Sintesi della storia in 1-2 righe",
+            value=pyd_script.logline,
+            height=80,
+            label_visibility="collapsed",
+        )
+        if st.form_submit_button("💾 Salva logline", type="secondary"):
+            if new_logline != pyd_script.logline:
+                pyd_script.logline = new_logline
+                _save_script(project_id, pyd_script)
+                st.toast("Logline salvata.", icon="✓")
+                st.rerun()
+            else:
+                st.info("Nessuna modifica da salvare.")
 
     st.divider()
 
     # ============================================================
-    # Personaggi
+    # Personaggi (CRUD completo)
     # ============================================================
     st.markdown(f"### Personaggi ({len(pyd_script.characters)})")
-    if not pyd_script.characters:
-        st.caption("_Nessun personaggio nella sceneggiatura._")
-    else:
-        for idx, ch in enumerate(pyd_script.characters):
-            with st.expander(f"👤 **{ch.name}**", expanded=False):
-                st.markdown(f"**Bibbia visiva:**")
-                st.write(ch.visual_bible or "_(non specificata)_")
-                if ch.voice:
-                    st.markdown("**Voce:**")
-                    st.write(ch.voice)
+
+    for ch_idx, ch in enumerate(pyd_script.characters):
+        with st.expander(f"👤 **{ch.name}**", expanded=False):
+            with st.form(f"_form_char_{ch_idx}", border=False):
+                new_name = st.text_input("Nome", value=ch.name)
+                new_bible = st.text_area(
+                    "Bibbia visiva",
+                    value=ch.visual_bible,
+                    height=100,
+                    placeholder="Aspetto, abbigliamento, segni distintivi...",
+                )
+                new_voice = st.text_area(
+                    "Voce / modo di parlare",
+                    value=ch.voice,
+                    height=70,
+                    placeholder="Tono, vocabolario, espressioni ricorrenti...",
+                )
+                col_save_ch, col_del_ch = st.columns(2)
+                with col_save_ch:
+                    save_ch = st.form_submit_button(
+                        "💾 Salva personaggio",
+                        type="secondary",
+                        use_container_width=True,
+                    )
+                with col_del_ch:
+                    del_ch = st.form_submit_button(
+                        "🗑 Elimina dalla sceneggiatura",
+                        use_container_width=True,
+                    )
+
+            if save_ch:
+                pyd_script.characters[ch_idx].name = new_name.strip() or ch.name
+                pyd_script.characters[ch_idx].visual_bible = new_bible
+                pyd_script.characters[ch_idx].voice = new_voice
+                _save_script(project_id, pyd_script)
+                st.toast("Personaggio salvato.", icon="✓")
+                st.rerun()
+            if del_ch:
+                del pyd_script.characters[ch_idx]
+                _save_script(project_id, pyd_script)
+                st.toast("Personaggio rimosso dalla sceneggiatura.")
+                st.warning(
+                    "⚠️ Eventuali character sheet con reference image in **👥 Personaggi** "
+                    "sono separate e vanno eliminate là."
+                )
+                st.rerun()
+
+    # Aggiungi personaggio
+    with st.expander("➕ Aggiungi personaggio", expanded=False):
+        with st.form("_form_add_char", clear_on_submit=True):
+            add_name = st.text_input("Nome", placeholder="Es. Marco Riccio")
+            add_bible = st.text_area("Bibbia visiva", height=80)
+            add_voice = st.text_area("Voce", height=60)
+            if st.form_submit_button("Aggiungi", type="primary"):
+                if add_name.strip():
+                    pyd_script.characters.append(
+                        Character(
+                            name=add_name.strip(),
+                            visual_bible=add_bible,
+                            voice=add_voice,
+                        )
+                    )
+                    _save_script(project_id, pyd_script)
+                    st.toast(f"Personaggio «{add_name}» aggiunto.", icon="✓")
+                    st.rerun()
+                else:
+                    st.error("Inserisci un nome.")
 
     st.divider()
 
     # ============================================================
-    # Pagine + vignette
+    # Pagine + vignette + dialoghi
     # ============================================================
     n_pages = len(pyd_script.pages)
     n_panels = sum(len(p.panels) for p in pyd_script.pages)
-    n_dialogues = sum(
-        len(panel.dialogues) for page in pyd_script.pages for panel in page.panels
-    )
-    st.markdown(f"### Pagine ({n_pages} pagine · {n_panels} vignette · {n_dialogues} dialoghi)")
+    n_dlg = sum(len(panel.dialogues) for page in pyd_script.pages for panel in page.panels)
+    st.markdown(f"### Pagine ({n_pages} pagine · {n_panels} vignette · {n_dlg} dialoghi)")
 
-    for page in pyd_script.pages:
-        with st.expander(f"📖 Pagina {page.number} — {len(page.panels)} vignette", expanded=False):
-            for panel in page.panels:
-                st.markdown(f"**Vignetta {panel.number}**")
-                st.caption(panel.description)
-                if panel.dialogues:
-                    for dlg in panel.dialogues:
-                        speaker = f"**{dlg.speaker}**: " if dlg.speaker else ""
-                        kind_emoji = {
-                            "FUMETTO": "💬",
-                            "PENSIERO": "💭",
-                            "DIDASCALIA": "📜",
-                            "SFX": "💥",
-                        }.get(dlg.kind, "")
-                        st.markdown(f"{kind_emoji} {speaker}_{dlg.text}_")
-                else:
-                    st.caption("_(nessun dialogo)_")
-                st.markdown("---")
+    for page_idx, page in enumerate(pyd_script.pages):
+        with st.expander(
+            f"📖 Pagina {page.number} — {len(page.panels)} vignette",
+            expanded=False,
+        ):
+            for panel_idx, panel in enumerate(page.panels):
+                _render_panel_editor(project_id, pyd_script, page_idx, panel_idx)
 
-    st.info(
-        "💡 L'editing completo di logline, personaggi, dialoghi e vignette verrà "
-        "abilitato nella prossima iterazione. Per ora puoi rigenerare la sceneggiatura "
-        "dalla tab **Sorgente** se vuoi cambiare l'output."
-    )
+            # Aggiungi vignetta
+            col_add_pn, col_del_pg = st.columns(2)
+            with col_add_pn:
+                if st.button(
+                    "+ Aggiungi vignetta",
+                    key=f"_add_pn_p{page_idx}",
+                    use_container_width=True,
+                ):
+                    new_pn_number = len(page.panels) + 1
+                    page.panels.append(
+                        Panel(number=new_pn_number, description="")
+                    )
+                    _save_script(project_id, pyd_script)
+                    st.toast(f"Vignetta {new_pn_number} aggiunta.")
+                    st.rerun()
+            with col_del_pg:
+                if st.button(
+                    "🗑 Elimina pagina",
+                    key=f"_del_pg_p{page_idx}",
+                    use_container_width=True,
+                    help="Cancella questa pagina e tutte le vignette dentro",
+                ):
+                    del pyd_script.pages[page_idx]
+                    _renumber_pages(pyd_script)
+                    _save_script(project_id, pyd_script)
+                    st.toast("Pagina eliminata.")
+                    st.rerun()
+
+    # Aggiungi pagina globale
+    if st.button("+ Aggiungi pagina", type="primary", use_container_width=True):
+        new_pg_number = len(pyd_script.pages) + 1
+        pyd_script.pages.append(Page(number=new_pg_number))
+        _save_script(project_id, pyd_script)
+        st.toast(f"Pagina {new_pg_number} aggiunta.")
+        st.rerun()
 
 
 # ============================================================
