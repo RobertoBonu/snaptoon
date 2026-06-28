@@ -1225,3 +1225,18 @@ hr, [data-testid="stHorizontalBlock"] hr {
 .snaptoon-text-success { color: #10B981 !important; }
 .snaptoon-text-warning { color: #F59E0B !important; }
 .snaptoon-mono { font-family: 'JetBrains Mono', monospace !important; font-size: 13px; }
+
+/* ---- Hide the sidebar on the auth screens (login / first-login password) ----
+   login_form.py renders a `.snaptoon-auth-marker` only on those screens; we use
+   :has() to detect it and hide the sidebar (and its collapsed toggle) there only.
+   The marker's own block is collapsed so it adds no spacing. :has() still matches
+   it because display:none keeps the node in the DOM. */
+[data-testid="stElementContainer"]:has(.snaptoon-auth-marker) {
+  display: none !important;
+}
+
+[data-testid="stApp"]:has(.snaptoon-auth-marker) [data-testid="stSidebar"],
+[data-testid="stApp"]:has(.snaptoon-auth-marker) [data-testid="stSidebarCollapsedControl"],
+[data-testid="stApp"]:has(.snaptoon-auth-marker) [data-testid="stSidebarCollapseButton"] {
+  display: none !important;
+}

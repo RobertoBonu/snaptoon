@@ -105,6 +105,18 @@ notebook also resets on these restarts (state lost).
   + `background-color:currentColor` so the icon inherits the link color (slate / amber-active /
   hover) automatically. HOME has no icon span → give it the icon via `*:first-child a::before`.
   Per-item icons assigned by `nth-child(2..6)` (order = page filename order; reorder => remap).
+- Hiding the sidebar ONLY on the auth screens (login + first-login change-password) WITHOUT
+  touching app.py: login_form.py IS editable, so emit an invisible marker
+  `st.markdown('<div class="snaptoon-auth-marker"></div>', unsafe_allow_html=True)` at the top of
+  BOTH render_login_form() and render_change_password_form() (the only pre-auth views). Then in
+  custom.css use `:has()` (Streamlit = modern Chromium, supported): collapse the marker's own block
+  with `[data-testid=stElementContainer]:has(.snaptoon-auth-marker){display:none}` (no layout gap;
+  display:none keeps the node so :has still matches) and hide the nav with
+  `[data-testid=stApp]:has(.snaptoon-auth-marker) [data-testid=stSidebar]{display:none!important}`
+  (also hide `stSidebarCollapsedControl` + `stSidebarCollapseButton`). Authenticated pages don't
+  render login_form -> no marker -> sidebar shows normally. NOTE there's an existing
+  `enforce_sidebar_visibility()` rule with !important, so the auth-hide selectors MUST use
+  !important too (they do) to win.
 
 # Other env facts
 - Runtime is Python 3.11 (NOT 3.13). Install deps via the package-management skill

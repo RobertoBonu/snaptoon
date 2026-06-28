@@ -13,6 +13,9 @@ def render_login_form() -> tuple[str, str, bool]:
     Returns:
         (email, password, submitted) — tuple con i valori inseriti e se il form è stato inviato.
     """
+    # Marker accoppiato a custom.css `:has(.snaptoon-auth-marker)`: nasconde la
+    # sidebar solo nelle schermate di autenticazione (vedi style/custom.css).
+    st.markdown('<div class="snaptoon-auth-marker"></div>', unsafe_allow_html=True)
     _, col, _ = st.columns([1, 2, 1])
     with col:
         with st.form("snaptoon_login_form"):
@@ -58,6 +61,8 @@ def render_change_password_form() -> tuple[str, str, bool]:
     Returns:
         (new_password, confirm_password, submitted)
     """
+    # Marker accoppiato a custom.css `:has(.snaptoon-auth-marker)` (vedi style/custom.css).
+    st.markdown('<div class="snaptoon-auth-marker"></div>', unsafe_allow_html=True)
     _, col, _ = st.columns([1, 2, 1])
     with col:
         st.markdown(
