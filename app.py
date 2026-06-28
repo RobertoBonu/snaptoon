@@ -50,7 +50,29 @@ def _hide_sidebar() -> None:
     )
 
 
+def _ensure_sidebar_toggle_visible() -> None:
+    """Forza il bottone di apri/chiudi sidebar a restare visibile.
+    Il CSS custom dell'agente può nasconderlo accidentalmente —
+    qui ripristiniamo solo questo controllo, senza altri side effects."""
+    st.markdown(
+        """
+        <style>
+        [data-testid="stSidebarCollapsedControl"],
+        [data-testid="collapsedControl"],
+        button[kind="header"][data-testid*="Sidebar"] {
+            display: block !important;
+            visibility: visible !important;
+            opacity: 1 !important;
+            z-index: 1000 !important;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
 _inject_css()
+_ensure_sidebar_toggle_visible()
 
 
 # ============================================================
