@@ -55,6 +55,7 @@ from auth import current_user, logout
 from billing.plans import cost_for_operation, plan_config
 from db.models import CreditOperation
 from db.repos import credits as credits_repo
+from db.repos import page_layouts as page_layouts_repo
 from db.repos import projects as projects_repo
 from db.repos import scripts as scripts_repo
 from db.repos import usage as usage_repo
@@ -62,7 +63,9 @@ from db.repos import users as users_repo
 from db.repos import vignettes as vignettes_repo
 from db.repos.credits import InsufficientCreditsError
 from db.session import session_scope
+from snaptoon_core.layout import DEFAULT_SHAPE, GRIDS, SHAPES
 from snaptoon_core.models import Panel, Script as PydScript
+from snaptoon_core.scene import ASPECT_RATIOS, MOODS, SHOT_ANGLES, SHOT_DISTANCES
 from snaptoon_core.styles_library import get_preset
 from storage.client import download_bytes, object_exists, upload_bytes
 from storage.keys import reference_key, vignette_key
@@ -125,6 +128,95 @@ def _render_sidebar(user, project_name: str, plan_label: str, credits_left: int,
 
 
 # ============================================================
+# Helper: salvataggi script + page layout
+# ============================================================
+
+
+def _save_grid_for_page(project_id: uuid.UUID, page_number: int, grid_id: str) -> None:
+    with session_scope() as s:
+        project = projects_repo.get_by_id(s, project_id)
+        if project is None:
+            return
+        pl = page_layouts_repo.get_or_create(s, project, page_number, default_grid=grid_id)
+        page_layouts_repo.set_grid(s, pl, grid_id)
+
+
+def _update_panel_in_script(
+    project_id: uuid.UUID,
+    page_number: int,
+    panel_number: int,
+    *,
+    characters_in_scene: list[str] | None = None,
+    aspect_ratio: str | None = None,
+    shot_distance: str | None = None,
+    shot_angle: str | None = None,
+    mood: str | None = None,
+) -> None:
+    """Aggiorna campi scena di un Panel dentro lo Script JSONB."""
+    with session_scope() as s:
+        project = projects_repo.get_by_id(s, project_id)
+        if project is None or project.script is None:
+            return
+        pyd_script = scripts_repo.load_pydantic(project.script)
+        for page in pyd_script.pages:
+            if page.number != page_number:
+                continue
+            for panel in page.panels:
+                if panel.number != panel_number:
+                    continue
+                if characters_in_scene is not None:
+                    panel.characters_in_scene = characters_in_scene
+                if aspect_ratio is not None:
+                    panel.aspect_ratio = aspect_ratio or None
+                if shot_distance is not None:
+                    panel.shot_distance = shot_distance or None
+                if shot_angle is not None:
+                    panel.shot_angle = shot_angle or None
+                if mood is not None:
+                    panel.mood = mood or None
+                break
+        scripts_repo.save_pydantic(s, project.script, pyd_script)
+
+
+def _update_dialogue_in_script(
+    project_id: uuid.UUID,
+    page_number: int,
+    panel_number: int,
+    dialogue_index: int,
+    *,
+    shape: str | None = None,
+    position_x: float | None = None,
+    position_y: float | None = None,
+    show_tail: bool | None = None,
+) -> None:
+    """Aggiorna campi balloon di un Dialogue dentro lo Script JSONB."""
+    with session_scope() as s:
+        project = projects_repo.get_by_id(s, project_id)
+        if project is None or project.script is None:
+            return
+        pyd_script = scripts_repo.load_pydantic(project.script)
+        for page in pyd_script.pages:
+            if page.number != page_number:
+                continue
+            for panel in page.panels:
+                if panel.number != panel_number:
+                    continue
+                if not panel.dialogues or dialogue_index >= len(panel.dialogues):
+                    return
+                dlg = panel.dialogues[dialogue_index]
+                if shape is not None:
+                    dlg.shape = shape or None
+                if position_x is not None:
+                    dlg.position_x = position_x
+                if position_y is not None:
+                    dlg.position_y = position_y
+                if show_tail is not None:
+                    dlg.show_tail = show_tail
+                break
+        scripts_repo.save_pydantic(s, project.script, pyd_script)
+
+
+# ============================================================
 # Helper: auto-detect cast in scena
 # ============================================================
 
@@ -143,9 +235,70 @@ def _detect_cast_in_panel(panel_description: str, cast_view: list[dict]) -> list
     return detected
 
 
+def _resolve_cast_for_panel(panel: Panel, cast_view: list[dict]) -> list[dict]:
+    """Cast da usare per la generazione: esplicito vince su auto-detect."""
+    if panel.characters_in_scene:
+        explicit_set = {n.lower() for n in panel.characters_in_scene}
+        return [cs for cs in cast_view if cs["name"].lower() in explicit_set]
+    return _detect_cast_in_panel(panel.description, cast_view)
+
+
+# ============================================================
+# Aspect ratio → OpenAI size mapping
+# ============================================================
+
+_ASPECT_TO_OPENAI_SIZE = {
+    "1_1": "1024x1024",
+    "3_4": "1024x1536",
+    "2_3": "1024x1536",
+    "9_16": "1024x1536",
+    "4_3": "1536x1024",
+    "3_2": "1536x1024",
+    "16_9": "1536x1024",
+    "2_1": "1536x1024",
+}
+
+
+def _resolve_openai_size(aspect_key: str | None) -> str:
+    if aspect_key and aspect_key in _ASPECT_TO_OPENAI_SIZE:
+        return _ASPECT_TO_OPENAI_SIZE[aspect_key]
+    return "1024x1024"
+
+
 # ============================================================
 # Helper: prompt builder
 # ============================================================
+
+
+def _scene_clauses(panel: Panel) -> str:
+    """Costruisce le clausole 'regia' della scena (aspect + framing + mood)."""
+    clauses: list[str] = []
+
+    # Aspect ratio
+    if panel.aspect_ratio:
+        opt = next((o for o in ASPECT_RATIOS if o.key == panel.aspect_ratio), None)
+        if opt:
+            clauses.append(f"FORMAT: {opt.prompt_en}.")
+
+    # Distanza inquadratura
+    if panel.shot_distance:
+        opt = next((o for o in SHOT_DISTANCES if o.key == panel.shot_distance), None)
+        if opt:
+            clauses.append(f"SHOT DISTANCE: {opt.prompt_en}.")
+
+    # Angolo
+    if panel.shot_angle:
+        opt = next((o for o in SHOT_ANGLES if o.key == panel.shot_angle), None)
+        if opt:
+            clauses.append(f"CAMERA ANGLE: {opt.prompt_en}.")
+
+    # Mood
+    if panel.mood:
+        opt = next((o for o in MOODS if o.key == panel.mood), None)
+        if opt:
+            clauses.append(f"MOOD: {opt.prompt_en}.")
+
+    return " ".join(clauses)
 
 
 def _build_panel_prompt(
@@ -156,7 +309,7 @@ def _build_panel_prompt(
 ) -> str:
     """Costruisce il prompt per generare una vignetta.
 
-    Versione MVP — usa preset.expansion + descrizione vignetta + cast.
+    Combina: render-mode + stile + scena + clausole regia + cast + negative.
     """
     parts: list[str] = []
 
@@ -174,6 +327,11 @@ def _build_panel_prompt(
 
     # Scena
     parts.append(f"=== SCENE ===\n{panel.description.strip()}")
+
+    # Clausole regia (aspect + framing + mood) se settate
+    scene_directives = _scene_clauses(panel)
+    if scene_directives:
+        parts.append(f"=== DIRECTING ===\n{scene_directives}")
 
     # Cast in scena con visual_description (rinforza consistency)
     if cast_in_scene:
@@ -234,11 +392,11 @@ def _generate_vignette(
 
     cost = cost_for_operation("generate_panel", quality="medium")
     t0 = time.time()
-    size = "1024x1024"
+    size = _resolve_openai_size(panel.aspect_ratio)
     quality = "medium"
 
-    # Detect cast in scena
-    cast_in_scene = _detect_cast_in_panel(panel.description, cast_view)
+    # Detect cast in scena: esplicito vince su auto-detect
+    cast_in_scene = _resolve_cast_for_panel(panel, cast_view)
 
     # Raccogli reference keys (slot 1 di ogni personaggio in scena, se esiste)
     ref_keys: list[str] = []
@@ -337,7 +495,7 @@ def _generate_vignette(
             storage_key=vignette_storage_key,
             prompt_hash=p_hash,
             quality=quality,
-            aspect_ratio_key="1_1",
+            aspect_ratio_key=panel.aspect_ratio or "1_1",
             provider="openai",
             model="gpt-image-2",
         )
@@ -395,6 +553,11 @@ def _load_view(user_id, project_slug: str) -> dict | None:
             for v in vigs
         }
 
+        # Page layouts (gabbie scelte per ogni pagina)
+        grid_by_page: dict[int, str] = {}
+        for pl in project.page_layouts:
+            grid_by_page[pl.page_number] = pl.grid_id
+
         return {
             "id": project.id,
             "name": project.name,
@@ -402,6 +565,7 @@ def _load_view(user_id, project_slug: str) -> dict | None:
             "script": pyd_script,
             "cast": cast_view,
             "vignettes_by_coords": vigs_by_coords,
+            "grid_by_page": grid_by_page,
         }
 
 
@@ -500,6 +664,194 @@ def _render_vignette_card(
                     st.rerun()
                 else:
                     st.error(err)
+
+            # Popover 🎬 Scena: cast esplicito + aspect/distance/angle/mood
+            with st.popover("🎬 Scena", use_container_width=True):
+                st.caption(
+                    "Parametri di regia per questa vignetta. Vincolano "
+                    "cast, formato, inquadratura, mood. Override del auto-detect."
+                )
+
+                # Cast esplicito
+                all_cast_names = [cs["name"] for cs in view["cast"]]
+                _all_set = set(all_cast_names)
+                default_cast = [n for n in (panel.characters_in_scene or []) if n in _all_set]
+                stale = [n for n in (panel.characters_in_scene or []) if n not in _all_set]
+                if stale:
+                    st.caption(f"⚠️ Personaggi non più nel cast: {', '.join(stale)}")
+                if all_cast_names:
+                    sel_cast = st.multiselect(
+                        "👥 Personaggi nella vignetta",
+                        options=all_cast_names,
+                        default=default_cast,
+                        key=f"sc_cast_p{page_number}_v{panel.number}",
+                    )
+                else:
+                    sel_cast = []
+                    st.caption("_Nessun personaggio nel cast. Vai su 👥 Personaggi._")
+
+                # Aspect ratio
+                aspect_opts = [("(default)", None)] + [(o.label, o.key) for o in ASPECT_RATIOS]
+                aspect_labels = [lbl for lbl, _ in aspect_opts]
+                current_aspect = panel.aspect_ratio
+                current_idx = next(
+                    (i for i, (_, k) in enumerate(aspect_opts) if k == current_aspect), 0
+                )
+                aspect_label = st.selectbox(
+                    "📐 Formato vignetta",
+                    aspect_labels,
+                    index=current_idx,
+                    key=f"sc_ar_p{page_number}_v{panel.number}",
+                )
+                sel_aspect_key = next(k for lbl, k in aspect_opts if lbl == aspect_label) or ""
+
+                # Distanza
+                dist_opts = [("(default)", None)] + [(o.label, o.key) for o in SHOT_DISTANCES]
+                dist_labels = [lbl for lbl, _ in dist_opts]
+                current_dist = panel.shot_distance
+                d_idx = next((i for i, (_, k) in enumerate(dist_opts) if k == current_dist), 0)
+                dist_label = st.selectbox(
+                    "🎥 Distanza inquadratura",
+                    dist_labels,
+                    index=d_idx,
+                    key=f"sc_sd_p{page_number}_v{panel.number}",
+                )
+                sel_dist_key = next(k for lbl, k in dist_opts if lbl == dist_label) or ""
+
+                # Angolo
+                angle_opts = [("(default)", None)] + [(o.label, o.key) for o in SHOT_ANGLES]
+                angle_labels = [lbl for lbl, _ in angle_opts]
+                current_angle = panel.shot_angle
+                a_idx = next((i for i, (_, k) in enumerate(angle_opts) if k == current_angle), 0)
+                angle_label = st.selectbox(
+                    "🎞 Angolo",
+                    angle_labels,
+                    index=a_idx,
+                    key=f"sc_sa_p{page_number}_v{panel.number}",
+                )
+                sel_angle_key = next(k for lbl, k in angle_opts if lbl == angle_label) or ""
+
+                # Mood
+                mood_opts = [("(default)", None)] + [(o.label, o.key) for o in MOODS]
+                mood_labels = [lbl for lbl, _ in mood_opts]
+                current_mood = panel.mood
+                m_idx = next((i for i, (_, k) in enumerate(mood_opts) if k == current_mood), 0)
+                mood_label = st.selectbox(
+                    "🎭 Mood",
+                    mood_labels,
+                    index=m_idx,
+                    key=f"sc_md_p{page_number}_v{panel.number}",
+                )
+                sel_mood_key = next(k for lbl, k in mood_opts if lbl == mood_label) or ""
+
+                col_save, col_reset = st.columns(2)
+                with col_save:
+                    if st.button(
+                        "💾 Salva scena",
+                        key=f"sc_save_p{page_number}_v{panel.number}",
+                        type="primary",
+                        use_container_width=True,
+                    ):
+                        _update_panel_in_script(
+                            project_id=view["id"],
+                            page_number=page_number,
+                            panel_number=panel.number,
+                            characters_in_scene=sel_cast,
+                            aspect_ratio=sel_aspect_key,
+                            shot_distance=sel_dist_key,
+                            shot_angle=sel_angle_key,
+                            mood=sel_mood_key,
+                        )
+                        st.toast("Scena salvata.", icon="✓")
+                        st.rerun()
+                with col_reset:
+                    if st.button(
+                        "↩️ Reset",
+                        key=f"sc_reset_p{page_number}_v{panel.number}",
+                        use_container_width=True,
+                    ):
+                        _update_panel_in_script(
+                            project_id=view["id"],
+                            page_number=page_number,
+                            panel_number=panel.number,
+                            characters_in_scene=[],
+                            aspect_ratio="",
+                            shot_distance="",
+                            shot_angle="",
+                            mood="",
+                        )
+                        st.toast("Scena ripristinata.", icon="↩️")
+                        st.rerun()
+
+            # Popover 🎈 Balloon: posizionamento dialoghi
+            if panel.dialogues:
+                with st.popover(
+                    f"🎈 Balloon ({len(panel.dialogues)})",
+                    use_container_width=True,
+                ):
+                    st.caption(
+                        "Forma e posizione di ogni dialogo. Verranno disegnati "
+                        "come overlay nel rendering della pagina (📐 Impagina)."
+                    )
+                    for d_idx, dlg in enumerate(panel.dialogues):
+                        st.markdown(f"**{d_idx + 1}. {dlg.kind}** — _{dlg.text[:50]}_")
+                        speaker_label = f"({dlg.speaker})" if dlg.speaker else ""
+                        if speaker_label:
+                            st.caption(speaker_label)
+
+                        # Shape
+                        default_shape = DEFAULT_SHAPE.get(dlg.kind, "oval")
+                        current_shape = dlg.shape or default_shape
+                        sel_shape = st.selectbox(
+                            "Forma",
+                            options=SHAPES,
+                            index=SHAPES.index(current_shape) if current_shape in SHAPES else 0,
+                            key=f"bal_shape_p{page_number}_v{panel.number}_d{d_idx}",
+                            format_func=lambda s, ds=default_shape: f"{s}{' (default)' if s == ds else ''}",
+                        )
+
+                        # Position
+                        col_x, col_y = st.columns(2)
+                        with col_x:
+                            cur_x_pct = int((dlg.position_x or 0.5) * 100)
+                            new_x = st.slider(
+                                "X (%)",
+                                0, 100, cur_x_pct,
+                                key=f"bal_x_p{page_number}_v{panel.number}_d{d_idx}",
+                            )
+                        with col_y:
+                            cur_y_pct = int((dlg.position_y or 0.15) * 100)
+                            new_y = st.slider(
+                                "Y (%)",
+                                0, 100, cur_y_pct,
+                                key=f"bal_y_p{page_number}_v{panel.number}_d{d_idx}",
+                            )
+
+                        show_tail = st.toggle(
+                            "Tail visibile",
+                            value=dlg.show_tail,
+                            key=f"bal_tail_p{page_number}_v{panel.number}_d{d_idx}",
+                        )
+
+                        if st.button(
+                            "💾 Salva balloon",
+                            key=f"bal_save_p{page_number}_v{panel.number}_d{d_idx}",
+                            type="primary",
+                            use_container_width=True,
+                        ):
+                            _update_dialogue_in_script(
+                                project_id=view["id"],
+                                page_number=page_number,
+                                panel_number=panel.number,
+                                dialogue_index=d_idx,
+                                shape=sel_shape,
+                                position_x=new_x / 100.0,
+                                position_y=new_y / 100.0,
+                                show_tail=show_tail,
+                            )
+                            st.toast(f"Balloon {d_idx + 1} salvato.", icon="🎈")
+                            st.rerun()
+                        st.divider()
 
 
 # ============================================================
@@ -617,6 +969,17 @@ st.divider()
 # Lista pagine + vignette
 # ============================================================
 
+# Build lista opzioni grid: prima quelle con capienza esatta per N vignette
+_GRID_OPTIONS_ALL = [(gid, g.name, g.capacity) for gid, g in GRIDS.items()]
+
+
+def _grid_options_sorted(n_panels: int) -> list[tuple[str, str]]:
+    """Restituisce (grid_id, label) ordinati: capienza esatta prima, poi altri."""
+    matching = [(gid, lbl) for gid, lbl, cap in _GRID_OPTIONS_ALL if cap == n_panels]
+    others = [(gid, lbl) for gid, lbl, cap in _GRID_OPTIONS_ALL if cap != n_panels]
+    return matching + others
+
+
 for page in _view["script"].pages:
     n_pg_generated = sum(
         1 for panel in page.panels
@@ -627,6 +990,55 @@ for page in _view["script"].pages:
         f"📖 Pagina {page.number} — {n_pg_generated}/{n_pg_total} vignette generate",
         expanded=True,
     ):
+        # ============================================================
+        # Selettore gabbia per la pagina
+        # ============================================================
+        current_grid = _view["grid_by_page"].get(page.number, "2x2")
+        if current_grid not in GRIDS:
+            current_grid = "2x2"
+        grid_opts = _grid_options_sorted(n_pg_total)
+        labels = [f"⭐ {lbl}" if GRIDS[gid].capacity == n_pg_total else lbl
+                  for gid, lbl in grid_opts]
+        ids = [gid for gid, _ in grid_opts]
+        try:
+            cur_idx = ids.index(current_grid)
+        except ValueError:
+            cur_idx = 0
+
+        col_grid_sel, col_grid_save = st.columns([3, 1])
+        with col_grid_sel:
+            sel_grid_label = st.selectbox(
+                f"🗂 Gabbia pagina {page.number}",
+                options=labels,
+                index=cur_idx,
+                key=f"grid_sel_p{page.number}",
+                help=(
+                    f"La pagina ha {n_pg_total} vignette. "
+                    "Le gabbie con la capienza esatta sono marcate ⭐."
+                ),
+            )
+            sel_grid_id = ids[labels.index(sel_grid_label)]
+            sel_grid_capacity = GRIDS[sel_grid_id].capacity
+        with col_grid_save:
+            if st.button(
+                "💾 Salva",
+                key=f"grid_save_p{page.number}",
+                disabled=(sel_grid_id == current_grid),
+                use_container_width=True,
+                type="secondary",
+            ):
+                _save_grid_for_page(_view["id"], page.number, sel_grid_id)
+                st.toast(f"Gabbia «{sel_grid_id}» salvata.", icon="🗂")
+                st.rerun()
+
+        if sel_grid_capacity != n_pg_total:
+            st.caption(
+                f"⚠️ Capienza gabbia: {sel_grid_capacity} celle vs {n_pg_total} vignette in pagina. "
+                f"{'Le ultime ' + str(n_pg_total - sel_grid_capacity) + ' vignette saranno ignorate.' if sel_grid_capacity < n_pg_total else 'Resteranno ' + str(sel_grid_capacity - n_pg_total) + ' celle vuote.'}"
+            )
+
+        st.markdown("---")
+
         for panel in page.panels:
             _render_vignette_card(
                 panel=panel,
