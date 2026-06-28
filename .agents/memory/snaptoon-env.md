@@ -33,6 +33,15 @@ works.
   that runs streamlit; remove any standalone `Start application` streamlit workflow to
   avoid a double-bind on port 5000.
 
+# Recurring: "app not running" after env restart
+When the dev environment sleeps/restarts, ALL three artifact workflows
+(`artifacts/snaptoon: SnapToon`, `artifacts/api-server: API Server`,
+`artifacts/mockup-sandbox: Component Preview Server`) drop to `not_started` and the
+proxy returns 502 at `/`. `.replit` `[workflows]` is empty so nothing auto-starts them.
+**Fix:** restart all three workflows (snaptoon first), then verify `curl localhost:80/`
+=200. This is NOT an app bug — the app starts fine every time. The code_execution
+notebook also resets on these restarts (state lost).
+
 # Other env facts
 - Runtime is Python 3.11 (NOT 3.13). Install deps via the package-management skill
   (`installLanguagePackages`, uv-backed); raw `pip install` times out (exit -1).
