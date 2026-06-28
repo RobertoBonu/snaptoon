@@ -46,6 +46,7 @@ import app_state as appstate
 from auth import current_user, logout
 from billing.plans import cost_for_operation, plan_config
 from db.models import CreditOperation
+from db.repos import cast_archive as cast_archive_repo
 from db.repos import characters as characters_repo
 from db.repos import credits as credits_repo
 from db.repos import projects as projects_repo
@@ -616,6 +617,107 @@ else:
             style_id=_project_view["style_id"],
             user_credits_left=_user.credits_remaining,
         )
+
+st.markdown("---")
+
+# ============================================================
+# 📚 Archivio personale del cast
+# ============================================================
+
+with st.expander("📚 Archivio personale del cast (riusabile tra progetti)", expanded=False):
+    st.caption(
+        "Salva i tuoi personaggi nell'archivio per riutilizzarli in altri progetti. "
+        "La reference image NON viene archiviata (è specifica del progetto e dello stile)."
+    )
+
+    with session_scope() as _s:
+        _archive = cast_archive_repo.list_for_user(_s, _user)
+        _archive_view = [
+            {"id": e.id, "name": e.name, "visual_description": e.visual_description,
+             "color_palette": e.color_palette, "notes": e.notes}
+            for e in _archive
+        ]
+
+    # Importa archivio → cast progetto
+    if _archive_view:
+        st.markdown(f"**Archivio attuale: {len(_archive_view)} personaggi**")
+        for entry in _archive_view:
+            with st.container(border=True):
+                col_info, col_imp, col_del = st.columns([4, 1, 1])
+                with col_info:
+                    st.markdown(f"**{entry['name']}**")
+                    st.caption(entry["visual_description"][:200] + ("…" if len(entry["visual_description"]) > 200 else ""))
+                with col_imp:
+                    # Check se già nel progetto
+                    already = any(c["name"].lower() == entry["name"].lower() for c in _cast_view)
+                    if st.button(
+                        "📥 Importa",
+                        key=f"_arc_imp_{entry['id']}",
+                        disabled=already,
+                        help="Già nel cast di questo progetto." if already else None,
+                        use_container_width=True,
+                    ):
+                        try:
+                            with session_scope() as s:
+                                project = projects_repo.get_by_id(s, _project_view["id"])
+                                if project is not None:
+                                    characters_repo.create_character(
+                                        s, project=project,
+                                        name=entry["name"],
+                                        visual_description=entry["visual_description"],
+                                        color_palette=entry["color_palette"],
+                                    )
+                            st.toast(f"«{entry['name']}» importato nel progetto.", icon="📥")
+                            st.rerun()
+                        except ValueError as e:
+                            st.error(str(e))
+                with col_del:
+                    if st.button(
+                        "🗑",
+                        key=f"_arc_del_{entry['id']}",
+                        use_container_width=True,
+                        help="Rimuovi dall'archivio (NON rimuove dal progetto attuale)",
+                    ):
+                        with session_scope() as s:
+                            arc_entry = next(
+                                (e for e in cast_archive_repo.list_for_user(s, _user)
+                                 if e.id == entry["id"]), None
+                            )
+                            if arc_entry is not None:
+                                cast_archive_repo.delete(s, arc_entry)
+                        st.toast("Rimosso dall'archivio.")
+                        st.rerun()
+    else:
+        st.caption("_L'archivio è vuoto. Salva qualche personaggio dal cast di questo progetto._")
+
+    # Salva cast progetto → archivio
+    st.markdown("---")
+    st.markdown("**Salva un personaggio del progetto nell'archivio**")
+    if _cast_view:
+        savable = [c for c in _cast_view if not any(
+            a["name"].lower() == c["name"].lower() for a in _archive_view
+        )]
+        if savable:
+            options = [c["name"] for c in savable]
+            sel = st.selectbox("Personaggio da archiviare", options=options, key="_arc_save_sel")
+            if st.button("💾 Salva nell'archivio", key="_arc_save_btn", type="secondary"):
+                chosen = next(c for c in savable if c["name"] == sel)
+                try:
+                    with session_scope() as s:
+                        cast_archive_repo.upsert(
+                            s, user=_user,
+                            name=chosen["name"],
+                            visual_description=chosen["visual_description"],
+                            color_palette=chosen.get("color_palette", ""),
+                        )
+                    st.toast(f"«{chosen['name']}» salvato nell'archivio.", icon="📚")
+                    st.rerun()
+                except ValueError as e:
+                    st.error(str(e))
+        else:
+            st.caption("_Tutti i personaggi del progetto sono già nell'archivio._")
+    else:
+        st.caption("_Aggiungi prima qualche personaggio al progetto._")
 
 st.markdown("---")
 

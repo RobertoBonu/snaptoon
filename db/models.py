@@ -398,6 +398,29 @@ class UsageLog(UUIDPrimaryKeyMixin, Base):
     )
 
 
+class CastArchiveEntry(UUIDPrimaryKeyMixin, TimestampMixin, Base):
+    """Archivio personale dei character sheet riusabili tra progetti.
+
+    L'utente può salvare un personaggio dal cast di un progetto nell'archivio
+    e poi importarlo in altri progetti. NB: la reference image NON viene
+    archiviata (è specifica del progetto+stile). V1.1 aggiungerà anche
+    quella.
+    """
+
+    __tablename__ = "cast_archive_entries"
+    __table_args__ = (
+        UniqueConstraint("user_id", "name", name="uq_cast_archive_user_name"),
+    )
+
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
+    visual_description: Mapped[str] = mapped_column(Text, default="", nullable=False)
+    color_palette: Mapped[str] = mapped_column(Text, default="", nullable=False)
+    notes: Mapped[str] = mapped_column(Text, default="", nullable=False)
+
+
 class AdminAudit(UUIDPrimaryKeyMixin, Base):
     """Log azioni admin (creazione utenti, grant crediti, disable account)."""
 
