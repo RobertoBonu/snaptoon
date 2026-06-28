@@ -32,6 +32,9 @@ def _inject_css() -> None:
 
 _inject_css()
 
+from app_state.ui import enforce_sidebar_visibility
+enforce_sidebar_visibility()
+
 # ============================================================
 # Auth + project resolution
 # ============================================================

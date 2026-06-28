@@ -34,22 +34,8 @@ def _inject_css() -> None:
 
 _inject_css()
 
-
-# Forza visibilità del bottone toggle sidebar (override CSS dell'agente)
-st.markdown(
-    """
-    <style>
-    [data-testid="stSidebarCollapsedControl"],
-    [data-testid="collapsedControl"] {
-        display: block !important;
-        visibility: visible !important;
-        opacity: 1 !important;
-        z-index: 1000 !important;
-    }
-    </style>
-    """,
-    unsafe_allow_html=True,
-)
+from app_state.ui import enforce_sidebar_visibility
+enforce_sidebar_visibility()
 
 
 # ============================================================
