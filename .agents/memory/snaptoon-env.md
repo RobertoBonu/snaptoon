@@ -53,11 +53,20 @@ notebook also resets on these restarts (state lost).
   is the proof of success; the trailing error is only the blocked LOCAL ref-update of
   `.git/refs/remotes/origin/main.lock` (bookkeeping), not a push failure. Judge success
   by that output line, NOT the exit code.
-- Confirm the remote state with read-only `git ls-remote origin -h refs/heads/main`.
-- The `origin` remote URL stores the GitHub PAT in cleartext; ALWAYS pipe git output
-  through `sed -E 's/ghp_[A-Za-z0-9]+/ghp_***REDACTED***/g'` to avoid leaking it.
+- `git config` / `git remote set-url` are ALSO blocked (they write `.git/config` → lock).
+  So you cannot change the remote URL or persist a credential helper from the main agent.
+- The GitHub PAT now lives in the `GITHUB_TOKEN` secret (NOT in the URL). Push/auth by
+  passing an EPHEMERAL credential helper on the command line (writes nothing) against the
+  CLEAN explicit URL:
+    git -c credential.helper='!f() { echo username=x-access-token; echo "password=$GITHUB_TOKEN"; }; f' \
+      push https://github.com/RobertoBonu/snaptoon.git main
+  Same `-c ... ls-remote https://github.com/RobertoBonu/snaptoon.git -h refs/heads/main`
+  to verify. Do NOT rely on `origin` (its stored URL still holds the OLD, now-revoked
+  token — harmless but won't authenticate).
+- Still pipe git output through `sed -E 's/ghp_[A-Za-z0-9_]+/***REDACTED***/g'` defensively.
 - Practical sync pattern for the user's "always align GitHub" rule: edit files (auto-
-  committed at turn end) → push at the next opportunity → confirm via ls-remote SHA.
+  committed at turn end) → push with the command above at the next opportunity → confirm
+  via ls-remote SHA.
 
 # Other env facts
 - Runtime is Python 3.11 (NOT 3.13). Install deps via the package-management skill

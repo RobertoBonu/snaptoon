@@ -36,7 +36,7 @@ _Describe the high-level user-facing capabilities of this app once they exist._
 
 - Lingua: l'utente (Roberto) comunica in italiano; rispondere sempre in italiano.
 - Lavoro di design: toccare SOLO `style/custom.css`, `.streamlit/config.toml`, `components/ui/login_form.py`. NON modificare `app.py` né la logica di autenticazione.
-- Sync GitHub: dopo ogni modifica di file, allineare il remote `origin/main` su GitHub e confermare in chat con lo SHA del commit. Vincoli reali dell'ambiente (vedi Gotchas): `git commit` diretto è bloccato (Replit committa in automatico a fine turno via checkpoint, con messaggio auto-generato, non personalizzabile in "design: ..."); `git push origin main` invece funziona e raggiunge GitHub. Poiché il commit automatico avviene a fine turno, il push delle modifiche del turno va eseguito all'opportunità successiva, riconciliando sempre così GitHub combaci col workspace.
+- Sync GitHub: dopo ogni modifica di file, allineare GitHub e confermare in chat con lo SHA. Vincoli reali (vedi `.agents/memory/snaptoon-env.md`): `git commit` e `git config`/`set-url` sono bloccati nel main agent (Replit committa da solo a fine turno con messaggio auto-generato). Il token GitHub è nel secret `GITHUB_TOKEN`, NON nell'URL. Push col credential helper effimero sull'URL pulito: `git -c credential.helper='!f() { echo username=x-access-token; echo "password=$GITHUB_TOKEN"; }; f' push https://github.com/RobertoBonu/snaptoon.git main` (il push trasferisce i dati anche se esce non-zero per il lock locale; successo = riga `..main -> main`). Verifica con `git ls-remote`.
 
 ## Gotchas
 
