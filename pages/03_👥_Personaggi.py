@@ -385,7 +385,7 @@ def _render_character_card(
                                     if new_name != char_name:
                                         characters_repo.rename_character(s, cs, new_name)
                                     characters_repo.update_character(s, cs, visual_description=new_desc)
-                            st.toast("Personaggio salvato.", icon="✓")
+                            st.toast("Personaggio salvato.", icon="✅")
                             st.rerun()
                         except ValueError as e:
                             st.error(str(e))
