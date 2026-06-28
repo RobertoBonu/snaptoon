@@ -171,6 +171,14 @@ class Project(UUIDPrimaryKeyMixin, TimestampMixin, UpdatedAtMixin, Base):
     style_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
     source_text: Mapped[str] = mapped_column(Text, default="", nullable=False)
 
+    # Aspetto visivo personalizzato (sfondo + balloon/caption/sfx colors).
+    # Schema JSON libero; vedi appearance.py per il contratto.
+    appearance: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+
+    # Pagina copyright (testo libero markdown). Se valorizzato, viene aggiunta
+    # come ultima pagina nel PDF export.
+    copyright_text: Mapped[str | None] = mapped_column(Text, nullable=True)
+
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     # Relations

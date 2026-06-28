@@ -64,7 +64,7 @@ from db.repos import vignettes as vignettes_repo
 from db.repos.credits import InsufficientCreditsError
 from db.session import session_scope
 from snaptoon_core.layout import DEFAULT_SHAPE, GRIDS, SHAPES
-from snaptoon_core.models import Panel, Script as PydScript
+from snaptoon_core.models import Page, Panel, Script as PydScript
 from snaptoon_core.scene import ASPECT_RATIOS, MOODS, SHOT_ANGLES, SHOT_DISTANCES
 from snaptoon_core.styles_library import get_preset
 from storage.client import download_bytes, object_exists, upload_bytes
@@ -176,6 +176,35 @@ def _update_panel_in_script(
                     panel.mood = mood or None
                 break
         scripts_repo.save_pydantic(s, project.script, pyd_script)
+
+
+def _add_page_to_script(project_id: uuid.UUID) -> int:
+    """Aggiunge una pagina vuota in fondo allo script. Ritorna numero nuova pagina."""
+    with session_scope() as s:
+        project = projects_repo.get_by_id(s, project_id)
+        if project is None or project.script is None:
+            return 0
+        pyd_script = scripts_repo.load_pydantic(project.script)
+        new_num = len(pyd_script.pages) + 1
+        pyd_script.pages.append(Page(number=new_num))
+        scripts_repo.save_pydantic(s, project.script, pyd_script)
+        return new_num
+
+
+def _add_panel_to_page(project_id: uuid.UUID, page_number: int) -> int:
+    """Aggiunge una vignetta vuota alla fine della pagina."""
+    with session_scope() as s:
+        project = projects_repo.get_by_id(s, project_id)
+        if project is None or project.script is None:
+            return 0
+        pyd_script = scripts_repo.load_pydantic(project.script)
+        for page in pyd_script.pages:
+            if page.number == page_number:
+                new_num = len(page.panels) + 1
+                page.panels.append(Panel(number=new_num, description=""))
+                scripts_repo.save_pydantic(s, project.script, pyd_script)
+                return new_num
+        return 0
 
 
 def _update_dialogue_in_script(
@@ -966,6 +995,19 @@ if n_missing > 0:
 st.divider()
 
 # ============================================================
+# Aggiungi pagina globale
+# ============================================================
+col_addpg, col_spacer = st.columns([1, 3])
+with col_addpg:
+    if st.button("➕ Aggiungi pagina", use_container_width=True):
+        new_num = _add_page_to_script(_view["id"])
+        if new_num > 0:
+            st.toast(f"Pagina {new_num} aggiunta.")
+            st.rerun()
+
+st.divider()
+
+# ============================================================
 # Lista pagine + vignette
 # ============================================================
 
@@ -1049,3 +1091,14 @@ for page in _view["script"].pages:
                 preset_expansion=_preset.expansion,
                 preset_negative=_preset.extra_negative_terms,
             )
+
+        # Aggiungi vignetta a questa pagina
+        if st.button(
+            f"➕ Aggiungi vignetta",
+            key=f"_add_pn_gen_p{page.number}",
+            use_container_width=True,
+        ):
+            new_pn_num = _add_panel_to_page(_view["id"], page.number)
+            if new_pn_num > 0:
+                st.toast(f"Vignetta {new_pn_num} aggiunta in pagina {page.number}.")
+                st.rerun()
