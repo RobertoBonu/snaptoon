@@ -223,9 +223,14 @@ def _render_project_card(project: dict, user: User) -> None:
         with col_open:
             if st.button("Apri →", key=f"open_{project['slug']}", type="primary", use_container_width=True):
                 appstate.set_current_project_slug(project["slug"])
-                # Navigation alle pages avviene tramite la sidebar nativa Streamlit
-                st.success(f"Progetto «{project['title']}» attivo. Apri 📝 Testo dalla sidebar.")
-                st.rerun()
+                try:
+                    st.switch_page("pages/01_📝_Testo.py")
+                except Exception:
+                    st.success(
+                        f"Progetto «{project['title']}» attivo. "
+                        "Apri 📝 Testo dalla sidebar."
+                    )
+                    st.rerun()
         with col_dup:
             if st.button("📋", key=f"dup_{project['slug']}", use_container_width=True,
                          help="Duplica progetto"):

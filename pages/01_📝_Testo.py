@@ -37,11 +37,11 @@ _inject_css()
 # ============================================================
 import app_state as appstate
 from auth import current_user, logout
-from billing.credits import InsufficientCreditsError
 from billing.plans import cost_for_operation, plan_config
 from db.models import CreditOperation, LengthTarget
 from db.repos import characters as characters_repo
 from db.repos import credits as credits_repo
+from db.repos.credits import InsufficientCreditsError
 from db.repos import projects as projects_repo
 from db.repos import scripts as scripts_repo
 from db.repos import usage as usage_repo
