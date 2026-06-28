@@ -75,6 +75,23 @@ footer                            { display: none !important; }
   padding-left: 17px;
 }
 
+/* Rename the entrypoint nav item (derived from app.py -> "app") to "HOME".
+   Only the first direct child of the nav list is the entrypoint. The label text is
+   rendered by Streamlit's markdown component inside [data-testid="stMarkdownContainer"],
+   so we zero that container's font (hiding "app") and inject "HOME" via ::after. */
+[data-testid="stSidebarNavItems"] > *:first-child a [data-testid="stMarkdownContainer"],
+[data-testid="stSidebarNavItems"] > *:first-child a [data-testid="stMarkdownContainer"] * {
+  font-size: 0 !important;
+  letter-spacing: 0 !important;
+}
+
+[data-testid="stSidebarNavItems"] > *:first-child a [data-testid="stMarkdownContainer"]::after {
+  content: "HOME";
+  font-size: 14px !important;
+  font-weight: 500;
+  letter-spacing: normal;
+}
+
 /* ============================================================
    MAIN CONTAINER
    ============================================================ */

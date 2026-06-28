@@ -84,6 +84,17 @@ notebook also resets on these restarts (state lost).
 - `screenshot` app_preview DOES work for the snaptoon artifact (`artifact_dir_name="snaptoon"`,
   `path="/"`) and shows the live login; the browser warning "Password field is not contained
   in a form" is harmless (Streamlit forms aren't real <form> elements).
+- Renaming a sidebar nav item label WITHOUT touching app.py (e.g. entrypoint "app" -> "HOME"):
+  the multipage nav DOM (Streamlit 1.58) is `div[data-testid=stSidebarNav]` >
+  `ul[data-testid=stSidebarNavItems]` > one `div[data-testid=stSidebarNavLinkContainer]` per
+  item (containers are DIVs, NOT `<li>`) > `a[data-testid=stSidebarNavLink]` > optional icon
+  `<span>` + the label rendered by Streamlit markdown inside `[data-testid=stMarkdownContainer]`.
+  Pitfalls learned the hard way: `li:first-child` matches nothing (no li); `...LinkContainer:first-child`
+  matches EVERY item (each is first-child of its own wrapper) — use `stSidebarNavItems > *:first-child`
+  to hit only the entrypoint; the label is NOT a bare text node or `<span>`, it's in
+  `stMarkdownContainer`, so zero THAT (and its `*`) with `font-size:0!important` to hide the old
+  text and add the new via `::after{content:"HOME";font-size:14px!important}`. `::after` content
+  renders fine; only `text-transform` is the unreliable property here (bake case into the literal).
 
 # Other env facts
 - Runtime is Python 3.11 (NOT 3.13). Install deps via the package-management skill
