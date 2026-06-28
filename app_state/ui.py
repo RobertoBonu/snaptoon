@@ -10,51 +10,70 @@ import streamlit as st
 
 
 def enforce_sidebar_visibility() -> None:
-    """Garantisce che il toggle sidebar resti sempre accessibile.
+    """Fissa la sidebar SEMPRE visibile, non chiudibile.
 
-    Il CSS custom dell'agente nasconde `[data-testid="stHeader"]` per
-    pulizia estetica. Quel contenitore però ospita anche il pulsante per
-    riaprire la sidebar quando l'utente la chiude. Senza questo override,
-    chiudere la sidebar la rende irrecuperabile (vedi bug 28/06/2026).
+    Decisione MVP: dato che il CSS dell'agente nasconde stHeader (dove vive
+    il toggle), una volta chiusa la sidebar diventava irrecuperabile.
+    Soluzione: la sidebar resta sempre aperta. Niente bottone chiudi,
+    niente toggle in alto. Sidebar = sempre lì.
 
-    Questo override:
-    1. Ripristina la visibilità di stHeader (solo per il toggle)
-    2. Forza visibilità del toggle nello stato collapsed
-    3. NON nasconde il bottone chiudi sidebar (l'utente può chiudere se vuole)
+    Trade-off:
+      + Sidebar sempre accessibile, zero bug di navigazione persa
+      + Esperienza uniforme tra desktop e mobile (sui Repl preview)
+      - Utenti su schermo stretto non possono recuperare spazio chiudendola
 
-    Da chiamare DOPO inject_css() in ogni pagina.
+    Per MVP è il trade-off giusto.
     """
     st.markdown(
         """
         <style>
-        /* Override hide-stHeader del CSS agente: serve a ospitare il toggle. */
-        [data-testid="stHeader"] {
-            display: block !important;
-            visibility: visible !important;
-            background: transparent !important;
-            height: auto !important;
-            min-height: 40px !important;
-            pointer-events: auto !important;
-        }
-
-        /* Toggle quando la sidebar è collassata (selettori multipli per
-           compatibilità tra versioni Streamlit). */
-        [data-testid="stSidebarCollapsedControl"],
-        [data-testid="collapsedControl"],
-        [data-testid="stHeader"] button,
-        [data-testid="stHeader"] [data-testid*="Button"] {
-            display: inline-flex !important;
+        /* ============================================================
+           Sidebar SEMPRE visibile, qualunque sia lo stato aria-expanded.
+           Sovrascrive il CSS dell'agente che può applicarci transform
+           translateX(-100%) per "nasconderla".
+           ============================================================ */
+        [data-testid="stSidebar"],
+        section[data-testid="stSidebar"],
+        [data-testid="stSidebar"][aria-expanded="false"],
+        [data-testid="stSidebar"][aria-expanded="true"] {
+            display: flex !important;
             visibility: visible !important;
             opacity: 1 !important;
-            z-index: 9999 !important;
+            transform: translateX(0) !important;
+            min-width: 244px !important;
+            max-width: 244px !important;
+            width: 244px !important;
             pointer-events: auto !important;
+            position: relative !important;
+            margin-left: 0 !important;
         }
 
-        /* Bottoni dentro stHeader devono essere cliccabili senza essere
-           coperti da altri elementi (es. CSS dell'agente con position fixed). */
-        [data-testid="stHeader"] svg {
-            color: #E2E8F0 !important;
-            fill: currentColor !important;
+        /* Contenuto interno deve essere visibile anche se aria-expanded=false */
+        [data-testid="stSidebarContent"] {
+            display: block !important;
+            visibility: visible !important;
+            opacity: 1 !important;
+        }
+
+        /* ============================================================
+           Nascondi pulsante "chiudi sidebar" interno.
+           Selettori multipli per compat tra versioni Streamlit.
+           ============================================================ */
+        [data-testid="stSidebar"] [data-testid="baseButton-headerNoPadding"],
+        [data-testid="stSidebar"] [data-testid="baseButton-header"],
+        [data-testid="stSidebar"] button[kind="header"],
+        [data-testid="stSidebarHeader"] button,
+        [data-testid="stSidebarUserContent"] > div:first-child > button {
+            display: none !important;
+        }
+
+        /* ============================================================
+           Nascondi anche il toggle "apri sidebar" in alto (non serve
+           più, la sidebar è sempre aperta).
+           ============================================================ */
+        [data-testid="stSidebarCollapsedControl"],
+        [data-testid="collapsedControl"] {
+            display: none !important;
         }
         </style>
         """,
