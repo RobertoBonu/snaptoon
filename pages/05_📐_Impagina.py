@@ -56,7 +56,7 @@ from db.session import session_scope
 from snaptoon_core.layout import GRIDS, export_pdf, render_page
 from snaptoon_core.models import Panel, Script as PydScript
 from storage.client import download_bytes, object_exists, upload_bytes
-from storage.keys import page_render_key, pdf_export_key, vignette_key
+from storage.keys import cover_illustration_key, page_render_key, pdf_export_key, vignette_key
 from appearance import to_balloon_config
 
 
@@ -245,9 +245,11 @@ def _export_project_pdf(
     page_numbers: list[int],
     copyright_text: str | None = None,
     appearance: dict | None = None,
+    include_cover: bool = True,
 ) -> tuple[bytes | None, str | None]:
     """Esporta un PDF multipagina dalle pagine già renderizzate.
 
+    Se include_cover e la cover illustration esiste, viene messa in cima.
     Se copyright_text presente, accoda una pagina copyright alla fine.
 
     Returns (pdf_bytes, error_msg) — bytes None se errore.
@@ -257,8 +259,21 @@ def _export_project_pdf(
 
     temp_files: list[Path] = []
     try:
-        # Scarica tutte le pagine renderizzate in temp files (ordine corretto)
         page_temp_paths: list[Path] = []
+
+        # Copertina come prima pagina (se presente)
+        if include_cover:
+            cv_key = cover_illustration_key(project_id)
+            if object_exists(cv_key):
+                data = download_bytes(cv_key)
+                tmp = tempfile.NamedTemporaryFile(suffix=".png", delete=False)
+                tmp.write(data)
+                tmp.close()
+                p = Path(tmp.name)
+                temp_files.append(p)
+                page_temp_paths.append(p)
+
+        # Scarica tutte le pagine renderizzate
         for pn in page_numbers:
             sk = page_render_key(project_id, pn)
             if not object_exists(sk):

@@ -54,6 +54,7 @@ import app_state as appstate
 from auth import current_user, logout
 from billing.plans import cost_for_operation, plan_config
 from db.models import CreditOperation
+from db.repos import covers as covers_repo
 from db.repos import credits as credits_repo
 from db.repos import page_layouts as page_layouts_repo
 from db.repos import projects as projects_repo
@@ -68,7 +69,7 @@ from snaptoon_core.models import Page, Panel, Script as PydScript
 from snaptoon_core.scene import ASPECT_RATIOS, MOODS, SHOT_ANGLES, SHOT_DISTANCES
 from snaptoon_core.styles_library import get_preset
 from storage.client import download_bytes, object_exists, upload_bytes
-from storage.keys import reference_key, vignette_key
+from storage.keys import cover_illustration_key, cover_rendered_key, reference_key, vignette_key
 
 
 # ============================================================
@@ -991,6 +992,230 @@ if n_missing > 0:
             st.rerun()
     with col_caption:
         st.caption(f"Costo: {cost_bulk} crediti totali ({cost_per_vignette} per vignetta).")
+
+st.divider()
+
+# ============================================================
+# 📕 COPERTINA
+# ============================================================
+
+
+def _generate_cover_illustration(
+    user_id: uuid.UUID,
+    project_id: uuid.UUID,
+    title: str,
+    description: str,
+    cast_names: list[str],
+    preset_expansion: str,
+    cast_view: list[dict],
+) -> tuple[bool, str | None]:
+    """Genera l'illustrazione di copertina via OpenAI."""
+    from snaptoon_core.generator import OpenAIImageGenerator
+
+    cost = cost_for_operation("generate_panel", quality="medium")
+    t0 = time.time()
+
+    if not description.strip():
+        return False, "Inserisci la descrizione visiva della copertina."
+
+    # Charge
+    with session_scope() as s:
+        user_db = users_repo.get_by_id(s, user_id)
+        if user_db is None:
+            return False, "Utente non trovato."
+        try:
+            credits_repo.charge(
+                s, user_db,
+                cost=cost,
+                operation=CreditOperation.generate_cover,
+                reason=f"Copertina progetto",
+                reference_id=str(project_id),
+            )
+        except InsufficientCreditsError as e:
+            return False, f"Crediti insufficienti: servono {e.required}, ne hai {e.available}."
+
+    # Build prompt
+    cast_in_cover = [cs for cs in cast_view if cs["name"] in cast_names]
+    parts = [
+        "=== RENDER MODE ===\n"
+        "Edge-to-edge full-bleed vertical book cover illustration. No frame, no border, "
+        "no text on the image. Cinematic poster composition.",
+        f"=== STYLE ===\n{preset_expansion.strip()}",
+        f"=== COVER ILLUSTRATION ===\n{description.strip()}",
+    ]
+    if cast_in_cover:
+        cast_block = ["=== CHARACTERS ON COVER ==="]
+        for cs in cast_in_cover:
+            cast_block.append(f"- {cs['name']}: {cs['visual_description']}")
+        cast_block.append(
+            "These characters must look IDENTICAL to the reference images provided. "
+            "Visual ground truth."
+        )
+        parts.append("\n".join(cast_block))
+    parts.append(
+        "=== AVOID ===\n"
+        "text in image, title text, author text, watermark, frame, border, "
+        "logo, speech bubble, multiple panels"
+    )
+    prompt = "\n\n".join(parts)
+
+    # Download reference images del cast in cover in temp files
+    ref_keys = [cs["ref_storage_key"] for cs in cast_in_cover
+                if cs.get("ref_storage_key") and object_exists(cs["ref_storage_key"])]
+    tmp_files: list[Path] = []
+    storage_key_path = cover_illustration_key(project_id)
+
+    try:
+        for rk in ref_keys:
+            data = download_bytes(rk)
+            tmp = tempfile.NamedTemporaryFile(suffix=".png", delete=False)
+            tmp.write(data)
+            tmp.close()
+            tmp_files.append(Path(tmp.name))
+
+        generator = OpenAIImageGenerator()
+        image_bytes = generator._generate_bytes(
+            prompt=prompt,
+            size="1024x1536",  # verticale 2:3 per copertina
+            reference_images=tmp_files if tmp_files else None,
+            quality="medium",
+        )
+        upload_bytes(storage_key_path, image_bytes, content_type="image/png")
+
+    except Exception as e:
+        err = str(e)[:500]
+        with session_scope() as s:
+            user_db = users_repo.get_by_id(s, user_id)
+            if user_db is not None:
+                credits_repo.refund(s, user_db, amount=cost, reason=f"Refund cover fallita: {err}")
+                usage_repo.log_operation(
+                    s, user=user_db, operation="generate_cover",
+                    credits_spent=0, success=False, error_message=err,
+                    latency_ms=int((time.time() - t0) * 1000),
+                    project_id=project_id,
+                )
+        return False, f"Errore generazione: {err}"
+    finally:
+        for tmp in tmp_files:
+            try:
+                tmp.unlink()
+            except FileNotFoundError:
+                pass
+
+    # Save
+    with session_scope() as s:
+        user_db = users_repo.get_by_id(s, user_id)
+        project = projects_repo.get_by_id(s, project_id)
+        if project is not None:
+            cover = covers_repo.get_or_create(s, project)
+            covers_repo.update_illustration_key(s, cover, storage_key_path)
+            usage_repo.log_operation(
+                s, user=user_db, operation="generate_cover",
+                credits_spent=cost, success=True,
+                latency_ms=int((time.time() - t0) * 1000),
+                project_id=project_id,
+            )
+    return True, None
+
+
+def _load_cover_view(project_id) -> dict:
+    with session_scope() as s:
+        project = projects_repo.get_by_id(s, project_id)
+        if project is None:
+            return {}
+        cover = covers_repo.get_or_create(s, project)
+        return {
+            "title": cover.title,
+            "subtitle": cover.subtitle,
+            "author": cover.author,
+            "description": cover.description,
+            "illustration_key": cover.illustration_storage_key,
+            "characters_in_scene": (cover.payload or {}).get("characters_in_scene", []),
+        }
+
+
+with st.expander("📕 Copertina", expanded=False):
+    cover_view = _load_cover_view(_view["id"])
+
+    with st.form("_form_cover_meta"):
+        col1, col2 = st.columns(2)
+        with col1:
+            cv_title = st.text_input("Titolo", value=cover_view.get("title", ""))
+            cv_author = st.text_input("Autore", value=cover_view.get("author", ""))
+        with col2:
+            cv_subtitle = st.text_input("Sottotitolo", value=cover_view.get("subtitle", ""))
+        cv_desc = st.text_area(
+            "Descrizione visiva della copertina (prompt)",
+            value=cover_view.get("description", ""),
+            placeholder="Es. un uomo solitario sotto la pioggia di notte, neon rossi, atmosfera cyberpunk",
+            height=100,
+        )
+
+        # Cast esplicito sulla copertina
+        all_names = [cs["name"] for cs in _view["cast"]]
+        cv_cast = st.multiselect(
+            "👥 Personaggi sulla copertina",
+            options=all_names,
+            default=[n for n in cover_view.get("characters_in_scene", []) if n in all_names],
+            help="Le reference image dei personaggi selezionati saranno usate per la consistency.",
+        )
+
+        if st.form_submit_button("💾 Salva copertina", type="secondary"):
+            with session_scope() as s:
+                project = projects_repo.get_by_id(s, _view["id"])
+                if project is not None:
+                    cover = covers_repo.get_or_create(s, project)
+                    covers_repo.update_text(
+                        s, cover,
+                        title=cv_title, subtitle=cv_subtitle,
+                        author=cv_author, description=cv_desc,
+                    )
+                    payload = dict(cover.payload or {})
+                    payload["characters_in_scene"] = cv_cast
+                    covers_repo.update_payload(s, cover, payload)
+            st.toast("Copertina salvata.", icon="📕")
+            st.rerun()
+
+    # Bottoni
+    has_illustration = cover_view.get("illustration_key") and object_exists(cover_view["illustration_key"])
+    col_gen_cv, col_preview_cv = st.columns(2)
+    with col_gen_cv:
+        cost = cost_for_operation("generate_panel", quality="medium")
+        can_gen = (
+            cover_view.get("description", "").strip()
+            and _user.credits_remaining >= cost
+        )
+        if st.button(
+            f"✨ Genera illustrazione ({cost} crediti)" if not has_illustration else "🔄 Rigenera illustrazione",
+            type="primary",
+            disabled=not can_gen,
+            help=None if can_gen else "Inserisci descrizione e verifica i crediti.",
+            use_container_width=True,
+        ):
+            with st.spinner("Genero illustrazione copertina..."):
+                success, err = _generate_cover_illustration(
+                    user_id=_user.id,
+                    project_id=_view["id"],
+                    title=cover_view.get("title", ""),
+                    description=cover_view.get("description", ""),
+                    cast_names=cover_view.get("characters_in_scene", []),
+                    preset_expansion=_preset.expansion,
+                    cast_view=_view["cast"],
+                )
+            if success:
+                st.toast("Illustrazione copertina generata.", icon="📕")
+                st.rerun()
+            else:
+                st.error(err)
+
+    if has_illustration:
+        try:
+            cv_data = download_bytes(cover_view["illustration_key"])
+            with col_preview_cv:
+                st.image(cv_data, use_container_width=True, caption="Illustrazione copertina (senza testi sovrapposti)")
+        except Exception:
+            with col_preview_cv:
+                st.warning("Errore lettura illustrazione.")
 
 st.divider()
 
