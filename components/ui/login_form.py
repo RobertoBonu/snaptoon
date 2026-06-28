@@ -13,32 +13,36 @@ def render_login_form() -> tuple[str, str, bool]:
     Returns:
         (email, password, submitted) — tuple con i valori inseriti e se il form è stato inviato.
     """
-    st.markdown(
-        """
-        <div class="snaptoon-login-wrapper">
-          <div class="snaptoon-login-card">
-            <div class="snaptoon-login-logo">
-              <div class="snaptoon-login-logo__title">SnapToon</div>
-              <div class="snaptoon-login-logo__subtitle">Dall'idea al fumetto, in uno snap.</div>
-            </div>
-          </div>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
-
     _, col, _ = st.columns([1, 2, 1])
     with col:
         with st.form("snaptoon_login_form"):
-            st.markdown("####")
-            email = st.text_input("Email", placeholder="nome@dominio.com")
-            password = st.text_input("Password", type="password")
+            st.markdown(
+                """
+                <div class="snaptoon-login-logo">
+                  <div class="snaptoon-login-logo__title">SnapToon<span class="snaptoon-login-logo__dot"></span></div>
+                  <div class="snaptoon-login-logo__subtitle">Dall'idea al fumetto, in uno snap.</div>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+            st.markdown('<div class="snaptoon-field-label">EMAIL</div>', unsafe_allow_html=True)
+            email = st.text_input(
+                "Email", placeholder="nome@dominio.com", label_visibility="collapsed"
+            )
+            st.markdown('<div class="snaptoon-field-label">PASSWORD</div>', unsafe_allow_html=True)
+            password = st.text_input(
+                "Password", type="password", placeholder="••••••••", label_visibility="collapsed"
+            )
             submitted = st.form_submit_button(
                 "Accedi",
                 type="primary",
                 use_container_width=True,
             )
-            st.caption("Hai dimenticato la password? Contatta l'amministratore.")
+            st.markdown(
+                "<p class=\"snaptoon-login-hint\">Hai dimenticato la password? "
+                "Contatta l'amministratore.</p>",
+                unsafe_allow_html=True,
+            )
 
         error = st.session_state.get("_ui_login_error")
         if error:

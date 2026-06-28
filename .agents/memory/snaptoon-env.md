@@ -68,6 +68,23 @@ notebook also resets on these restarts (state lost).
   committed at turn end) → push with the command above at the next opportunity → confirm
   via ls-remote SHA.
 
+# Streamlit custom-CSS quirks (login redesign)
+- Scope login-only styling to `.st-key-snaptoon_login_form ...` (Streamlit 1.58 puts a
+  `st-key-<form_key>` class on the form container; descendant selectors for inputs
+  `[data-baseweb="input"]`, the submit button, etc. work reliably). Center the page with
+  `:has(.st-key-snaptoon_login_form)` so it only triggers on the login screen.
+- `text-transform: uppercase` did NOT visually render on the field labels (neither on the
+  native `[data-testid="stWidgetLabel"]` element nor on a custom injected markdown `<div>`),
+  even with `!important`. The native-label `data-testid` selector also failed to take.
+  **Workaround that works:** render labels as your OWN `st.markdown('<div class="snaptoon-field-label">EMAIL</div>')`
+  with the text ALREADY uppercase in the literal string, and set the native widget label to
+  `label_visibility="collapsed"` (keep a real label arg like "Email" for a11y). CSS class
+  styling (size/color/letter-spacing) on that div DOES apply; only `text-transform` was the
+  unreliable part, so bake the case into the text.
+- `screenshot` app_preview DOES work for the snaptoon artifact (`artifact_dir_name="snaptoon"`,
+  `path="/"`) and shows the live login; the browser warning "Password field is not contained
+  in a form" is harmless (Streamlit forms aren't real <form> elements).
+
 # Other env facts
 - Runtime is Python 3.11 (NOT 3.13). Install deps via the package-management skill
   (`installLanguagePackages`, uv-backed); raw `pip install` times out (exit -1).
