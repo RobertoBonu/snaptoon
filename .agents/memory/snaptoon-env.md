@@ -95,6 +95,16 @@ notebook also resets on these restarts (state lost).
   `stMarkdownContainer`, so zero THAT (and its `*`) with `font-size:0!important` to hide the old
   text and add the new via `::after{content:"HOME";font-size:14px!important}`. `::after` content
   renders fine; only `text-transform` is the unreliable property here (bake case into the literal).
+- Replacing the emoji nav ICONS with stylized line icons (CSS-only, no app.py): inside each nav
+  `<a>` there are TWO spans — icon = `span:first-child`, label = `span:last-child` (both ARE spans).
+  Isolate the icon without hitting the label via `a > span:first-child:not(:last-child)` (the
+  entrypoint HOME has only the label span, so this correctly skips it). Hide the emoji glyph with
+  `font-size:0!important` on that span AND its `*` (the glyph can be nested), then paint a
+  Lucide-style icon with `-webkit-mask-image`+`mask-image` = inline SVG data-URI (percent-encode
+  `<`/`>` as %3C/%3E; use `stroke='black'`/`fill` so the mask alpha is opaque) + `mask-size:contain`
+  + `background-color:currentColor` so the icon inherits the link color (slate / amber-active /
+  hover) automatically. HOME has no icon span → give it the icon via `*:first-child a::before`.
+  Per-item icons assigned by `nth-child(2..6)` (order = page filename order; reorder => remap).
 
 # Other env facts
 - Runtime is Python 3.11 (NOT 3.13). Install deps via the package-management skill
