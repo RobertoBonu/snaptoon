@@ -171,6 +171,14 @@ class Project(UUIDPrimaryKeyMixin, TimestampMixin, UpdatedAtMixin, Base):
     style_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
     source_text: Mapped[str] = mapped_column(Text, default="", nullable=False)
 
+    # Aspetto visivo personalizzato (sfondo + balloon/caption/sfx colors).
+    # Schema JSON libero; vedi appearance.py per il contratto.
+    appearance: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+
+    # Pagina copyright (testo libero markdown). Se valorizzato, viene aggiunta
+    # come ultima pagina nel PDF export.
+    copyright_text: Mapped[str | None] = mapped_column(Text, nullable=True)
+
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     # Relations
@@ -388,6 +396,29 @@ class UsageLog(UUIDPrimaryKeyMixin, Base):
     occurred_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=utcnow, nullable=False
     )
+
+
+class CastArchiveEntry(UUIDPrimaryKeyMixin, TimestampMixin, Base):
+    """Archivio personale dei character sheet riusabili tra progetti.
+
+    L'utente può salvare un personaggio dal cast di un progetto nell'archivio
+    e poi importarlo in altri progetti. NB: la reference image NON viene
+    archiviata (è specifica del progetto+stile). V1.1 aggiungerà anche
+    quella.
+    """
+
+    __tablename__ = "cast_archive_entries"
+    __table_args__ = (
+        UniqueConstraint("user_id", "name", name="uq_cast_archive_user_name"),
+    )
+
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
+    visual_description: Mapped[str] = mapped_column(Text, default="", nullable=False)
+    color_palette: Mapped[str] = mapped_column(Text, default="", nullable=False)
+    notes: Mapped[str] = mapped_column(Text, default="", nullable=False)
 
 
 class AdminAudit(UUIDPrimaryKeyMixin, Base):

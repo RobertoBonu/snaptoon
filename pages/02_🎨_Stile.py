@@ -52,6 +52,7 @@ from snaptoon_core.styles_library import (
     get_preset,
     list_presets,
 )
+from appearance import DEFAULT_APPEARANCE, merge_with_defaults
 
 
 with session_scope() as _s:
@@ -259,7 +260,168 @@ def _apply_style(project_id, preset_id: str, preset_label: str) -> None:
 
 
 # ============================================================
-# Tab 3 — Anteprima prompt
+# Tab 3 — Aspetto pagina
+# ============================================================
+
+
+def _load_project_appearance(project_id) -> dict:
+    with session_scope() as s:
+        project = projects_repo.get_by_id(s, project_id)
+        return merge_with_defaults(project.appearance if project else None)
+
+
+def _save_project_appearance(project_id, appearance: dict) -> None:
+    with session_scope() as s:
+        project = projects_repo.get_by_id(s, project_id)
+        if project is not None:
+            project.appearance = appearance
+
+
+def _render_tab_aspetto(project_id) -> None:
+    appearance = _load_project_appearance(project_id)
+
+    st.caption(
+        "Colori e dimensioni dei testi nelle pagine renderizzate. "
+        "Le modifiche si vedono solo quando rigeneri il render delle pagine "
+        "in **📐 Impagina**."
+    )
+
+    with st.form("_form_appearance"):
+        st.markdown("**🎨 Pagina**")
+        page_bg = st.color_picker(
+            "Sfondo pagina",
+            value=appearance.get("page_bg", "#ffffff"),
+        )
+
+        st.divider()
+        st.markdown("**💬 Balloon (fumetto + pensiero)**")
+        col1, col2 = st.columns(2)
+        with col1:
+            balloon_text = st.color_picker(
+                "Colore testo",
+                value=appearance["balloon"]["text_color"],
+                key="ap_b_text",
+            )
+            balloon_fill_fumetto = st.color_picker(
+                "Fondo FUMETTO",
+                value=appearance["balloon"]["fill_fumetto"],
+                key="ap_b_f_fum",
+            )
+        with col2:
+            balloon_outline = st.color_picker(
+                "Colore contorno",
+                value=appearance["balloon"]["outline_color"],
+                key="ap_b_out",
+            )
+            balloon_fill_pensiero = st.color_picker(
+                "Fondo PENSIERO",
+                value=appearance["balloon"]["fill_pensiero"],
+                key="ap_b_f_pen",
+            )
+        balloon_size = st.slider(
+            "Dimensione testo balloon (px)",
+            min_value=16, max_value=48,
+            value=appearance["balloon"]["font_size"],
+            key="ap_b_size",
+        )
+
+        st.divider()
+        st.markdown("**📜 Didascalia (riquadro narrante)**")
+        col3, col4 = st.columns(2)
+        with col3:
+            caption_text = st.color_picker(
+                "Colore testo",
+                value=appearance["caption"]["text_color"],
+                key="ap_c_text",
+            )
+            caption_fill = st.color_picker(
+                "Fondo riquadro",
+                value=appearance["caption"]["fill"],
+                key="ap_c_fill",
+            )
+        with col4:
+            caption_outline = st.color_picker(
+                "Colore contorno",
+                value=appearance["caption"]["outline_color"],
+                key="ap_c_out",
+            )
+            caption_size = st.slider(
+                "Dimensione testo (px)",
+                min_value=14, max_value=36,
+                value=appearance["caption"]["font_size"],
+                key="ap_c_size",
+            )
+
+        st.divider()
+        st.markdown("**💥 SFX (onomatopee)**")
+        col5, col6 = st.columns(2)
+        with col5:
+            sfx_text = st.color_picker(
+                "Colore testo",
+                value=appearance["sfx"]["text_color"],
+                key="ap_s_text",
+            )
+        with col6:
+            sfx_outline = st.color_picker(
+                "Colore contorno",
+                value=appearance["sfx"]["outline_color"],
+                key="ap_s_out",
+            )
+        sfx_size = st.slider(
+            "Dimensione SFX (px)",
+            min_value=40, max_value=120,
+            value=appearance["sfx"]["font_size"],
+            key="ap_s_size",
+        )
+
+        st.divider()
+        col_save, col_reset = st.columns(2)
+        with col_save:
+            save_btn = st.form_submit_button(
+                "💾 Salva aspetto",
+                type="primary",
+                use_container_width=True,
+            )
+        with col_reset:
+            reset_btn = st.form_submit_button(
+                "↩️ Ripristina default",
+                use_container_width=True,
+            )
+
+    if save_btn:
+        new_appearance = {
+            "page_bg": page_bg,
+            "balloon": {
+                "text_color": balloon_text,
+                "outline_color": balloon_outline,
+                "fill_fumetto": balloon_fill_fumetto,
+                "fill_pensiero": balloon_fill_pensiero,
+                "font_size": balloon_size,
+            },
+            "caption": {
+                "text_color": caption_text,
+                "outline_color": caption_outline,
+                "fill": caption_fill,
+                "font_size": caption_size,
+            },
+            "sfx": {
+                "text_color": sfx_text,
+                "outline_color": sfx_outline,
+                "font_size": sfx_size,
+            },
+        }
+        _save_project_appearance(project_id, new_appearance)
+        st.toast("Aspetto salvato.", icon="🎨")
+        st.rerun()
+
+    if reset_btn:
+        _save_project_appearance(project_id, DEFAULT_APPEARANCE.copy())
+        st.toast("Aspetto ripristinato ai default.")
+        st.rerun()
+
+
+# ============================================================
+# Tab 4 — Anteprima prompt
 # ============================================================
 
 
@@ -380,9 +542,10 @@ _render_sidebar(
 st.title("🎨 Stile")
 st.caption(f"Progetto: **{_project_name}**")
 
-tab_selez, tab_sfoglia, tab_anteprima = st.tabs([
+tab_selez, tab_sfoglia, tab_aspetto, tab_anteprima = st.tabs([
     "✨ Selezione",
     "📚 Sfoglia libreria",
+    "🎨 Aspetto pagina",
     "👁 Anteprima prompt",
 ])
 
@@ -391,6 +554,9 @@ with tab_selez:
 
 with tab_sfoglia:
     _render_tab_sfoglia(_project_id, _project_style_id)
+
+with tab_aspetto:
+    _render_tab_aspetto(_project_id)
 
 with tab_anteprima:
     _render_tab_anteprima(_project_id, _project_style_id)

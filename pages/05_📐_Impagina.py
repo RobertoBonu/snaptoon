@@ -56,7 +56,8 @@ from db.session import session_scope
 from snaptoon_core.layout import GRIDS, export_pdf, render_page
 from snaptoon_core.models import Panel, Script as PydScript
 from storage.client import download_bytes, object_exists, upload_bytes
-from storage.keys import page_render_key, pdf_export_key, vignette_key
+from storage.keys import cover_illustration_key, page_render_key, pdf_export_key, vignette_key
+from appearance import to_balloon_config
 
 
 # ============================================================
@@ -126,6 +127,7 @@ def _render_page_to_storage(
     panels: list[Panel],
     grid_id: str,
     show_balloons: bool = True,
+    appearance: dict | None = None,
 ) -> tuple[bool, str | None]:
     """Render della pagina con vignette + balloon overlay.
 
@@ -167,12 +169,14 @@ def _render_page_to_storage(
         out_path = Path(out_tmp.name)
         temp_files.append(out_path)
 
+        cfg = to_balloon_config(appearance)
         render_page(
             panels_with_images=panel_paths,
             grid=grid,
             out_path=out_path,
             show_balloons=show_balloons,
             page_label="",
+            cfg=cfg,
         )
 
         # Upload finale
@@ -197,11 +201,56 @@ def _render_page_to_storage(
 # ============================================================
 
 
+def _generate_copyright_page(copyright_text: str, appearance: dict | None) -> Path:
+    """Genera una semplice pagina copyright come PNG temp."""
+    from PIL import Image, ImageDraw, ImageFont
+    from snaptoon_core.layout import PAGE_W, PAGE_H, RENDER_SCALE
+
+    cfg = to_balloon_config(appearance)
+    s = RENDER_SCALE
+    w, h = PAGE_W * s, PAGE_H * s
+
+    img = Image.new("RGB", (w, h), cfg.page_bg)
+    draw = ImageDraw.Draw(img)
+
+    # Font generico (system fallback)
+    try:
+        font = ImageFont.truetype("DejaVuSans.ttf", 32 * s)
+    except Exception:
+        font = ImageFont.load_default()
+
+    # Layout: testo centrato verticalmente, padding laterale
+    pad = 100 * s
+    text_color = cfg.balloon_text_color if cfg.page_bg in ("#ffffff", "#fff") else cfg.caption_text_color
+    lines = copyright_text.strip().split("\n")
+    line_h = 50 * s
+    total_h = line_h * len(lines)
+    y = (h - total_h) // 2
+    for line in lines:
+        bbox = draw.textbbox((0, 0), line, font=font)
+        line_w = bbox[2] - bbox[0]
+        x = (w - line_w) // 2
+        draw.text((x, y), line, fill=text_color, font=font)
+        y += line_h
+
+    tmp = tempfile.NamedTemporaryFile(suffix=".png", delete=False)
+    tmp.close()
+    p = Path(tmp.name)
+    img.save(p, "PNG")
+    return p
+
+
 def _export_project_pdf(
     project_id: uuid.UUID,
     page_numbers: list[int],
+    copyright_text: str | None = None,
+    appearance: dict | None = None,
+    include_cover: bool = True,
 ) -> tuple[bytes | None, str | None]:
     """Esporta un PDF multipagina dalle pagine già renderizzate.
+
+    Se include_cover e la cover illustration esiste, viene messa in cima.
+    Se copyright_text presente, accoda una pagina copyright alla fine.
 
     Returns (pdf_bytes, error_msg) — bytes None se errore.
     """
@@ -210,8 +259,21 @@ def _export_project_pdf(
 
     temp_files: list[Path] = []
     try:
-        # Scarica tutte le pagine renderizzate in temp files (ordine corretto)
         page_temp_paths: list[Path] = []
+
+        # Copertina come prima pagina (se presente)
+        if include_cover:
+            cv_key = cover_illustration_key(project_id)
+            if object_exists(cv_key):
+                data = download_bytes(cv_key)
+                tmp = tempfile.NamedTemporaryFile(suffix=".png", delete=False)
+                tmp.write(data)
+                tmp.close()
+                p = Path(tmp.name)
+                temp_files.append(p)
+                page_temp_paths.append(p)
+
+        # Scarica tutte le pagine renderizzate
         for pn in page_numbers:
             sk = page_render_key(project_id, pn)
             if not object_exists(sk):
@@ -226,6 +288,12 @@ def _export_project_pdf(
 
         if not page_temp_paths:
             return None, "Nessuna pagina renderizzata trovata."
+
+        # Pagina copyright alla fine se richiesta
+        if copyright_text and copyright_text.strip():
+            cp_path = _generate_copyright_page(copyright_text, appearance)
+            temp_files.append(cp_path)
+            page_temp_paths.append(cp_path)
 
         # Esporta PDF in temp
         pdf_tmp = tempfile.NamedTemporaryFile(suffix=".pdf", delete=False)
@@ -289,6 +357,8 @@ def _load_view(user_id, project_slug: str) -> dict | None:
             "script": pyd_script,
             "grids_by_page": grids_by_page,
             "vignette_count_by_page": vig_by_page,
+            "appearance": project.appearance,
+            "copyright_text": project.copyright_text or "",
         }
 
 
@@ -362,6 +432,7 @@ with col_bulk:
                 panels=page.panels,
                 grid_id=grid_id,
                 show_balloons=True,
+                appearance=_view["appearance"],
             )
             if not success:
                 errors.append(f"Pagina {page.number}: {err}")
@@ -382,7 +453,12 @@ with col_pdf:
         help=None if can_export else "Renderizza almeno una pagina prima di esportare.",
     ):
         with st.spinner("Creazione PDF in corso..."):
-            pdf_bytes, err = _export_project_pdf(_view["id"], rendered_pages)
+            pdf_bytes, err = _export_project_pdf(
+                _view["id"],
+                rendered_pages,
+                copyright_text=_view["copyright_text"],
+                appearance=_view["appearance"],
+            )
         if err:
             st.error(err)
         elif pdf_bytes:
@@ -401,6 +477,28 @@ if "_pdf_bytes" in st.session_state:
         use_container_width=True,
         on_click=lambda: st.session_state.pop("_pdf_bytes", None),
     )
+
+st.divider()
+
+# ============================================================
+# Pagina copyright (opzionale, accodata al PDF)
+# ============================================================
+with st.expander("📜 Pagina copyright (opzionale, ultima pagina del PDF)", expanded=False):
+    with st.form("_form_copyright"):
+        new_copy = st.text_area(
+            "Testo copyright",
+            value=_view["copyright_text"],
+            height=150,
+            placeholder="© 2026 Roberto Bonu. Tutti i diritti riservati.\nSnaptoon AI Edition.",
+            help="Verrà generata come ultima pagina nel PDF esportato. Lasciare vuoto per ometterla.",
+        )
+        if st.form_submit_button("💾 Salva copyright", type="secondary"):
+            with session_scope() as s:
+                project = projects_repo.get_by_id(s, _view["id"])
+                if project is not None:
+                    project.copyright_text = new_copy or None
+            st.toast("Copyright salvato.", icon="📜")
+            st.rerun()
 
 st.divider()
 

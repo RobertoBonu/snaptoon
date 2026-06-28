@@ -48,6 +48,7 @@ from db.repos.credits import InsufficientCreditsError
 from db.repos import projects as projects_repo
 from db.repos import scripts as scripts_repo
 from db.repos import usage as usage_repo
+from db.repos import users as users_repo
 from db.session import session_scope
 from snaptoon_core.models import (
     Character,
@@ -57,6 +58,13 @@ from snaptoon_core.models import (
     Script as PydScript,
 )
 from snaptoon_core.script import adapt_text_to_script
+from snaptoon_core.soggetto import (
+    SoggettoOutput,
+    SoggettoState,
+    generate_soggetto,
+    propose_questions,
+    refine_soggetto,
+)
 
 # Gate: serve essere loggati
 with session_scope() as _s:
@@ -321,6 +329,278 @@ def _execute_adapt_script(project_id, source_text: str, user) -> None:
     elif success:
         st.success("Sceneggiatura generata. Apri la tab **Sceneggiatura** per rivederla.")
         st.balloons()
+        st.rerun()
+
+
+# ============================================================
+# TAB 0 — Soggetto guidato (4 fasi)
+# ============================================================
+
+_SG_KEY_SCINTILLA = "_sg_scintilla"
+_SG_KEY_QUESTIONS = "_sg_questions"
+_SG_KEY_ANSWERS = "_sg_answers"
+_SG_KEY_OUTPUT = "_sg_output"
+_SG_KEY_PHASE = "_sg_phase"
+
+
+def _execute_propose_questions(scintilla: str, user) -> tuple[bool, str | None]:
+    """Charge crediti + chiama Claude per proporre 7 domande."""
+    cost = cost_for_operation("generate_subject")
+    with session_scope() as s:
+        user_db = users_repo.get_by_id(s, user.id)
+        if user_db is None:
+            return False, "Utente non trovato."
+        try:
+            credits_repo.charge(
+                s, user_db, cost=cost,
+                operation=CreditOperation.generate_subject,
+                reason="Propose questions soggetto guidato",
+            )
+        except InsufficientCreditsError as e:
+            return False, f"Crediti insufficienti: servono {e.required}, ne hai {e.available}."
+
+    try:
+        questions = propose_questions(scintilla)
+        st.session_state[_SG_KEY_QUESTIONS] = [q.model_dump() for q in questions]
+        return True, None
+    except Exception as e:
+        err = str(e)[:500]
+        with session_scope() as s:
+            user_db = users_repo.get_by_id(s, user.id)
+            if user_db is not None:
+                credits_repo.refund(s, user_db, amount=cost, reason=f"Refund propose_questions: {err}")
+        return False, f"Errore: {err}"
+
+
+def _execute_generate_soggetto(scintilla: str, answers: dict, length: str, user) -> tuple[bool, str | None]:
+    cost = cost_for_operation("generate_subject")
+    with session_scope() as s:
+        from db.repos import users as users_repo
+        user_db = users_repo.get_by_id(s, user.id)
+        if user_db is None:
+            return False, "Utente non trovato."
+        try:
+            credits_repo.charge(
+                s, user_db, cost=cost,
+                operation=CreditOperation.generate_subject,
+                reason="Generate soggetto",
+            )
+        except InsufficientCreditsError as e:
+            return False, f"Crediti insufficienti: servono {e.required}, ne hai {e.available}."
+
+    try:
+        output = generate_soggetto(scintilla, answers, length)
+        st.session_state[_SG_KEY_OUTPUT] = output.model_dump()
+        return True, None
+    except Exception as e:
+        err = str(e)[:500]
+        with session_scope() as s:
+            from db.repos import users as users_repo
+            user_db = users_repo.get_by_id(s, user.id)
+            if user_db is not None:
+                credits_repo.refund(s, user_db, amount=cost, reason=f"Refund generate_soggetto: {err}")
+        return False, f"Errore: {err}"
+
+
+def _execute_refine_soggetto(current: dict, instruction: str, user) -> tuple[bool, str | None]:
+    cost = cost_for_operation("generate_subject")
+    with session_scope() as s:
+        from db.repos import users as users_repo
+        user_db = users_repo.get_by_id(s, user.id)
+        if user_db is None:
+            return False, "Utente non trovato."
+        try:
+            credits_repo.charge(
+                s, user_db, cost=cost,
+                operation=CreditOperation.generate_subject,
+                reason="Refine soggetto",
+            )
+        except InsufficientCreditsError as e:
+            return False, f"Crediti insufficienti: servono {e.required}, ne hai {e.available}."
+
+    try:
+        new_output = refine_soggetto(SoggettoOutput.model_validate(current), instruction)
+        st.session_state[_SG_KEY_OUTPUT] = new_output.model_dump()
+        return True, None
+    except Exception as e:
+        err = str(e)[:500]
+        with session_scope() as s:
+            from db.repos import users as users_repo
+            user_db = users_repo.get_by_id(s, user.id)
+            if user_db is not None:
+                credits_repo.refund(s, user_db, amount=cost, reason=f"Refund refine: {err}")
+        return False, f"Errore: {err}"
+
+
+def _soggetto_to_source(output: dict) -> str:
+    """Trasforma il soggetto in testo sorgente formattato per adapt."""
+    parts = []
+    if output.get("logline"):
+        parts.append(f"LOGLINE\n{output['logline']}")
+    if output.get("premise"):
+        parts.append(f"\nPREMESSA\n{output['premise']}")
+    if output.get("personaggi"):
+        parts.append(f"\nPERSONAGGI\n{output['personaggi']}")
+    if output.get("sinossi"):
+        parts.append(f"\nSINOSSI\n{output['sinossi']}")
+    return "\n".join(parts)
+
+
+def _render_tab_soggetto(project_id, user) -> None:
+    st.caption(
+        "Workflow guidato in 4 fasi: scrivi una scintilla narrativa, "
+        "rispondi alle domande generate da Claude, ricevi un soggetto "
+        "strutturato, affinalo per istruzione, infine adottalo come sorgente "
+        "per l'adattamento in sceneggiatura."
+    )
+
+    phase = st.session_state.get(_SG_KEY_PHASE, 1)
+    cost = cost_for_operation("generate_subject")
+
+    # ============================================================
+    # FASE 1 — Scintilla
+    # ============================================================
+    st.markdown("### Fase 1 — Scintilla narrativa")
+    scintilla = st.text_area(
+        "L'idea iniziale, in 1-3 righe",
+        value=st.session_state.get(_SG_KEY_SCINTILLA, ""),
+        height=80,
+        key="_sg_scintilla_input",
+        placeholder="Es. Un uomo solitario entra in un bar di periferia. È l'ultimo a sapere che il mondo finirà tra un'ora.",
+    )
+
+    if st.button(
+        f"➡️ Proponi domande ({cost} crediti)",
+        type="primary",
+        disabled=(not scintilla.strip()) or (user.credits_remaining < cost),
+        key="_sg_btn_propose",
+    ):
+        st.session_state[_SG_KEY_SCINTILLA] = scintilla
+        with st.spinner("Claude sta proponendo le domande..."):
+            success, err = _execute_propose_questions(scintilla, user)
+        if success:
+            st.session_state[_SG_KEY_PHASE] = 2
+            st.rerun()
+        else:
+            st.error(err)
+
+    questions = st.session_state.get(_SG_KEY_QUESTIONS)
+    if not questions:
+        return
+
+    st.divider()
+
+    # ============================================================
+    # FASE 2 — Domande di sviluppo
+    # ============================================================
+    st.markdown(f"### Fase 2 — Domande di sviluppo ({len(questions)})")
+    st.caption("Rispondi a ogni domanda (lascia vuoto per «decidi tu Claude»).")
+
+    with st.form("_sg_form_answers"):
+        answers = {}
+        existing_ans = st.session_state.get(_SG_KEY_ANSWERS, {})
+        for q in questions:
+            st.markdown(f"**{q['label']}**")
+            st.caption(q.get("prompt", ""))
+            if q.get("suggestion"):
+                st.caption(f"💡 _{q['suggestion']}_")
+            ans = st.text_area(
+                f"La tua risposta",
+                value=existing_ans.get(q["key"], ""),
+                key=f"_sg_ans_{q['key']}",
+                height=70,
+                label_visibility="collapsed",
+            )
+            answers[q["key"]] = ans
+            st.markdown("")
+
+        length = st.radio(
+            "Lunghezza del soggetto",
+            options=["breve", "medio", "lungo"],
+            index=1,
+            horizontal=True,
+        )
+
+        if st.form_submit_button(
+            f"🪄 Genera soggetto ({cost} crediti)",
+            type="primary",
+            use_container_width=True,
+        ):
+            st.session_state[_SG_KEY_ANSWERS] = answers
+            with st.spinner("Claude sta scrivendo il soggetto..."):
+                success, err = _execute_generate_soggetto(
+                    st.session_state[_SG_KEY_SCINTILLA],
+                    answers,
+                    length,
+                    user,
+                )
+            if success:
+                st.session_state[_SG_KEY_PHASE] = 3
+                st.rerun()
+            else:
+                st.error(err)
+
+    output = st.session_state.get(_SG_KEY_OUTPUT)
+    if not output:
+        return
+
+    st.divider()
+
+    # ============================================================
+    # FASE 3 + 4 — Soggetto + Affina
+    # ============================================================
+    st.markdown("### Fase 3 — Soggetto generato")
+    if output.get("logline"):
+        st.markdown("**Logline**")
+        st.write(output["logline"])
+    if output.get("premise"):
+        st.markdown("**Premessa**")
+        st.write(output["premise"])
+    if output.get("personaggi"):
+        st.markdown("**Personaggi**")
+        st.write(output["personaggi"])
+    if output.get("sinossi"):
+        st.markdown("**Sinossi**")
+        st.write(output["sinossi"])
+
+    st.divider()
+    st.markdown("### Fase 4 — Affina con Claude")
+    with st.form("_sg_form_refine"):
+        instruction = st.text_area(
+            "Istruzione di affinamento",
+            placeholder="Es. Rendi più drammatico il finale. Oppure: rendi il protagonista una donna. Oppure: aggiungi un sottotrama romantica.",
+            height=100,
+        )
+        if st.form_submit_button(
+            f"🪄 Affina soggetto ({cost} crediti)",
+            type="secondary",
+            disabled=(user.credits_remaining < cost),
+        ):
+            if instruction.strip():
+                with st.spinner("Claude sta affinando il soggetto..."):
+                    success, err = _execute_refine_soggetto(output, instruction, user)
+                if success:
+                    st.rerun()
+                else:
+                    st.error(err)
+            else:
+                st.warning("Inserisci una istruzione.")
+
+    st.divider()
+    if st.button(
+        "✅ Adotta come sorgente",
+        type="primary",
+        help="Trasferisce il soggetto come testo sorgente, pronto per l'adattamento in sceneggiatura.",
+    ):
+        source = _soggetto_to_source(output)
+        with session_scope() as s:
+            project = projects_repo.get_by_id(s, project_id)
+            if project is not None:
+                projects_repo.set_source_text(s, project, source)
+        st.session_state[_SG_KEY_PHASE] = 1
+        st.session_state.pop(_SG_KEY_QUESTIONS, None)
+        st.session_state.pop(_SG_KEY_OUTPUT, None)
+        st.toast("Soggetto adottato come sorgente. Vai alla tab 📤 Sorgente.", icon="✨")
         st.rerun()
 
 
@@ -675,7 +955,14 @@ _render_sidebar(
 st.title("📝 Testo")
 st.caption(f"Progetto: **{_project_name}**")
 
-tab_source, tab_script = st.tabs(["📤 Sorgente", "🎬 Sceneggiatura"])
+tab_soggetto, tab_source, tab_script = st.tabs([
+    "💡 Soggetto guidato",
+    "📤 Sorgente",
+    "🎬 Sceneggiatura",
+])
+
+with tab_soggetto:
+    _render_tab_soggetto(_project_id, _user)
 
 with tab_source:
     _render_tab_sorgente(_project_id, _source_text, _user)
