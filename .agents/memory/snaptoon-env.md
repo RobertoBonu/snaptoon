@@ -42,6 +42,23 @@ proxy returns 502 at `/`. `.replit` `[workflows]` is empty so nothing auto-start
 =200. This is NOT an app bug — the app starts fine every time. The code_execution
 notebook also resets on these restarts (state lost).
 
+# Git push/commit mechanics in the main agent sandbox
+- `git commit` is BLOCKED in the main agent ("Destructive git operations are not
+  allowed"). The platform auto-creates a checkpoint commit at the END of each turn
+  (trigger "Loop ended"), with an auto-generated message — you cannot set a custom
+  "design: ..." message from the main agent. So you cannot commit a turn's own
+  working-tree edits within that same turn.
+- `git push origin main` (non-force) actually SUCCEEDS — the data reaches GitHub even
+  though the command exits non-zero. The transfer line `OLDSHA..NEWSHA  main -> main`
+  is the proof of success; the trailing error is only the blocked LOCAL ref-update of
+  `.git/refs/remotes/origin/main.lock` (bookkeeping), not a push failure. Judge success
+  by that output line, NOT the exit code.
+- Confirm the remote state with read-only `git ls-remote origin -h refs/heads/main`.
+- The `origin` remote URL stores the GitHub PAT in cleartext; ALWAYS pipe git output
+  through `sed -E 's/ghp_[A-Za-z0-9]+/ghp_***REDACTED***/g'` to avoid leaking it.
+- Practical sync pattern for the user's "always align GitHub" rule: edit files (auto-
+  committed at turn end) → push at the next opportunity → confirm via ls-remote SHA.
+
 # Other env facts
 - Runtime is Python 3.11 (NOT 3.13). Install deps via the package-management skill
   (`installLanguagePackages`, uv-backed); raw `pip install` times out (exit -1).

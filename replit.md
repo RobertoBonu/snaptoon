@@ -34,7 +34,9 @@ _Describe the high-level user-facing capabilities of this app once they exist._
 
 ## User preferences
 
-_Populate as you build — explicit user instructions worth remembering across sessions._
+- Lingua: l'utente (Roberto) comunica in italiano; rispondere sempre in italiano.
+- Lavoro di design: toccare SOLO `style/custom.css`, `.streamlit/config.toml`, `components/ui/login_form.py`. NON modificare `app.py` né la logica di autenticazione.
+- Sync GitHub: dopo ogni modifica di file, allineare il remote `origin/main` su GitHub e confermare in chat con lo SHA del commit. Vincoli reali dell'ambiente (vedi Gotchas): `git commit` diretto è bloccato (Replit committa in automatico a fine turno via checkpoint, con messaggio auto-generato, non personalizzabile in "design: ..."); `git push origin main` invece funziona e raggiunge GitHub. Poiché il commit automatico avviene a fine turno, il push delle modifiche del turno va eseguito all'opportunità successiva, riconciliando sempre così GitHub combaci col workspace.
 
 ## Gotchas
 
