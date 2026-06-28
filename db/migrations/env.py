@@ -7,7 +7,14 @@ Auto-discover dei modelli da db.models per autogenerate.
 from __future__ import annotations
 
 import os
+import sys
 from logging.config import fileConfig
+from pathlib import Path
+
+# Aggiungi root del progetto al PYTHONPATH così possiamo importare db.*
+_PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
+if str(_PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(_PROJECT_ROOT))
 
 from alembic import context
 from sqlalchemy import engine_from_config, pool
