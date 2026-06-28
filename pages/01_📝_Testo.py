@@ -454,7 +454,7 @@ def _render_panel_editor(
         if save_panel:
             panel.description = new_desc
             _save_script(project_id, pyd_script)
-            st.toast("Descrizione salvata.", icon="✓")
+            st.toast("Descrizione salvata.", icon="✅")
             st.rerun()
         if del_panel:
             del pyd_script.pages[page_idx].panels[panel_idx]
@@ -512,7 +512,7 @@ def _render_tab_sceneggiatura(project_id) -> None:
             if new_logline != pyd_script.logline:
                 pyd_script.logline = new_logline
                 _save_script(project_id, pyd_script)
-                st.toast("Logline salvata.", icon="✓")
+                st.toast("Logline salvata.", icon="✅")
                 st.rerun()
             else:
                 st.info("Nessuna modifica da salvare.")
@@ -558,7 +558,7 @@ def _render_tab_sceneggiatura(project_id) -> None:
                 pyd_script.characters[ch_idx].visual_bible = new_bible
                 pyd_script.characters[ch_idx].voice = new_voice
                 _save_script(project_id, pyd_script)
-                st.toast("Personaggio salvato.", icon="✓")
+                st.toast("Personaggio salvato.", icon="✅")
                 st.rerun()
             if del_ch:
                 del pyd_script.characters[ch_idx]
@@ -586,7 +586,7 @@ def _render_tab_sceneggiatura(project_id) -> None:
                         )
                     )
                     _save_script(project_id, pyd_script)
-                    st.toast(f"Personaggio «{add_name}» aggiunto.", icon="✓")
+                    st.toast(f"Personaggio «{add_name}» aggiunto.", icon="✅")
                     st.rerun()
                 else:
                     st.error("Inserisci un nome.")

@@ -762,7 +762,7 @@ def _render_vignette_card(
                             shot_angle=sel_angle_key,
                             mood=sel_mood_key,
                         )
-                        st.toast("Scena salvata.", icon="✓")
+                        st.toast("Scena salvata.", icon="✅")
                         st.rerun()
                 with col_reset:
                     if st.button(
