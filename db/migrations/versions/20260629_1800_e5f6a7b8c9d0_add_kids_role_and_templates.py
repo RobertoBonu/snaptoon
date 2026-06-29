@@ -24,6 +24,8 @@ def upgrade() -> None:
     op.execute("ALTER TYPE role_enum ADD VALUE IF NOT EXISTS 'kids'")
 
     # Crea tabella kids_templates
+    # NB: length_target_enum esiste già (creato nella migration initial),
+    # quindi create_type=False per evitare 'DuplicateObject'.
     op.create_table(
         "kids_templates",
         sa.Column("id", UUID(as_uuid=True), primary_key=True),
@@ -32,7 +34,11 @@ def upgrade() -> None:
         sa.Column("n_characters", sa.Integer(), nullable=False),
         sa.Column(
             "length_target",
-            sa.Enum("striscia", "breve", "medio", "lungo", name="length_target_enum"),
+            sa.Enum(
+                "striscia", "breve", "medio", "lungo",
+                name="length_target_enum",
+                create_type=False,
+            ),
             nullable=False,
         ),
         sa.Column("grid_distribution", JSONB(astext_type=sa.Text()), nullable=False),
