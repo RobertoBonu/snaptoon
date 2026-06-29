@@ -612,10 +612,7 @@ def _render_vignette_card(
     cost = cost_for_operation("generate_panel", quality="medium")
 
     cast_in_scene = _detect_cast_in_panel(panel.description, view["cast"])
-    refs_available = sum(
-        1 for cs in cast_in_scene
-        if cs.get("ref_storage_key") and load_image_bytes(cs["ref_storage_key"]) is not None
-    )
+    refs_available = sum(1 for cs in cast_in_scene if cs.get("ref_storage_key"))
 
     with st.container(border=True):
         col_img, col_meta = st.columns([1, 2])
@@ -922,10 +919,7 @@ if _preset is None:
     st.stop()
 
 # Avviso character_sheets senza reference (compromette consistency)
-chars_without_ref = [
-    cs for cs in _view["cast"]
-    if not cs.get("ref_storage_key") or load_image_bytes(cs["ref_storage_key"]) is None
-]
+chars_without_ref = [cs for cs in _view["cast"] if not cs.get("ref_storage_key")]
 if chars_without_ref:
     names = ", ".join(cs["name"] for cs in chars_without_ref)
     st.warning(
@@ -1278,8 +1272,7 @@ with st.expander("📕 Copertina", expanded=False):
 
     # Bottoni
     _cover_ill_key = cover_view.get("illustration_key")
-    _cover_ill_bytes = load_image_bytes(_cover_ill_key) if _cover_ill_key else None
-    has_illustration = _cover_ill_bytes is not None
+    has_illustration = bool(_cover_ill_key)
     col_gen_cv, col_preview_cv = st.columns(2)
     with col_gen_cv:
         cost = cost_for_operation("generate_panel", quality="medium")
@@ -1315,8 +1308,12 @@ with st.expander("📕 Copertina", expanded=False):
                 st.error(err)
 
     if has_illustration:
+        _cover_ill_bytes = load_image_bytes(_cover_ill_key)
         with col_preview_cv:
-            st.image(_cover_ill_bytes, use_container_width=True, caption="Illustrazione copertina (senza testi sovrapposti)")
+            if _cover_ill_bytes is not None:
+                st.image(_cover_ill_bytes, use_container_width=True, caption="Illustrazione copertina (senza testi sovrapposti)")
+            else:
+                st.warning("Errore lettura illustrazione.")
 
 st.divider()
 

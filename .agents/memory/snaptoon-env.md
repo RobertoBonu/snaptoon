@@ -118,6 +118,27 @@ notebook also resets on these restarts (state lost).
   `enforce_sidebar_visibility()` rule with !important, so the auth-hide selectors MUST use
   !important too (they do) to win.
 
+# Image loading / Object Storage cost model
+- `storage.client.object_exists` is CHEAP: the Replit backend implements it via
+  `client.list(prefix=key)` (a metadata listing), NOT a full download. An earlier
+  version did `download_as_bytes` for the check (catastrophic latency) — that is long
+  fixed. Do NOT assume existence checks are expensive; only `download_bytes` transfers
+  the blob. (Some code comments still wrongly claim object_exists downloads — ignore.)
+- Perf rule for "on-demand" image loading in the Streamlit pages: download bytes ONLY at
+  the point they're shown on screen (display/download/generation). For counts/status
+  ("exists or not") use DB fields already in the view dicts (`ref_storage_key`,
+  `illustration_key`, vignette records) or `object_exists` (page-renders have no DB flag)
+  — never download full bytes just to count, it defeats lazy loading.
+- `storage/images.py` `load_image_bytes` caches via `st.cache_data`; the cached inner fn
+  must RAISE on miss/error (st.cache_data does not cache exceptions) so the wrapper can
+  return None for not-found (ObjectNotFoundError/BucketNotFoundError/FileNotFoundError)
+  vs log+return-None-without-caching for transient errors. Caching a transient failure as
+  None would hide a valid image for the whole TTL. Call `invalidate_image_cache()` after
+  every upload/delete (it clears the whole image cache — coarse but writes are rare).
+- **Why:** Streamlit `st.expander` ALWAYS executes its body (collapsed only hides via CSS),
+  so "lazy on expand" needs explicit gating; the realistic win is cheap presence checks +
+  cached downloads, which the validation code review enforces.
+
 # Other env facts
 - Runtime is Python 3.11 (NOT 3.13). Install deps via the package-management skill
   (`installLanguagePackages`, uv-backed); raw `pip install` times out (exit -1).

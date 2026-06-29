@@ -319,16 +319,19 @@ def _render_character_card(
     visual_description = char_dict["visual_description"]
     ref_storage_key = char_dict.get("ref_storage_key")
 
-    image_data = load_image_bytes(ref_storage_key) if ref_storage_key else None
-    has_ref = image_data is not None
+    has_ref = bool(ref_storage_key)
     status_emoji = "🟢" if has_ref else "⚪"
 
     with st.expander(f"{status_emoji}  **{char_name}**", expanded=not has_ref):
         col_img, col_form = st.columns([1, 2])
 
         with col_img:
-            if image_data is not None:
-                st.image(image_data, caption="Slot 1", use_container_width=True)
+            if has_ref:
+                image_data = load_image_bytes(ref_storage_key)
+                if image_data is not None:
+                    st.image(image_data, caption="Slot 1", use_container_width=True)
+                else:
+                    st.warning("Errore lettura immagine. Rigenera o ricarica.")
             else:
                 st.markdown(
                     """
@@ -533,10 +536,7 @@ st.caption(f"Progetto: **{_project_view['name']}**")
 
 # Stato globale + bulk
 n_total = len(_cast_view)
-n_with_ref = sum(
-    1 for c in _cast_view
-    if c.get("ref_storage_key") and load_image_bytes(c["ref_storage_key"]) is not None
-)
+n_with_ref = sum(1 for c in _cast_view if c.get("ref_storage_key"))
 n_missing = n_total - n_with_ref
 
 if n_total > 0:

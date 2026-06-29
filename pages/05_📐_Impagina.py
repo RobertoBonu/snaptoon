@@ -55,7 +55,7 @@ from db.repos import vignettes as vignettes_repo
 from db.session import session_scope
 from snaptoon_core.layout import GRIDS, export_pdf, render_page
 from snaptoon_core.models import Panel, Script as PydScript
-from storage.client import upload_bytes
+from storage.client import object_exists, upload_bytes
 from storage.images import invalidate_image_cache, load_image_bytes
 from storage.keys import cover_illustration_key, page_render_key, pdf_export_key, vignette_key
 from appearance import to_balloon_config
@@ -390,11 +390,11 @@ if not pages:
 # ============================================================
 
 n_pages_total = len(pages)
-_page_render_bytes: dict[int, bytes | None] = {
-    page.number: load_image_bytes(page_render_key(_view["id"], page.number))
-    for page in pages
-}
-rendered_pages: list[int] = [pn for pn, b in _page_render_bytes.items() if b is not None]
+# Presenza render = check economico (list con prefix), niente download dei bytes.
+rendered_pages: list[int] = [
+    page.number for page in pages
+    if object_exists(page_render_key(_view["id"], page.number))
+]
 
 n_rendered = len(rendered_pages)
 n_missing = n_pages_total - n_rendered
@@ -513,7 +513,7 @@ for page in pages:
 
         with col_preview:
             if is_rendered:
-                data = _page_render_bytes.get(page.number)
+                data = load_image_bytes(page_render_key(_view["id"], page.number))
                 if data is not None:
                     st.image(data, use_container_width=True)
                 else:
@@ -564,7 +564,7 @@ for page in pages:
                     st.error(err)
 
             if is_rendered:
-                data = _page_render_bytes.get(page.number)
+                data = load_image_bytes(page_render_key(_view["id"], page.number))
                 if data is not None:
                     st.download_button(
                         "⬇️ Scarica PNG",
