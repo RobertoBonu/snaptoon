@@ -133,8 +133,8 @@ def render_sidebar_nav(user) -> None:
     is_kids = (role_val == "kids")
 
     with st.sidebar:
-        # Blocco 1 — Home
-        st.page_link("app.py", label="Home", icon=":material/home:")
+        # Blocco 1 — Home (dashboard progetti)
+        st.page_link("app.py", label="I miei progetti", icon=":material/home:")
 
         # Blocco 2 — Flusso standard (non kids)
         if not is_kids:
