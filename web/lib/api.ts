@@ -196,6 +196,50 @@ export interface CharacterList {
   characters: Character[];
 }
 
+// === Vignette + Pagine (flusso Pro) ===
+
+export interface SceneOption {
+  key: string;
+  label: string;
+}
+
+export interface SceneOptions {
+  shot_distances: SceneOption[];
+  shot_angles: SceneOption[];
+  moods: SceneOption[];
+  aspect_ratios: SceneOption[];
+}
+
+export interface VignetteStatus {
+  page_number: number;
+  panel_number: number;
+  description: string;
+  dialogue_text?: string | null;
+  dialogue_speaker?: string | null;
+  generated: boolean;
+  shot_distance?: string | null;
+  shot_angle?: string | null;
+  mood?: string | null;
+  aspect_ratio_key?: string | null;
+}
+
+export interface VignettesList {
+  vignettes: VignetteStatus[];
+}
+
+export interface PageInfo {
+  page_number: number;
+  grid_id: string;
+  available_grids: string[];
+  capacity: number;
+  n_panels: number;
+  show_balloons: boolean;
+}
+
+export interface PagesList {
+  pages: PageInfo[];
+}
+
 /**
  * Fetch dell'API con gestione standardizzata di errori.
  * - credentials: 'include' invia il cookie auth
