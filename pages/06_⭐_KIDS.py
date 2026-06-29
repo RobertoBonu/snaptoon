@@ -269,6 +269,14 @@ def _render_dashboard() -> None:
         return
 
     st.markdown("")
+
+    # Mappa style_id → (emoji stile, gradient colore)
+    _STYLE_BADGE = {
+        "bold_toddler_graphic": ("🎨", "#F59E0B", "Flat"),
+        "illumination_cartoon_style": ("🎭", "#8B5CF6", "3D"),
+        "japanese_preschool_anime": ("🌸", "#EC4899", "Manga"),
+    }
+
     cols_per_row = 3
     for row_start in range(0, len(libri), cols_per_row):
         row = libri[row_start:row_start + cols_per_row]
@@ -276,20 +284,42 @@ def _render_dashboard() -> None:
         for col, lib in zip(cols, row):
             with col:
                 with st.container(border=True):
-                    # Usa cache: 1 sola chiamata storage per cover, riusata tra rerun
-                    cover_bytes = _cached_cover_thumb(
-                        str(lib["id"]),
-                        lib["updated_at"].isoformat() if lib.get("updated_at") else "",
+                    # NESSUN download di cover: usiamo un placeholder graphic
+                    # invece di chiamare Replit Object Storage (latenza 3-10s
+                    # per cold start). La cover vera si vede entrando nel
+                    # libretto (step 6). Pattern uguale alla home progetti.
+                    badge_emoji, badge_color, style_label = _STYLE_BADGE.get(
+                        lib["style_id"], ("📕", "#F59E0B", "Kids")
                     )
-                    if cover_bytes:
-                        st.image(cover_bytes, use_container_width=True)
-                    else:
-                        st.markdown(
-                            "<div style='background:#161B26;height:200px;"
-                            "border-radius:8px;display:flex;align-items:center;"
-                            "justify-content:center;color:#475569;'>📕</div>",
-                            unsafe_allow_html=True,
-                        )
+                    st.markdown(
+                        f"""
+                        <div style='
+                            background: linear-gradient(135deg, {badge_color}22 0%, #161B26 100%);
+                            border: 1px solid {badge_color}66;
+                            border-radius: 12px;
+                            aspect-ratio: 2/3;
+                            display: flex;
+                            flex-direction: column;
+                            align-items: center;
+                            justify-content: center;
+                            gap: 12px;
+                            margin-bottom: 12px;
+                        '>
+                            <div style='font-size: 64px;'>📕</div>
+                            <div style='
+                                background: {badge_color};
+                                color: #0D1017;
+                                padding: 4px 12px;
+                                border-radius: 12px;
+                                font-size: 11px;
+                                font-weight: 700;
+                                letter-spacing: 0.05em;
+                                text-transform: uppercase;
+                            '>{badge_emoji} {style_label}</div>
+                        </div>
+                        """,
+                        unsafe_allow_html=True,
+                    )
 
                     st.markdown(f"**{lib['name']}**")
                     st.caption(f"Creato il {lib['created_at'].strftime('%d/%m/%Y')}")
