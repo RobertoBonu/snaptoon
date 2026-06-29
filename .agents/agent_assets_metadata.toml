@@ -1,0 +1,26 @@
+uploads = []
+outputs = []
+
+[[generated]]
+id = "lpDVDjpaJyXh0avSch3l4"
+uri = "file://artifacts/mockup-sandbox/public/images/hero-comic.png"
+type = "image"
+title = "generated_image"
+
+[[generated]]
+id = "EYFNIkFt6qXO9VJxMtUYi"
+uri = "file://artifacts/mockup-sandbox/public/images/card-characters.png"
+type = "image"
+title = "generated_image"
+
+[[generated]]
+id = "A8DCfD-xKk9EqDtILDc6i"
+uri = "file://artifacts/mockup-sandbox/public/images/card-generator.png"
+type = "image"
+title = "generated_image"
+
+[[generated]]
+id = "4YlvT5zQ4v4waQGuR7jRk"
+uri = "file://artifacts/mockup-sandbox/public/images/card-layout.png"
+type = "image"
+title = "generated_image"

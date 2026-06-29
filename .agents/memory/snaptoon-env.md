@@ -147,3 +147,12 @@ notebook also resets on these restarts (state lost).
 - For ad hoc curl always use `http://localhost:80` (the proxy), never service ports directly.
 - `screenshot` app_preview only works for registered artifacts; verify Streamlit via
   curl/logs (HTTP 200 on `/` and `/_stcore/health`) instead.
+- Git in main agent: NOT only `commit`/`config` are blocked — `git fetch`/`git pull`
+  are ALSO blocked ("Destructive git operations are not allowed in the main agent")
+  because they write objects under .git/objects. So you CANNOT integrate remote
+  changes from here. Only `git push` (no force) and read-only `log`/`ls-remote`
+  (with the inline credential helper) work. If the remote has DIVERGED (its tip is
+  not an ancestor of HEAD), a non-force push is rejected and there is no main-agent
+  way to merge — delegate the merge+push to a background Project Task, or let the
+  user integrate via their own flow (they push via Claude). Confirm divergence with
+  `ls-remote` vs local `git log` instead of fetch.
