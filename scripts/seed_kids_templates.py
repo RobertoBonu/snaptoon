@@ -5,10 +5,12 @@ Esegui DOPO `alembic upgrade head`:
 
 Idempotente: usa upsert sullo slug.
 
-Schemi:
-- Breve (6 pagine, 16 vignette): splash · 1+2 · 2x2 · 1+2 · 2x2 · splash
-- Lungo (16 pagine, ~50 vignette): pattern esteso con 3 splash strategici
-  (apertura, climax centrale, finale)
+Schemi (la copertina è INCLUSA nel conteggio totale del libretto):
+- Breve = copertina + 5 pagine interne (12 vignette interne).
+- Lungo = copertina + 15 pagine interne (44 vignette interne).
+
+Quindi grid_distribution rappresenta SOLO le pagine interne. La copertina
+viene generata a parte come pagina aggiuntiva con prompt dedicato.
 
 3 template per le 2 lunghezze = 6 record totali. La differenza tra "1/2/3
 personaggi" influisce SOLO sul prompt Claude (gabbie/scene identiche).
@@ -30,23 +32,22 @@ from db.session import session_scope
 # Distribuzione gabbie + scene
 # ============================================================
 
-# 6 pagine — sequenza grid_id
-GRIDS_BREVE = ["splash", "1+2", "2x2", "1+2", "2x2", "splash"]
+# 5 pagine interne — sequenza grid_id (la copertina è esterna)
+GRIDS_BREVE = ["splash", "1+2", "2x2", "1+2", "splash"]
 
-# 16 pagine — sequenza grid_id (con 3 splash strategici)
+# 15 pagine interne — sequenza grid_id (con 3 splash strategici)
 GRIDS_LUNGO = [
     "splash",  # 1 — apertura
     "1+2", "1+2",  # 2-3 — setup
     "2x2", "2x2",  # 4-5 — sviluppo
-    "1+2",  # 6
-    "splash",  # 7 — climax 1
-    "2x2", "2x2",  # 8-9
-    "1+2",  # 10
-    "2x2", "2x2",  # 11-12
-    "1+2",  # 13
-    "splash",  # 14 — climax 2
-    "2x2",  # 15
-    "splash",  # 16 — finale
+    "splash",  # 6 — climax 1
+    "2x2", "2x2",  # 7-8
+    "1+2",  # 9
+    "2x2", "2x2",  # 10-11
+    "1+2",  # 12
+    "splash",  # 13 — climax 2
+    "2x2",  # 14
+    "splash",  # 15 — finale
 ]
 
 
@@ -54,7 +55,7 @@ GRIDS_LUNGO = [
 GRID_CAPACITY = {"splash": 1, "1+2": 3, "2x2": 4}
 
 
-def _scene_for_grid(grid_id: str, page_index: int) -> list[dict]:
+def _scene_for_grid(grid_id: str, page_index: int, total_pages: int) -> list[dict]:
     """Ritorna scene_params per ogni vignetta di una pagina.
 
     Pattern:
@@ -65,9 +66,10 @@ def _scene_for_grid(grid_id: str, page_index: int) -> list[dict]:
     - 2x2:
         ciclico close/medium/close/medium con mood vario
     """
-    is_climax = page_index in {6, 13}  # 0-indexed: climax 1 (pag 7) e climax 2 (pag 14)
-    is_finale = page_index == 15  # pag 16
-    is_opening = page_index == 0  # pag 1
+    is_opening = page_index == 0
+    is_finale = page_index == total_pages - 1
+    # climax: splash NON in apertura e NON in finale
+    is_climax = grid_id == "splash" and not is_opening and not is_finale
 
     if grid_id == "splash":
         if is_climax:
@@ -101,8 +103,9 @@ def _scene_for_grid(grid_id: str, page_index: int) -> list[dict]:
 def _build_scene_distribution(grids: list[str]) -> list[dict]:
     """Per ogni vignetta nell'ordine in cui appare nei grid, scene params."""
     result = []
+    total = len(grids)
     for page_idx, grid_id in enumerate(grids):
-        result.extend(_scene_for_grid(grid_id, page_idx))
+        result.extend(_scene_for_grid(grid_id, page_idx, total))
     return result
 
 
@@ -118,7 +121,7 @@ TEMPLATES = [
         "n_characters": 1,
         "length_target": LengthTarget.breve,
         "grid_distribution": GRIDS_BREVE,
-        "notes": "Focus assoluto su un singolo personaggio. 6 pagine, 16 vignette.",
+        "notes": "Focus assoluto su un singolo personaggio. Copertina + 5 pagine, 12 vignette.",
     },
     {
         "slug": "kids_1p_lungo",
@@ -126,7 +129,7 @@ TEMPLATES = [
         "n_characters": 1,
         "length_target": LengthTarget.lungo,
         "grid_distribution": GRIDS_LUNGO,
-        "notes": "Avventura completa di un singolo personaggio. 16 pagine, ~50 vignette.",
+        "notes": "Avventura completa di un singolo personaggio. Copertina + 15 pagine, ~44 vignette.",
     },
     # 2 personaggi
     {
@@ -135,7 +138,7 @@ TEMPLATES = [
         "n_characters": 2,
         "length_target": LengthTarget.breve,
         "grid_distribution": GRIDS_BREVE,
-        "notes": "Duo di personaggi. Dialoghi 50/50. 6 pagine, 16 vignette.",
+        "notes": "Duo di personaggi. Dialoghi 50/50. Copertina + 5 pagine, 12 vignette.",
     },
     {
         "slug": "kids_2p_lungo",
@@ -143,7 +146,7 @@ TEMPLATES = [
         "n_characters": 2,
         "length_target": LengthTarget.lungo,
         "grid_distribution": GRIDS_LUNGO,
-        "notes": "Storia di due personaggi. 16 pagine, ~50 vignette.",
+        "notes": "Storia di due personaggi. Copertina + 15 pagine, ~44 vignette.",
     },
     # 3 personaggi
     {
@@ -152,7 +155,7 @@ TEMPLATES = [
         "n_characters": 3,
         "length_target": LengthTarget.breve,
         "grid_distribution": GRIDS_BREVE,
-        "notes": "Trio di amici. 6 pagine, 16 vignette.",
+        "notes": "Trio di amici. Copertina + 5 pagine, 12 vignette.",
     },
     {
         "slug": "kids_3p_lungo",
@@ -160,7 +163,7 @@ TEMPLATES = [
         "n_characters": 3,
         "length_target": LengthTarget.lungo,
         "grid_distribution": GRIDS_LUNGO,
-        "notes": "Avventura di gruppo. 16 pagine, ~50 vignette.",
+        "notes": "Avventura di gruppo. Copertina + 15 pagine, ~44 vignette.",
     },
 ]
 

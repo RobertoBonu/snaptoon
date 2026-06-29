@@ -1727,7 +1727,7 @@ def _render_step_6() -> None:
         if object_exists(cv_key):
             try:
                 data = download_bytes(cv_key)
-                st.image(data, width=320)
+                st.image(data, use_container_width=True)
             except Exception:
                 st.warning("Errore lettura copertina.")
         else:
