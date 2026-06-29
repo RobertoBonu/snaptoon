@@ -37,6 +37,82 @@ def _divider() -> None:
     )
 
 
+def show_page_loading(message: str = "Caricamento...") -> "st._DeltaGenerator":
+    """Mostra un loading overlay centrato con spinner animato.
+
+    Da chiamare PRIMA degli import pesanti del backend, così l'utente vede
+    subito feedback visivo invece di una pagina bianca. Streamlit invia
+    questo render al browser via WebSocket, e il messaggio appare DURANTE
+    gli import successivi (i 3s di caricamento backend).
+
+    Returns:
+        Il placeholder `st.empty()` su cui chiamare `.empty()` quando hai
+        finito di caricare per nascondere il loader.
+
+    Esempio:
+        loader = show_page_loading("Apriamo i tuoi libretti...")
+        # ... import pesanti ...
+        loader.empty()  # nasconde il loader, l'utente vede il contenuto
+    """
+    placeholder = st.empty()
+    placeholder.markdown(
+        f"""
+        <style>
+        @keyframes _snaptoon_spin {{
+            0% {{ transform: rotate(0deg); }}
+            100% {{ transform: rotate(360deg); }}
+        }}
+        @keyframes _snaptoon_pulse {{
+            0%, 100% {{ opacity: 0.6; }}
+            50% {{ opacity: 1; }}
+        }}
+        .snaptoon-loader-wrap {{
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: #0D1017;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 24px;
+            z-index: 9999;
+        }}
+        .snaptoon-loader-spinner {{
+            width: 56px;
+            height: 56px;
+            border: 4px solid #1E2436;
+            border-top-color: #F59E0B;
+            border-radius: 50%;
+            animation: _snaptoon_spin 0.9s linear infinite;
+        }}
+        .snaptoon-loader-text {{
+            color: #E2E8F0;
+            font-family: 'Inter', sans-serif;
+            font-size: 16px;
+            font-weight: 500;
+            animation: _snaptoon_pulse 1.6s ease-in-out infinite;
+        }}
+        .snaptoon-loader-brand {{
+            position: absolute;
+            top: 24px;
+            color: #F59E0B;
+            font-family: 'Inter', sans-serif;
+            font-size: 20px;
+            font-weight: 700;
+            letter-spacing: 0.05em;
+        }}
+        </style>
+        <div class="snaptoon-loader-wrap">
+            <div class="snaptoon-loader-brand">📚 SnapToon</div>
+            <div class="snaptoon-loader-spinner"></div>
+            <div class="snaptoon-loader-text">{message}</div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+    return placeholder
+
+
 def render_sidebar_nav(user) -> None:
     """Costruisce la sidebar nav manualmente per un utente autenticato.
 
