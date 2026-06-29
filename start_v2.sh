@@ -28,10 +28,16 @@ trap "kill ${UVICORN_PID} 2>/dev/null || true" EXIT
 for i in $(seq 1 30); do
     if curl -sf "http://localhost:${API_PORT}/api/health" >/dev/null 2>&1; then
         echo "[start_v2] FastAPI ready."
+        API_READY=1
         break
     fi
     sleep 1
 done
+
+if [ "${API_READY:-0}" -ne 1 ]; then
+    echo "[start_v2] ERRORE: FastAPI non pronta dopo 30s. Esco." >&2
+    exit 1
+fi
 
 echo "[start_v2] Starting Next.js on :${WEB_PORT}..."
 cd web

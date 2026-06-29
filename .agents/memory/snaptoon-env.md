@@ -156,3 +156,27 @@ notebook also resets on these restarts (state lost).
   way to merge — delegate the merge+push to a background Project Task, or let the
   user integrate via their own flow (they push via Claude). Confirm divergence with
   `ls-remote` vs local `git log` instead of fetch.
+
+## V2 migration (Streamlit → Next.js + FastAPI)
+- SnapToon's `/` web artifact NO LONGER runs Streamlit `app.py`. It runs the V2
+  stack: Next.js in `web/` + FastAPI in `api/main.py`. Next.js serves on $PORT
+  (5000) and proxies `/api/*` → FastAPI on :8000 via `web/app/api/[...path]/route.ts`
+  (explicit catch-all route, NOT next rewrites — rewrites are flaky on Replit).
+  **Why:** owner chose V2 as the product direction; the `*_v2.sh` scripts + .replit
+  deployment already targeted V2 while the artifact/workflow still ran legacy
+  Streamlit, causing a port-5000 conflict ("Port 5000 is not available").
+  **How to apply:** dev = `start_v2_dev.sh` (uvicorn + `next dev` on $PORT);
+  prod = `build_v2.sh` (build) + `start_v2.sh` (`next start`). artifact.toml maps
+  `/`→5000, health `/api/health`. Streamlit `app.py` is legacy/dormant.
+- `next.config.ts` sets `allowedDevOrigins` from REPLIT_DEV_DOMAIN/REPLIT_DOMAINS so
+  the Next dev server accepts the Replit iframe proxy origin for /_next/* (else a
+  cross-origin warning that breaks in future Next majors).
+
+## Two main-agent gotchas learned here
+- `verifyAndReplaceArtifactToml` CANNOT change the artifact `version` field
+  ("cannot change artifact version") — keep `version` identical to the existing
+  toml; only edit services/commands/paths/env.
+- `pkill -f "<pattern>"` matches against EVERY process's full cmdline INCLUDING the
+  shell running your command — if your command text contains the pattern (e.g. you
+  also grep/echo "next dev"), pkill kills your own shell (exit 143). Kill by explicit
+  PID instead, or use patterns that can't appear in your own command line.

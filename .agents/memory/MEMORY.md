@@ -1,1 +1,1 @@
-- [SnapToon environment quirks](snaptoon-env.md) — expose Streamlit via a hand-written `kind="web"` artifact at `/`→5000; Python 3.11; alembic needs PYTHONPATH; curl via :80 proxy.
+- [SnapToon environment quirks](snaptoon-env.md) — SnapToon `/` runs the V2 stack (Next.js + FastAPI), not Streamlit; main-agent git/artifact-toml/pkill gotchas inside.
