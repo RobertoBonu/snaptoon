@@ -24,8 +24,41 @@ def enforce_sidebar_visibility() -> None:
 
     Per MVP è il trade-off giusto.
     """
-    st.markdown(
+    # Determina se l'utente loggato corrente è admin per nascondere link Admin
+    # ai non-admin. Streamlit mostra tutti i pages/*.py come link sidebar a
+    # qualunque utente: bisogna nasconderli a livello CSS.
+    #
+    # Resolution priority:
+    # 1. session_state cache (popolato da app.py o auth_required)
+    # 2. fallback: lookup DB diretto (così funziona anche se la cache non c'è)
+    is_admin = bool(st.session_state.get("snaptoon_user_is_admin", False))
+    if not is_admin:
+        try:
+            from auth.sessions import current_user as _current_user
+            from db.session import session_scope as _session_scope
+            with _session_scope() as _s:
+                _u = _current_user(_s)
+                if _u is not None:
+                    is_admin = _u.is_admin
+                    st.session_state["snaptoon_user_is_admin"] = is_admin
+        except Exception:
+            pass
+
+    # Nasconde gli ultimi N nav items per role:
+    # - non-admin: nascondi solo "Admin" (ultimo, file 99_🛠_Admin.py)
+    # - admin: nessun nav nascosto
+    admin_link_hide_css = ""
+    if not is_admin:
+        admin_link_hide_css = """
+        /* Nascondi il link Admin (ultimo nav item, file 99_🛠_Admin.py)
+           per gli utenti che non hanno role=admin. */
+        [data-testid="stSidebarNavItems"] > *:last-child {
+            display: none !important;
+        }
         """
+
+    st.markdown(
+        f"""
         <style>
         /* ============================================================
            Sidebar SEMPRE visibile, qualunque sia lo stato aria-expanded.
@@ -35,7 +68,7 @@ def enforce_sidebar_visibility() -> None:
         [data-testid="stSidebar"],
         section[data-testid="stSidebar"],
         [data-testid="stSidebar"][aria-expanded="false"],
-        [data-testid="stSidebar"][aria-expanded="true"] {
+        [data-testid="stSidebar"][aria-expanded="true"] {{
             display: flex !important;
             visibility: visible !important;
             opacity: 1 !important;
@@ -46,14 +79,16 @@ def enforce_sidebar_visibility() -> None:
             pointer-events: auto !important;
             position: relative !important;
             margin-left: 0 !important;
-        }
+        }}
+
+        {admin_link_hide_css}
 
         /* Contenuto interno deve essere visibile anche se aria-expanded=false */
-        [data-testid="stSidebarContent"] {
+        [data-testid="stSidebarContent"] {{
             display: block !important;
             visibility: visible !important;
             opacity: 1 !important;
-        }
+        }}
 
         /* ============================================================
            Nascondi pulsante "chiudi sidebar" interno.
@@ -63,18 +98,18 @@ def enforce_sidebar_visibility() -> None:
         [data-testid="stSidebar"] [data-testid="baseButton-header"],
         [data-testid="stSidebar"] button[kind="header"],
         [data-testid="stSidebarHeader"] button,
-        [data-testid="stSidebarUserContent"] > div:first-child > button {
+        [data-testid="stSidebarUserContent"] > div:first-child > button {{
             display: none !important;
-        }
+        }}
 
         /* ============================================================
            Nascondi anche il toggle "apri sidebar" in alto (non serve
            più, la sidebar è sempre aperta).
            ============================================================ */
         [data-testid="stSidebarCollapsedControl"],
-        [data-testid="collapsedControl"] {
+        [data-testid="collapsedControl"] {{
             display: none !important;
-        }
+        }}
         </style>
         """,
         unsafe_allow_html=True,
