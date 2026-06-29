@@ -180,21 +180,10 @@ def _duplicate_project_by_slug(user: User, slug: str, new_name: str) -> str | No
 
 
 def _render_sidebar_minimal(user: User) -> None:
-    """Sidebar della home: logo + email + nuovo progetto + esci. Niente nav verso pages."""
+    """Sidebar della home: nuovo progetto + esci. Niente nav verso pages
+    (l'utente naviga via i link sidebar nativi di Streamlit). Email/ruolo/crediti
+    NON ridondanti — sono già nel main content della home + Account page."""
     with st.sidebar:
-        st.markdown(
-            """
-            <div class="snaptoon-sidebar-logo">
-              <span class="snaptoon-sidebar-logo__wordmark">
-                SnapToon<span class="snaptoon-sidebar-logo__dot"></span>
-              </span>
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
-        st.caption(user.email)
-        st.caption(f"Piano: **{plan_config(user.plan).label}** · {user.credits_remaining}/{user.credits_total_this_period} crediti")
-        st.divider()
         if st.button("+ Nuovo progetto", key="_sb_new_proj", use_container_width=True, type="primary"):
             st.session_state[appstate.KEY_SHOW_NEW_PROJECT_MODAL] = True
             st.rerun()
