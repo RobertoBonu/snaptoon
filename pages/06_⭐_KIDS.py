@@ -182,6 +182,25 @@ def _list_kids_projects(user_id) -> list[dict]:
         ]
 
 
+@st.cache_data(ttl=600, show_spinner=False, max_entries=50)
+def _cached_cover_thumb(project_id_str: str, updated_at_iso: str) -> bytes | None:
+    """Scarica e cacha i bytes della cover per 10 minuti.
+
+    Chiave cache include updated_at: se la cover viene rigenerata,
+    Project.updated_at cambia e la cache viene invalidata automaticamente.
+
+    Ritorna None se la cover non esiste (gestione 404). Niente object_exists
+    perché su Replit Object Storage `object_exists` fa un download completo
+    sotto il cofano (vedi storage/client.py): meglio fare un solo download
+    in try/except e cacharlo.
+    """
+    cv_key = cover_illustration_key(uuid.UUID(project_id_str))
+    try:
+        return download_bytes(cv_key)
+    except Exception:
+        return None
+
+
 # ============================================================
 # Header + step indicator
 # ============================================================
@@ -254,18 +273,13 @@ def _render_dashboard() -> None:
         for col, lib in zip(cols, row):
             with col:
                 with st.container(border=True):
-                    cover_key = cover_illustration_key(lib["id"])
-                    if object_exists(cover_key):
-                        try:
-                            data = download_bytes(cover_key)
-                            st.image(data, use_container_width=True)
-                        except Exception:
-                            st.markdown(
-                                "<div style='background:#161B26;height:200px;"
-                                "border-radius:8px;display:flex;align-items:center;"
-                                "justify-content:center;color:#475569;'>📕 (cover non disponibile)</div>",
-                                unsafe_allow_html=True,
-                            )
+                    # Usa cache: 1 sola chiamata storage per cover, riusata tra rerun
+                    cover_bytes = _cached_cover_thumb(
+                        str(lib["id"]),
+                        lib["updated_at"].isoformat() if lib.get("updated_at") else "",
+                    )
+                    if cover_bytes:
+                        st.image(cover_bytes, use_container_width=True)
                     else:
                         st.markdown(
                             "<div style='background:#161B26;height:200px;"

@@ -104,6 +104,16 @@ def enforce_sidebar_visibility() -> None:
         f"""
         <style>
         /* ============================================================
+           Riattiva la sidebar (custom.css la nasconde di default per
+           evitare flash sulla pagina di login). enforce_sidebar_visibility()
+           viene chiamato SOLO per utenti autenticati.
+           ============================================================ */
+        [data-testid="stSidebar"] {{
+            display: flex !important;
+            visibility: visible !important;
+        }}
+
+        /* ============================================================
            Sidebar nav divisori per blocchi:
              HOME
              ───
