@@ -101,6 +101,7 @@ class RoleConfig:
     can_access_admin: bool = False
     can_use_bookshop: bool = False
     can_export_idml: bool = False
+    can_use_kids_mode: bool = False  # accesso al wizard KIDS
 
 
 ROLE_CONFIG: dict[Role, RoleConfig] = {
@@ -113,12 +114,14 @@ ROLE_CONFIG: dict[Role, RoleConfig] = {
         can_access_admin=True,
         can_use_bookshop=True,
         can_export_idml=True,
+        can_use_kids_mode=True,
         features=(
             "Accesso pannello admin",
             "10.000 crediti al mese",
             "Progetti illimitati",
             "Tutte le qualità AI",
             "Tutte le funzionalità sbloccate",
+            "Modalità Kids",
         ),
     ),
     Role.autore_base: RoleConfig(
@@ -162,6 +165,23 @@ ROLE_CONFIG: dict[Role, RoleConfig] = {
             "Qualità Bassa + Media + Alta",
             "Pubblicazione nel bookshop",
             "Export IDML tipografico (Adobe InDesign)",
+        ),
+    ),
+    Role.kids: RoleConfig(
+        role=Role.kids,
+        label="Kids",
+        monthly_credits=100,
+        max_projects=5,
+        allowed_qualities=("low",),
+        can_use_kids_mode=True,
+        features=(
+            "100 crediti al mese",
+            "5 progetti",
+            "Solo qualità Bassa (kids)",
+            "Modalità wizard 5-step",
+            "3 template (1/2/3 personaggi)",
+            "3 stili: Flat / 3D / Manga",
+            "Export PDF",
         ),
     ),
 }

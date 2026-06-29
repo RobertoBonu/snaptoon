@@ -61,12 +61,14 @@ class Role(str, enum.Enum):
     - autore_base      : creator standard (Bassa + Media quality)
     - autore_premium   : creator avanzato (anche Alta quality)
     - editore          : pubblica nel bookshop + accesso a export IDML (futuro)
+    - kids             : modalità semplificata wizard 5-step per libri illustrati bambini
     """
 
     admin = "admin"
     autore_base = "autore_base"
     autore_premium = "autore_premium"
     editore = "editore"
+    kids = "kids"
 
 
 class LengthTarget(str, enum.Enum):
@@ -421,6 +423,38 @@ class UsageLog(UUIDPrimaryKeyMixin, Base):
     occurred_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=utcnow, nullable=False
     )
+
+
+class KidsTemplate(UUIDPrimaryKeyMixin, TimestampMixin, UpdatedAtMixin, Base):
+    """Template pre-configurati per la modalità Kids.
+
+    Combina N personaggi (1/2/3) × lunghezza (breve/lungo) per generare
+    automaticamente la sequenza di gabbie e scene del fumetto. L'utente
+    Kids sceglie SOLO template + stile, niente di altro.
+
+    grid_distribution: list[str] — sequenza di grid_id per ogni pagina
+                       (es. ["splash", "1+2", "2x2", "1+2", "2x2", "splash"])
+    scene_distribution: list[dict] — uno per ogni vignetta nell'ordine in cui
+                        appaiono (espandi grid_distribution per cell);
+                        ogni dict ha shot_distance, shot_angle, mood (optional).
+    """
+
+    __tablename__ = "kids_templates"
+    __table_args__ = (
+        UniqueConstraint("slug", name="uq_kids_templates_slug"),
+    )
+
+    slug: Mapped[str] = mapped_column(String(64), nullable=False)
+    label: Mapped[str] = mapped_column(String(255), nullable=False)
+    n_characters: Mapped[int] = mapped_column(Integer, nullable=False)
+    length_target: Mapped[LengthTarget] = mapped_column(
+        Enum(LengthTarget, name="length_target_enum", values_callable=lambda x: [e.value for e in x]),
+        nullable=False,
+    )
+    grid_distribution: Mapped[list] = mapped_column(JSONB, nullable=False, default=list)
+    scene_distribution: Mapped[list] = mapped_column(JSONB, nullable=False, default=list)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    notes: Mapped[str] = mapped_column(Text, default="", nullable=False)
 
 
 class CastArchiveEntry(UUIDPrimaryKeyMixin, TimestampMixin, Base):
