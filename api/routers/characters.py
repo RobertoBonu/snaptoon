@@ -1,0 +1,277 @@
+"""Endpoint personaggi: CRUD + generazione reference image."""
+from __future__ import annotations
+
+import uuid
+from datetime import datetime
+from typing import Optional
+
+from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.responses import Response
+from pydantic import BaseModel, Field
+
+from api.routers.auth import require_user
+from billing.plans import cost_for_operation
+from db.models import CreditOperation
+from db.repos import characters as characters_repo
+from db.repos import credits as credits_repo
+from db.repos import projects as projects_repo
+from db.repos import users as users_repo
+from db.repos.credits import InsufficientCreditsError
+from db.session import session_scope
+from storage.client import download_bytes, object_exists, upload_bytes
+from storage.keys import reference_key
+
+router = APIRouter()
+
+
+# ============================================================
+# Schemas
+# ============================================================
+
+
+class CharacterOut(BaseModel):
+    id: str
+    name: str
+    visual_description: str
+    has_reference: bool
+    created_at: datetime
+
+
+class CharacterListOut(BaseModel):
+    characters: list[CharacterOut]
+
+
+class CharacterCreateIn(BaseModel):
+    name: str = Field(..., min_length=1, max_length=80)
+    visual_description: str = Field(..., min_length=1, max_length=2000)
+
+
+class CharacterUpdateIn(BaseModel):
+    name: Optional[str] = Field(default=None, min_length=1, max_length=80)
+    visual_description: Optional[str] = Field(
+        default=None, min_length=1, max_length=2000
+    )
+
+
+# ============================================================
+# Helpers
+# ============================================================
+
+
+def _to_out(cs, has_ref: bool) -> CharacterOut:
+    return CharacterOut(
+        id=str(cs.id),
+        name=cs.name,
+        visual_description=cs.visual_description,
+        has_reference=has_ref,
+        created_at=cs.created_at,
+    )
+
+
+# ============================================================
+# Endpoints
+# ============================================================
+
+
+@router.get("/projects/{slug}/characters", response_model=CharacterListOut)
+def list_characters(
+    slug: str, user: dict = Depends(require_user)
+) -> CharacterListOut:
+    user_id = uuid.UUID(user["id"])
+    with session_scope() as s:
+        project = projects_repo.get_by_slug(s, user_id, slug)
+        if project is None:
+            raise HTTPException(status_code=404, detail="Progetto non trovato")
+        chars = characters_repo.list_for_project(s, project)
+        # has_reference: controlla che la chiave esista su storage
+        out = []
+        for c in chars:
+            rk = reference_key(project.id, c.id, 1)
+            out.append(_to_out(c, has_ref=object_exists(rk)))
+        return CharacterListOut(characters=out)
+
+
+@router.post(
+    "/projects/{slug}/characters",
+    response_model=CharacterOut,
+    status_code=status.HTTP_201_CREATED,
+)
+def create_character(
+    slug: str, payload: CharacterCreateIn, user: dict = Depends(require_user)
+) -> CharacterOut:
+    user_id = uuid.UUID(user["id"])
+    with session_scope() as s:
+        project = projects_repo.get_by_slug(s, user_id, slug)
+        if project is None:
+            raise HTTPException(status_code=404, detail="Progetto non trovato")
+        try:
+            cs = characters_repo.create_character(
+                s, project=project, name=payload.name,
+                visual_description=payload.visual_description,
+            )
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e))
+        return _to_out(cs, has_ref=False)
+
+
+@router.patch(
+    "/projects/{slug}/characters/{char_id}",
+    response_model=CharacterOut,
+)
+def update_character(
+    slug: str,
+    char_id: str,
+    payload: CharacterUpdateIn,
+    user: dict = Depends(require_user),
+) -> CharacterOut:
+    user_id = uuid.UUID(user["id"])
+    try:
+        cid = uuid.UUID(char_id)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="ID personaggio invalido")
+    with session_scope() as s:
+        project = projects_repo.get_by_slug(s, user_id, slug)
+        if project is None:
+            raise HTTPException(status_code=404, detail="Progetto non trovato")
+        cs = next((c for c in project.character_sheets if c.id == cid), None)
+        if cs is None:
+            raise HTTPException(status_code=404, detail="Personaggio non trovato")
+        if payload.name is not None:
+            characters_repo.rename_character(s, cs, payload.name)
+        if payload.visual_description is not None:
+            characters_repo.update_character(
+                s, cs, visual_description=payload.visual_description
+            )
+        rk = reference_key(project.id, cs.id, 1)
+        return _to_out(cs, has_ref=object_exists(rk))
+
+
+@router.delete(
+    "/projects/{slug}/characters/{char_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+def delete_character(
+    slug: str, char_id: str, user: dict = Depends(require_user)
+) -> None:
+    user_id = uuid.UUID(user["id"])
+    try:
+        cid = uuid.UUID(char_id)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="ID personaggio invalido")
+    with session_scope() as s:
+        project = projects_repo.get_by_slug(s, user_id, slug)
+        if project is None:
+            raise HTTPException(status_code=404, detail="Progetto non trovato")
+        cs = next((c for c in project.character_sheets if c.id == cid), None)
+        if cs is None:
+            raise HTTPException(status_code=404, detail="Personaggio non trovato")
+        characters_repo.delete_character(s, cs)
+
+
+@router.post(
+    "/projects/{slug}/characters/{char_id}/reference",
+    response_model=CharacterOut,
+)
+def generate_reference(
+    slug: str, char_id: str, user: dict = Depends(require_user)
+) -> CharacterOut:
+    """Genera reference image (slot 1) per il personaggio.
+
+    Costa generate_reference (1 cr).
+    """
+    user_id = uuid.UUID(user["id"])
+    try:
+        cid = uuid.UUID(char_id)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="ID invalido")
+
+    # Carica dati
+    with session_scope() as s:
+        project = projects_repo.get_by_slug(s, user_id, slug)
+        if project is None:
+            raise HTTPException(status_code=404, detail="Progetto non trovato")
+        cs = next((c for c in project.character_sheets if c.id == cid), None)
+        if cs is None:
+            raise HTTPException(status_code=404, detail="Personaggio non trovato")
+        style_preset_id = project.style_id
+        char_name = cs.name
+        char_desc = cs.visual_description
+        pid = project.id
+
+    if not style_preset_id:
+        raise HTTPException(
+            status_code=400,
+            detail="Scegli prima uno stile per il progetto.",
+        )
+
+    # Charge
+    cost = cost_for_operation("generate_reference")
+    try:
+        with session_scope() as s:
+            u = users_repo.get_by_id(s, user_id)
+            credits_repo.charge(
+                s, u, cost=cost,
+                operation=CreditOperation.generate_reference,
+                reason=f"Reference {char_name}",
+                reference_id=str(pid),
+            )
+    except InsufficientCreditsError as e:
+        raise HTTPException(
+            status_code=402,
+            detail=f"Crediti insufficienti: servono {e.required}, ne hai {e.available}",
+        )
+
+    # Genera
+    try:
+        from snaptoon_core.generator import OpenAIImageGenerator
+        from snaptoon_core.kids_pipeline import build_reference_prompt
+
+        generator = OpenAIImageGenerator()
+        prompt = build_reference_prompt(char_name, char_desc, style_preset_id)
+        img_bytes = generator._generate_bytes(
+            prompt=prompt,
+            size="1024x1024",
+            reference_images=None,
+            quality="medium",
+        )
+    except Exception as e:
+        with session_scope() as s:
+            u = users_repo.get_by_id(s, user_id)
+            credits_repo.refund(
+                s, u, amount=cost,
+                reason=f"Refund reference {char_name}: {str(e)[:200]}",
+            )
+        raise HTTPException(status_code=502, detail=f"Errore generazione: {str(e)[:300]}")
+
+    # Upload + save
+    rk = reference_key(pid, cid, 1)
+    upload_bytes(rk, img_bytes, content_type="image/png")
+    with session_scope() as s:
+        project = projects_repo.get_by_slug(s, user_id, slug)
+        cs = next((c for c in project.character_sheets if c.id == cid), None)
+        if cs:
+            characters_repo.upsert_reference(
+                s, cs, slot_number=1, storage_key=rk,
+                mime_type="image/png", file_size=len(img_bytes),
+            )
+        return _to_out(cs, has_ref=True)
+
+
+@router.get("/projects/{slug}/characters/{char_id}/reference")
+def get_reference_image(
+    slug: str, char_id: str, user: dict = Depends(require_user)
+) -> Response:
+    user_id = uuid.UUID(user["id"])
+    try:
+        cid = uuid.UUID(char_id)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="ID invalido")
+    with session_scope() as s:
+        project = projects_repo.get_by_slug(s, user_id, slug)
+        if project is None:
+            raise HTTPException(status_code=404, detail="Progetto non trovato")
+        pid = project.id
+    rk = reference_key(pid, cid, 1)
+    if not object_exists(rk):
+        raise HTTPException(status_code=404, detail="Reference non trovata")
+    return Response(content=download_bytes(rk), media_type="image/png")
