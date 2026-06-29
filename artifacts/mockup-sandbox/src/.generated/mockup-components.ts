@@ -7,6 +7,7 @@ export const modules: ModuleMap = {
   "./components/mockups/snaptoon/Genera.tsx": () => import("../components/mockups/snaptoon/Genera.tsx"),
   "./components/mockups/snaptoon/Home.tsx": () => import("../components/mockups/snaptoon/Home.tsx"),
   "./components/mockups/snaptoon/Impagina.tsx": () => import("../components/mockups/snaptoon/Impagina.tsx"),
+  "./components/mockups/snaptoon/Landing.tsx": () => import("../components/mockups/snaptoon/Landing.tsx"),
   "./components/mockups/snaptoon/Login.tsx": () => import("../components/mockups/snaptoon/Login.tsx"),
   "./components/mockups/snaptoon/Onboarding.tsx": () => import("../components/mockups/snaptoon/Onboarding.tsx"),
   "./components/mockups/snaptoon/Personaggi.tsx": () => import("../components/mockups/snaptoon/Personaggi.tsx"),
