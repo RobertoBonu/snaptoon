@@ -93,11 +93,20 @@ if _user.must_change_password:
     st.markdown("[← Torna alla home](/)")
     st.stop()
 
-_role_cfg = role_config(_user.role)
-if not (_role_cfg.can_use_kids_mode):
+# Check accesso Kids — robusto a cache stale del modulo billing/plans:
+# admin ha sempre accesso (via is_admin); kids tramite Role enum.
+_user_role_str = _user.role.value if hasattr(_user.role, "value") else str(_user.role)
+_can_use_kids = _user.is_admin or (_user_role_str == "kids")
+if not _can_use_kids:
     st.error("Modalità Kids non disponibile per il tuo ruolo.")
     st.markdown("[← Vai alla home](/)")
     st.stop()
+
+# Carica role_cfg per uso dopo (può essere None se cache stale, usiamo fallback)
+try:
+    _role_cfg = role_config(_user.role)
+except KeyError:
+    _role_cfg = None
 
 
 # ============================================================
