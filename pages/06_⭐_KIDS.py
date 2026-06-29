@@ -1911,6 +1911,20 @@ def _generate_kids_pdf(project_id: uuid.UUID) -> None:
         page_temp_paths: list[Path] = []
 
         try:
+            # === Pagina 1: Copertina ===
+            cv_key = cover_illustration_key(project_id)
+            if object_exists(cv_key):
+                cover_data = download_bytes(cv_key)
+                cover_tmp = tempfile.NamedTemporaryFile(suffix=".png", delete=False)
+                cover_tmp.write(cover_data)
+                cover_tmp.close()
+                cover_path = Path(cover_tmp.name)
+                temp_files.append(cover_path)
+                page_temp_paths.append(cover_path)
+            else:
+                st.warning("Copertina non trovata: il PDF inizia dalla prima pagina interna.")
+
+            # === Pagine interne ===
             for page in pyd_script_db.pages:
                 grid_id = grids_by_page.get(page.number, "2x2")
                 grid = GRIDS.get(grid_id)
