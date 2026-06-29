@@ -3,6 +3,10 @@ modules = ["nodejs-24", "python-3.11"]
 [deployment]
 router = "application"
 deploymentTarget = "autoscale"
+# V2 — Next.js (frontend) + FastAPI (backend) tramite proxy interno.
+# Streamlit (legacy) NON viene più avviato.
+build = ["sh", "build_v2.sh"]
+run = ["sh", "start_v2.sh"]
 
 [deployment.postBuild]
 args = ["pnpm", "store", "prune"]

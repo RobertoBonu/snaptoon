@@ -17,6 +17,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from api.routers import account as account_router
+from api.routers import admin as admin_router
 from api.routers import auth as auth_router
 from api.routers import characters as characters_router
 from api.routers import kids as kids_router
@@ -56,6 +57,7 @@ app.include_router(styles_router.router, prefix="/api/styles", tags=["styles"])
 app.include_router(characters_router.router, prefix="/api", tags=["characters"])
 app.include_router(vignettes_router.router, prefix="/api", tags=["vignettes"])
 app.include_router(pages_router.router, prefix="/api", tags=["pages"])
+app.include_router(admin_router.router, prefix="/api/admin", tags=["admin"])
 
 
 @app.get("/api/health")
