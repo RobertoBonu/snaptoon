@@ -134,6 +134,68 @@ export interface KidsProjectDetails {
   vignettes: KidsVignetteStatus[];
 }
 
+// === Sceneggiatura (flusso Pro) ===
+
+export interface ScriptDialogue {
+  kind: string;
+  speaker?: string | null;
+  text: string;
+}
+
+export interface ScriptPanel {
+  number: number;
+  description: string;
+  dialogues: ScriptDialogue[];
+  shot_distance?: string | null;
+  shot_angle?: string | null;
+  mood?: string | null;
+}
+
+export interface ScriptPage {
+  number: number;
+  panels: ScriptPanel[];
+}
+
+export interface ProjectScript {
+  source_text: string;
+  has_script: boolean;
+  script?: {
+    logline: string;
+    characters: Array<{ name: string; visual_bible: string; voice: string }>;
+    pages: ScriptPage[];
+  } | null;
+}
+
+// === Stili ===
+
+export interface Style {
+  id: string;
+  label: string;
+  category: string;
+  expansion: string;
+  is_handmade: boolean;
+  is_custom: boolean;
+}
+
+export interface StyleList {
+  styles: Style[];
+  categories: string[];
+}
+
+// === Personaggi (flusso Pro) ===
+
+export interface Character {
+  id: string;
+  name: string;
+  visual_description: string;
+  has_reference: boolean;
+  created_at: string;
+}
+
+export interface CharacterList {
+  characters: Character[];
+}
+
 /**
  * Fetch dell'API con gestione standardizzata di errori.
  * - credentials: 'include' invia il cookie auth
