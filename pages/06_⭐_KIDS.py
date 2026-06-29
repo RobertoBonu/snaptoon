@@ -39,8 +39,12 @@ def _inject_css() -> None:
 
 _inject_css()
 
-from app_state.ui import enforce_sidebar_visibility, render_sidebar_nav
+from app_state.ui import enforce_sidebar_visibility, render_sidebar_nav, show_page_loading
 enforce_sidebar_visibility()
+
+# Loading overlay durante gli import pesanti (~3s). Streamlit invia il
+# render al browser via WS prima di proseguire con gli import bloccanti.
+_kids_loader = show_page_loading("Apriamo i tuoi libretti...")
 
 
 # ============================================================
@@ -94,6 +98,9 @@ from storage.keys import (
 # ============================================================
 with session_scope() as _s:
     _user = current_user(_s)
+
+# Backend pronto: rimuovi loading overlay
+_kids_loader.empty()
 
 if _user is None:
     st.error("Devi accedere per usare questa pagina.")
