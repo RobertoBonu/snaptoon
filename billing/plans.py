@@ -172,7 +172,7 @@ ROLE_CONFIG: dict[Role, RoleConfig] = {
         label="Kids",
         monthly_credits=100,
         max_projects=5,
-        allowed_qualities=("low",),
+        allowed_qualities=("medium",),
         can_use_kids_mode=True,
         features=(
             "100 crediti al mese",
