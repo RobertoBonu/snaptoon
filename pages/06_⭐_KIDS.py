@@ -1017,8 +1017,8 @@ def _render_step_5() -> None:
 
     # Costi (lo script è già stato pagato in step 4, non lo conto qui)
     cost_per_ref = cost_for_operation("generate_reference")
-    cost_per_panel = cost_for_operation("generate_panel", quality="low")
-    cost_cover = cost_for_operation("generate_panel", quality="low")
+    cost_per_panel = cost_for_operation("generate_panel", quality="medium")
+    cost_cover = cost_for_operation("generate_panel", quality="medium")
     cost_total = cost_per_ref * len(names) + cost_cover + cost_per_panel * n_panels
     st.caption(
         f"💰 Costo immagini: **{cost_total} crediti** "
@@ -1260,7 +1260,7 @@ def _execute_full_kids_generation(
                 prompt=prompt,
                 size="1024x1024",
                 reference_images=ref_keys_for_gen if ref_keys_for_gen else None,
-                quality="low",
+                quality="medium",
             )
             # Upload come reference slot 1
             with session_scope() as s:
@@ -1320,7 +1320,7 @@ def _execute_full_kids_generation(
             fresh_user = users_repo.get_by_id(s, _user.id)
             credits_repo.charge(
                 s, fresh_user,
-                cost=cost_for_operation("generate_panel", quality="low"),
+                cost=cost_for_operation("generate_panel", quality="medium"),
                 operation=CreditOperation.generate_cover,
                 reason=f"KIDS copertina {kids_title}",
                 reference_id=str(project_id_local),
@@ -1330,7 +1330,7 @@ def _execute_full_kids_generation(
             prompt=cover_prompt,
             size="1024x1536",  # verticale per copertina
             reference_images=cover_refs if cover_refs else None,
-            quality="low",
+            quality="medium",
         )
 
         cover_storage = cover_illustration_key(project_id_local)
@@ -1360,7 +1360,7 @@ def _execute_full_kids_generation(
             fresh_user = users_repo.get_by_id(s, _user.id)
             credits_repo.refund(
                 s, fresh_user,
-                amount=cost_for_operation("generate_panel", quality="low"),
+                amount=cost_for_operation("generate_panel", quality="medium"),
                 reason=f"Refund kids cover: {e}",
             )
 
@@ -1411,7 +1411,7 @@ def _execute_full_kids_generation(
                 fresh_user = users_repo.get_by_id(s, _user.id)
                 credits_repo.charge(
                     s, fresh_user,
-                    cost=cost_for_operation("generate_panel", quality="low"),
+                    cost=cost_for_operation("generate_panel", quality="medium"),
                     operation=CreditOperation.generate_panel,
                     reason=f"KIDS vignetta p{page.number}v{panel.number}",
                 )
@@ -1420,7 +1420,7 @@ def _execute_full_kids_generation(
                 prompt=prompt,
                 size="1024x1024",
                 reference_images=tmp_refs if tmp_refs else None,
-                quality="low",
+                quality="medium",
             )
 
             vk = vignette_key(project_id_local, page.number, panel.number)
@@ -1433,7 +1433,7 @@ def _execute_full_kids_generation(
                     page_number=page.number, panel_number=panel.number,
                     storage_key=vk,
                     prompt_hash=_hash_prompt(prompt),
-                    quality="low",
+                    quality="medium",
                     aspect_ratio_key="1_1",
                     provider="openai",
                     model="gpt-image-2",
@@ -1463,7 +1463,7 @@ def _execute_full_kids_generation(
                 fresh_user = users_repo.get_by_id(s, _user.id)
                 credits_repo.refund(
                     s, fresh_user,
-                    amount=cost_for_operation("generate_panel", quality="low"),
+                    amount=cost_for_operation("generate_panel", quality="medium"),
                     reason=f"Refund kids panel: {e}",
                 )
 
@@ -1487,7 +1487,7 @@ def _regenerate_single_panel(
     """Rigenera UNA vignetta. Usa stessi dati del progetto."""
     from snaptoon_core.generator import OpenAIImageGenerator
 
-    cost = cost_for_operation("generate_panel", quality="low")
+    cost = cost_for_operation("generate_panel", quality="medium")
 
     # Carica context dal DB
     with session_scope() as s:
@@ -1556,7 +1556,7 @@ def _regenerate_single_panel(
             prompt=prompt,
             size="1024x1024",
             reference_images=tmp_refs if tmp_refs else None,
-            quality="low",
+            quality="medium",
         )
 
         vk = vignette_key(project_id, page_number, panel_number)
@@ -1569,7 +1569,7 @@ def _regenerate_single_panel(
                 page_number=page_number, panel_number=panel_number,
                 storage_key=vk,
                 prompt_hash=_hash_prompt(prompt, str(time.time())),  # invalida cache
-                quality="low",
+                quality="medium",
                 aspect_ratio_key="1_1",
                 provider="openai",
                 model="gpt-image-2",
@@ -1598,7 +1598,7 @@ def _regenerate_cover(project_id: uuid.UUID) -> tuple[bool, str | None]:
     """Rigenera la copertina."""
     from snaptoon_core.generator import OpenAIImageGenerator
 
-    cost = cost_for_operation("generate_panel", quality="low")
+    cost = cost_for_operation("generate_panel", quality="medium")
 
     with session_scope() as s:
         project = projects_repo.get_by_id(s, project_id)
@@ -1645,7 +1645,7 @@ def _regenerate_cover(project_id: uuid.UUID) -> tuple[bool, str | None]:
             prompt=prompt,
             size="1024x1536",
             reference_images=tmp_refs if tmp_refs else None,
-            quality="low",
+            quality="medium",
         )
 
         cover_key = cover_illustration_key(project_id)
@@ -1733,7 +1733,7 @@ def _render_step_6() -> None:
         else:
             st.info("Copertina non disponibile.")
     with col_cv_btn:
-        cost = cost_for_operation("generate_panel", quality="low")
+        cost = cost_for_operation("generate_panel", quality="medium")
         can = _user.credits_remaining >= cost
         if st.button(
             f"🔄 Rigenera copertina\n({cost} cr)",
@@ -1772,7 +1772,7 @@ def _render_step_6() -> None:
                         st.caption("Non generata")
                     st.caption(f"P{page_num}V{panel.number}")
 
-                    cost = cost_for_operation("generate_panel", quality="low")
+                    cost = cost_for_operation("generate_panel", quality="medium")
                     can = _user.credits_remaining >= cost
                     if st.button(
                         f"🔄 Rigenera ({cost})",
