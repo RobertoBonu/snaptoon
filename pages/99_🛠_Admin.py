@@ -136,32 +136,52 @@ st.divider()
 # ============================================================
 
 with st.expander("➕ Crea nuovo utente", expanded=False):
+    # Genera la password UNA VOLTA per sessione, salvala in session_state.
+    # Senza questo, ad ogni rerun _generate_temp_password() ne genera una nuova
+    # e quella visualizzata può divergere da quella salvata nel DB.
+    if "_admin_new_user_pwd" not in st.session_state:
+        st.session_state["_admin_new_user_pwd"] = _generate_temp_password()
+
+    col_regen_l, col_regen_r = st.columns([3, 1])
+    with col_regen_l:
+        st.caption(
+            f"Password temporanea generata: **`{st.session_state['_admin_new_user_pwd']}`**"
+        )
+    with col_regen_r:
+        if st.button("🎲 Rigenera password", key="_regen_pwd", use_container_width=True):
+            st.session_state["_admin_new_user_pwd"] = _generate_temp_password()
+            st.rerun()
+
     with st.form("_form_new_user", clear_on_submit=False):
         col_email, col_role = st.columns(2)
         with col_email:
             new_email = st.text_input(
                 "Email",
                 placeholder="marco@example.com",
+                key="_new_user_email",
             )
         with col_role:
             new_role_label = st.selectbox(
                 "Ruolo iniziale",
                 options=[role_config(r).label for r in Role],
+                key="_new_user_role",
             )
             new_role = next(r for r in Role if role_config(r).label == new_role_label)
 
         col_pwd, col_credits = st.columns(2)
         with col_pwd:
             new_pwd = st.text_input(
-                "Password temporanea",
-                value=_generate_temp_password(),
-                help="L'utente la cambierà al primo login.",
+                "Password temporanea (editabile)",
+                value=st.session_state["_admin_new_user_pwd"],
+                help="L'utente la cambierà al primo login. Puoi modificarla qui o usare la rigenera sopra.",
+                key="_new_user_pwd",
             )
         with col_credits:
             new_credits = st.number_input(
                 "Crediti iniziali",
                 min_value=0, max_value=100000,
                 value=role_config(new_role).monthly_credits,
+                key="_new_user_credits",
             )
 
         if st.form_submit_button("Crea account", type="primary"):
@@ -197,16 +217,34 @@ with st.expander("➕ Crea nuovo utente", expanded=False):
                             payload={"email": new_email, "role": new_role.value,
                                      "initial_credits": int(new_credits)},
                         )
-                st.success(
-                    f"✅ Utente **{new_email}** creato come **{role_config(new_role).label}**. "
-                    f"Password temporanea: `{new_pwd}` — mandala fuori dall'app."
-                )
-                st.warning(
-                    "⚠️ Per sicurezza, ricarica la pagina dopo aver comunicato la "
-                    "password — sparirà dal log."
-                )
+                # Reset la password generata per il prossimo utente
+                st.session_state["_admin_last_created"] = {
+                    "email": new_email,
+                    "pwd": new_pwd,
+                    "role": role_config(new_role).label,
+                }
+                st.session_state.pop("_admin_new_user_pwd", None)
+                st.rerun()
             except Exception as e:
                 st.error(f"Errore: {e}")
+
+    # Mostra fuori dal form le credenziali appena create (sopravvive al rerun)
+    if "_admin_last_created" in st.session_state:
+        info = st.session_state["_admin_last_created"]
+        st.success(
+            f"✅ Utente **{info['email']}** creato come **{info['role']}**."
+        )
+        st.code(
+            f"Email:    {info['email']}\nPassword: {info['pwd']}",
+            language="text",
+        )
+        st.caption(
+            "⚠️ Copia ora le credenziali e mandale all'utente. "
+            "Verranno cancellate dalla pagina al refresh."
+        )
+        if st.button("🔒 Cancella credenziali dalla vista", key="_clear_last"):
+            st.session_state.pop("_admin_last_created", None)
+            st.rerun()
 
 
 st.divider()
@@ -345,6 +383,39 @@ for usr in filtered_users:
                             )
                     st.toast(f"+{grant_amount} crediti accreditati.", icon="🪙")
                     st.rerun()
+
+            # Reset password
+            with st.form(f"_form_reset_pwd_{usr.id}", border=True):
+                st.markdown("**🔑 Reset password**")
+                reset_pwd_value = st.text_input(
+                    "Nuova password temporanea",
+                    value=_generate_temp_password(),
+                    key=f"reset_pwd_{usr.id}",
+                    help="L'utente dovrà cambiarla al prossimo login.",
+                )
+                if st.form_submit_button(
+                    "🔑 Imposta nuova password",
+                    use_container_width=True,
+                ):
+                    if len(reset_pwd_value) < 8:
+                        st.error("Password troppo corta (min 8 char).")
+                    else:
+                        with session_scope() as s:
+                            fresh_usr = users_repo.get_by_id(s, usr.id)
+                            if fresh_usr is not None:
+                                users_repo.set_password_hash(
+                                    s, fresh_usr, hash_password(reset_pwd_value)
+                                )
+                                # Forziamo cambio al prossimo login
+                                fresh_usr.must_change_password = True
+                                usage_repo.audit_admin_action(
+                                    s, admin=_user, action="reset_password",
+                                    target_user_id=fresh_usr.id, payload={},
+                                )
+                        st.success(
+                            f"Password resettata. Nuova password temporanea: `{reset_pwd_value}` — "
+                            "mandala all'utente."
+                        )
 
             # Disabilita / Riabilita
             if not is_me:
