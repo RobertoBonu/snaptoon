@@ -56,10 +56,9 @@ from db.session import session_scope
 from snaptoon_core.styles_library import get_preset
 from storage.client import (
     delete_object,
-    download_bytes,
-    object_exists,
     upload_bytes,
 )
+from storage.images import invalidate_image_cache, load_image_bytes
 from storage.keys import reference_key
 
 
@@ -212,6 +211,7 @@ def _generate_reference_image(
         )
         # Upload in Object Storage
         upload_bytes(storage_key_path, image_bytes, content_type="image/png")
+        invalidate_image_cache()
 
     except Exception as e:
         # Refund + usage log
@@ -282,6 +282,7 @@ def _upload_reference_image(
     storage_key_path = reference_key(project_id, char_id, 1)
     try:
         upload_bytes(storage_key_path, file_bytes, content_type=mime_type)
+        invalidate_image_cache()
     except Exception as e:
         return False, f"Errore upload: {e}"
 
@@ -318,19 +319,16 @@ def _render_character_card(
     visual_description = char_dict["visual_description"]
     ref_storage_key = char_dict.get("ref_storage_key")
 
-    has_ref = ref_storage_key and object_exists(ref_storage_key)
+    image_data = load_image_bytes(ref_storage_key) if ref_storage_key else None
+    has_ref = image_data is not None
     status_emoji = "🟢" if has_ref else "⚪"
 
     with st.expander(f"{status_emoji}  **{char_name}**", expanded=not has_ref):
         col_img, col_form = st.columns([1, 2])
 
         with col_img:
-            if has_ref:
-                try:
-                    image_data = download_bytes(ref_storage_key)
-                    st.image(image_data, caption=f"Slot 1", use_container_width=True)
-                except Exception:
-                    st.warning("Errore lettura immagine. Rigenera o ricarica.")
+            if image_data is not None:
+                st.image(image_data, caption="Slot 1", use_container_width=True)
             else:
                 st.markdown(
                     """
@@ -468,6 +466,7 @@ def _render_character_card(
                                 if ref_storage_key:
                                     try:
                                         delete_object(ref_storage_key)
+                                        invalidate_image_cache()
                                     except Exception:
                                         pass
                                 characters_repo.delete_character(s, cs)
@@ -536,7 +535,7 @@ st.caption(f"Progetto: **{_project_view['name']}**")
 n_total = len(_cast_view)
 n_with_ref = sum(
     1 for c in _cast_view
-    if c.get("ref_storage_key") and object_exists(c["ref_storage_key"])
+    if c.get("ref_storage_key") and load_image_bytes(c["ref_storage_key"]) is not None
 )
 n_missing = n_total - n_with_ref
 

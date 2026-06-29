@@ -68,7 +68,8 @@ from snaptoon_core.layout import DEFAULT_SHAPE, GRIDS, SHAPES
 from snaptoon_core.models import Page, Panel, Script as PydScript
 from snaptoon_core.scene import ASPECT_RATIOS, MOODS, SHOT_ANGLES, SHOT_DISTANCES
 from snaptoon_core.styles_library import get_preset
-from storage.client import download_bytes, object_exists, upload_bytes
+from storage.client import upload_bytes
+from storage.images import invalidate_image_cache, load_image_bytes
 from storage.keys import cover_illustration_key, cover_rendered_key, reference_key, vignette_key
 
 
@@ -415,11 +416,16 @@ def _generate_vignette(
     # Detect cast in scena: esplicito vince su auto-detect
     cast_in_scene = _resolve_cast_for_panel(panel, cast_view)
 
-    # Raccogli reference keys (slot 1 di ogni personaggio in scena, se esiste)
-    ref_keys: list[str] = []
+    # Raccogli reference (slot 1 di ogni personaggio in scena, se esiste).
+    # Un solo download cachato per chiave: niente object_exists separato.
+    ref_bytes_by_key: dict[str, bytes] = {}
     for cs in cast_in_scene:
-        if cs.get("ref_storage_key") and object_exists(cs["ref_storage_key"]):
-            ref_keys.append(cs["ref_storage_key"])
+        rk = cs.get("ref_storage_key")
+        if rk:
+            data = load_image_bytes(rk)
+            if data is not None:
+                ref_bytes_by_key[rk] = data
+    ref_keys: list[str] = list(ref_bytes_by_key.keys())
 
     # Prompt
     prompt = _build_panel_prompt(panel, preset_expansion, preset_negative, cast_in_scene)
@@ -447,7 +453,7 @@ def _generate_vignette(
     tmp_files: list[Path] = []
     try:
         for rk in ref_keys:
-            data = download_bytes(rk)
+            data = ref_bytes_by_key[rk]
             tmp = tempfile.NamedTemporaryFile(suffix=".png", delete=False)
             tmp.write(data)
             tmp.close()
@@ -464,6 +470,7 @@ def _generate_vignette(
 
         # Upload Object Storage
         upload_bytes(vignette_storage_key, image_bytes, content_type="image/png")
+        invalidate_image_cache()
 
     except Exception as e:
         # Refund + usage log
@@ -607,7 +614,7 @@ def _render_vignette_card(
     cast_in_scene = _detect_cast_in_panel(panel.description, view["cast"])
     refs_available = sum(
         1 for cs in cast_in_scene
-        if cs.get("ref_storage_key") and object_exists(cs["ref_storage_key"])
+        if cs.get("ref_storage_key") and load_image_bytes(cs["ref_storage_key"]) is not None
     )
 
     with st.container(border=True):
@@ -615,11 +622,11 @@ def _render_vignette_card(
 
         with col_img:
             if has_image:
-                try:
-                    sk = view["vignettes_by_coords"][coords]["storage_key"]
-                    image_data = download_bytes(sk)
+                sk = view["vignettes_by_coords"][coords]["storage_key"]
+                image_data = load_image_bytes(sk)
+                if image_data is not None:
                     st.image(image_data, use_container_width=True)
-                except Exception:
+                else:
                     st.warning("Errore lettura immagine. Rigenera.")
             else:
                 st.markdown(
@@ -917,7 +924,7 @@ if _preset is None:
 # Avviso character_sheets senza reference (compromette consistency)
 chars_without_ref = [
     cs for cs in _view["cast"]
-    if not cs.get("ref_storage_key") or not object_exists(cs["ref_storage_key"])
+    if not cs.get("ref_storage_key") or load_image_bytes(cs["ref_storage_key"]) is None
 ]
 if chars_without_ref:
     names = ", ".join(cs["name"] for cs in chars_without_ref)
@@ -1075,9 +1082,15 @@ def _generate_cover_illustration(
     )
     prompt = "\n\n".join(parts)
 
-    # Download reference images del cast in cover in temp files
-    ref_keys = [cs["ref_storage_key"] for cs in cast_in_cover
-                if cs.get("ref_storage_key") and object_exists(cs["ref_storage_key"])]
+    # Download reference images del cast in cover (un solo download cachato per chiave)
+    ref_bytes_by_key: dict[str, bytes] = {}
+    for cs in cast_in_cover:
+        rk = cs.get("ref_storage_key")
+        if rk:
+            data = load_image_bytes(rk)
+            if data is not None:
+                ref_bytes_by_key[rk] = data
+    ref_keys = list(ref_bytes_by_key.keys())
     tmp_files: list[Path] = []
     storage_key_path = cover_illustration_key(project_id)
 
@@ -1086,7 +1099,7 @@ def _generate_cover_illustration(
 
     try:
         for rk in ref_keys:
-            data = download_bytes(rk)
+            data = ref_bytes_by_key[rk]
             tmp = tempfile.NamedTemporaryFile(suffix=".png", delete=False)
             tmp.write(data)
             tmp.close()
@@ -1100,6 +1113,7 @@ def _generate_cover_illustration(
             quality="medium",
         )
         upload_bytes(storage_key_path, image_bytes, content_type="image/png")
+        invalidate_image_cache()
 
     except Exception as e:
         err = str(e)[:500]
@@ -1263,7 +1277,9 @@ with st.expander("📕 Copertina", expanded=False):
             st.rerun()
 
     # Bottoni
-    has_illustration = cover_view.get("illustration_key") and object_exists(cover_view["illustration_key"])
+    _cover_ill_key = cover_view.get("illustration_key")
+    _cover_ill_bytes = load_image_bytes(_cover_ill_key) if _cover_ill_key else None
+    has_illustration = _cover_ill_bytes is not None
     col_gen_cv, col_preview_cv = st.columns(2)
     with col_gen_cv:
         cost = cost_for_operation("generate_panel", quality="medium")
@@ -1299,13 +1315,8 @@ with st.expander("📕 Copertina", expanded=False):
                 st.error(err)
 
     if has_illustration:
-        try:
-            cv_data = download_bytes(cover_view["illustration_key"])
-            with col_preview_cv:
-                st.image(cv_data, use_container_width=True, caption="Illustrazione copertina (senza testi sovrapposti)")
-        except Exception:
-            with col_preview_cv:
-                st.warning("Errore lettura illustrazione.")
+        with col_preview_cv:
+            st.image(_cover_ill_bytes, use_container_width=True, caption="Illustrazione copertina (senza testi sovrapposti)")
 
 st.divider()
 

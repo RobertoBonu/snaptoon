@@ -67,7 +67,8 @@ from snaptoon_core.llm import DEFAULT_MODEL, client as llm_client
 from snaptoon_core.models import Character, Dialogue, Page, Panel
 from snaptoon_core.models import Script as PydScript
 from snaptoon_core.styles_library import get_preset
-from storage.client import download_bytes, object_exists, upload_bytes
+from storage.client import download_bytes, upload_bytes
+from storage.images import invalidate_image_cache, load_image_bytes
 from storage.keys import (
     cover_illustration_key,
     page_render_key,
@@ -1340,6 +1341,7 @@ def _execute_full_kids_generation(
                     continue
                 ref_storage = reference_key(project_id_local, cs.id, 1)
                 upload_bytes(ref_storage, image_bytes, content_type="image/png")
+                invalidate_image_cache()
                 characters_repo.upsert_reference(
                     s, cs, slot_number=1, storage_key=ref_storage,
                     mime_type="image/png", file_size=len(image_bytes),
@@ -1379,12 +1381,13 @@ def _execute_full_kids_generation(
         cover_refs = []
         for name in names:
             rk = char_storage_keys.get(name)
-            if rk and object_exists(rk):
-                data = download_bytes(rk)
-                tmp = tempfile.NamedTemporaryFile(suffix=".png", delete=False)
-                tmp.write(data)
-                tmp.close()
-                cover_refs.append(Path(tmp.name))
+            if rk:
+                data = load_image_bytes(rk)
+                if data is not None:
+                    tmp = tempfile.NamedTemporaryFile(suffix=".png", delete=False)
+                    tmp.write(data)
+                    tmp.close()
+                    cover_refs.append(Path(tmp.name))
 
         with session_scope() as s:
             fresh_user = users_repo.get_by_id(s, _user.id)
@@ -1405,6 +1408,7 @@ def _execute_full_kids_generation(
 
         cover_storage = cover_illustration_key(project_id_local)
         upload_bytes(cover_storage, cover_bytes, content_type="image/png")
+        invalidate_image_cache()
 
         # Save sul Cover ORM
         with session_scope() as s:
@@ -1474,12 +1478,13 @@ def _execute_full_kids_generation(
             tmp_refs = []
             for name in names:
                 rk = char_storage_keys.get(name)
-                if rk and object_exists(rk):
-                    data = download_bytes(rk)
-                    tmp = tempfile.NamedTemporaryFile(suffix=".png", delete=False)
-                    tmp.write(data)
-                    tmp.close()
-                    tmp_refs.append(Path(tmp.name))
+                if rk:
+                    data = load_image_bytes(rk)
+                    if data is not None:
+                        tmp = tempfile.NamedTemporaryFile(suffix=".png", delete=False)
+                        tmp.write(data)
+                        tmp.close()
+                        tmp_refs.append(Path(tmp.name))
 
             with session_scope() as s:
                 fresh_user = users_repo.get_by_id(s, _user.id)
@@ -1499,6 +1504,7 @@ def _execute_full_kids_generation(
 
             vk = vignette_key(project_id_local, page.number, panel.number)
             upload_bytes(vk, image_bytes, content_type="image/png")
+            invalidate_image_cache()
 
             with session_scope() as s:
                 project = projects_repo.get_by_id(s, project_id_local)
@@ -1631,12 +1637,13 @@ def _regenerate_single_panel(
     try:
         for c in cast:
             rk = c.get("ref_key")
-            if rk and object_exists(rk):
-                data = download_bytes(rk)
-                tmp = tempfile.NamedTemporaryFile(suffix=".png", delete=False)
-                tmp.write(data)
-                tmp.close()
-                tmp_refs.append(Path(tmp.name))
+            if rk:
+                data = load_image_bytes(rk)
+                if data is not None:
+                    tmp = tempfile.NamedTemporaryFile(suffix=".png", delete=False)
+                    tmp.write(data)
+                    tmp.close()
+                    tmp_refs.append(Path(tmp.name))
 
         generator = OpenAIImageGenerator()
         image_bytes = generator._generate_bytes(
@@ -1648,6 +1655,7 @@ def _regenerate_single_panel(
 
         vk = vignette_key(project_id, page_number, panel_number)
         upload_bytes(vk, image_bytes, content_type="image/png")
+        invalidate_image_cache()
 
         with session_scope() as s:
             project = projects_repo.get_by_id(s, project_id)
@@ -1720,12 +1728,13 @@ def _regenerate_cover(project_id: uuid.UUID) -> tuple[bool, str | None, bytes | 
     try:
         for c in cast:
             rk = c.get("ref_key")
-            if rk and object_exists(rk):
-                data = download_bytes(rk)
-                tmp = tempfile.NamedTemporaryFile(suffix=".png", delete=False)
-                tmp.write(data)
-                tmp.close()
-                tmp_refs.append(Path(tmp.name))
+            if rk:
+                data = load_image_bytes(rk)
+                if data is not None:
+                    tmp = tempfile.NamedTemporaryFile(suffix=".png", delete=False)
+                    tmp.write(data)
+                    tmp.close()
+                    tmp_refs.append(Path(tmp.name))
 
         generator = OpenAIImageGenerator()
         image_bytes = generator._generate_bytes(
@@ -1737,6 +1746,7 @@ def _regenerate_cover(project_id: uuid.UUID) -> tuple[bool, str | None, bytes | 
 
         cover_key = cover_illustration_key(project_id)
         upload_bytes(cover_key, image_bytes, content_type="image/png")
+        invalidate_image_cache()
 
         with session_scope() as s:
             project = projects_repo.get_by_id(s, project_id)
@@ -1816,14 +1826,12 @@ def _render_step_6() -> None:
         fresh_cv = st.session_state.get(cv_cache_key)
         if fresh_cv:
             st.image(fresh_cv, use_container_width=True)
-        elif object_exists(cv_key):
-            try:
-                data = download_bytes(cv_key)
-                st.image(data, use_container_width=True)
-            except Exception:
-                st.warning("Errore lettura copertina.")
         else:
-            st.info("Copertina non disponibile.")
+            data = load_image_bytes(cv_key)
+            if data is not None:
+                st.image(data, use_container_width=True)
+            else:
+                st.info("Copertina non disponibile.")
     with col_cv_btn:
         cost = cost_for_operation("generate_panel", quality="medium")
         can = _user.credits_remaining >= cost
@@ -1864,11 +1872,11 @@ def _render_step_6() -> None:
                         st.image(fresh_panel, use_container_width=True)
                         already_generated = True
                     elif key in vig_keys:
-                        try:
-                            data = download_bytes(vig_keys[key])
+                        data = load_image_bytes(vig_keys[key])
+                        if data is not None:
                             st.image(data, use_container_width=True)
                             already_generated = True
-                        except Exception:
+                        else:
                             st.warning("Errore")
                             already_generated = False
                     else:
@@ -1927,8 +1935,8 @@ def _generate_kids_pdf(project_id: uuid.UUID) -> None:
         try:
             # === Pagina 1: Copertina ===
             cv_key = cover_illustration_key(project_id)
-            if object_exists(cv_key):
-                cover_data = download_bytes(cv_key)
+            cover_data = load_image_bytes(cv_key)
+            if cover_data is not None:
                 cover_tmp = tempfile.NamedTemporaryFile(suffix=".png", delete=False)
                 cover_tmp.write(cover_data)
                 cover_tmp.close()
@@ -1949,8 +1957,8 @@ def _generate_kids_pdf(project_id: uuid.UUID) -> None:
                 panel_paths = []
                 for panel in page.panels:
                     vk = vignette_key(project_id, page.number, panel.number)
-                    if object_exists(vk):
-                        data = download_bytes(vk)
+                    data = load_image_bytes(vk)
+                    if data is not None:
                         tmp = tempfile.NamedTemporaryFile(suffix=".png", delete=False)
                         tmp.write(data)
                         tmp.close()
@@ -1976,6 +1984,8 @@ def _generate_kids_pdf(project_id: uuid.UUID) -> None:
                     upload_bytes(page_render_key(project_id, page.number),
                                  f.read(), content_type="image/png")
                 page_temp_paths.append(out_path)
+
+            invalidate_image_cache()
 
             # Export PDF
             pdf_tmp = tempfile.NamedTemporaryFile(suffix=".pdf", delete=False)

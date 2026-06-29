@@ -55,7 +55,8 @@ from db.repos import vignettes as vignettes_repo
 from db.session import session_scope
 from snaptoon_core.layout import GRIDS, export_pdf, render_page
 from snaptoon_core.models import Panel, Script as PydScript
-from storage.client import download_bytes, object_exists, upload_bytes
+from storage.client import upload_bytes
+from storage.images import invalidate_image_cache, load_image_bytes
 from storage.keys import cover_illustration_key, page_render_key, pdf_export_key, vignette_key
 from appearance import to_balloon_config
 
@@ -136,9 +137,9 @@ def _render_page_to_storage(
     try:
         for panel in panels:
             vk = vignette_key(project_id, page_number, panel.number)
-            if object_exists(vk):
+            data = load_image_bytes(vk)
+            if data is not None:
                 try:
-                    data = download_bytes(vk)
                     tmp = tempfile.NamedTemporaryFile(suffix=".png", delete=False)
                     tmp.write(data)
                     tmp.close()
@@ -170,6 +171,7 @@ def _render_page_to_storage(
         result_bytes = out_path.read_bytes()
         storage_key_path = page_render_key(project_id, page_number)
         upload_bytes(storage_key_path, result_bytes, content_type="image/png")
+        invalidate_image_cache()
 
     except Exception as e:
         return False, f"Errore render: {e}"
@@ -251,8 +253,8 @@ def _export_project_pdf(
         # Copertina come prima pagina (se presente)
         if include_cover:
             cv_key = cover_illustration_key(project_id)
-            if object_exists(cv_key):
-                data = download_bytes(cv_key)
+            data = load_image_bytes(cv_key)
+            if data is not None:
                 tmp = tempfile.NamedTemporaryFile(suffix=".png", delete=False)
                 tmp.write(data)
                 tmp.close()
@@ -263,9 +265,9 @@ def _export_project_pdf(
         # Scarica tutte le pagine renderizzate
         for pn in page_numbers:
             sk = page_render_key(project_id, pn)
-            if not object_exists(sk):
+            data = load_image_bytes(sk)
+            if data is None:
                 continue
-            data = download_bytes(sk)
             tmp = tempfile.NamedTemporaryFile(suffix=".png", delete=False)
             tmp.write(data)
             tmp.close()
@@ -388,10 +390,11 @@ if not pages:
 # ============================================================
 
 n_pages_total = len(pages)
-rendered_pages: list[int] = []
-for page in pages:
-    if object_exists(page_render_key(_view["id"], page.number)):
-        rendered_pages.append(page.number)
+_page_render_bytes: dict[int, bytes | None] = {
+    page.number: load_image_bytes(page_render_key(_view["id"], page.number))
+    for page in pages
+}
+rendered_pages: list[int] = [pn for pn, b in _page_render_bytes.items() if b is not None]
 
 n_rendered = len(rendered_pages)
 n_missing = n_pages_total - n_rendered
@@ -510,11 +513,10 @@ for page in pages:
 
         with col_preview:
             if is_rendered:
-                try:
-                    sk = page_render_key(_view["id"], page.number)
-                    data = download_bytes(sk)
+                data = _page_render_bytes.get(page.number)
+                if data is not None:
                     st.image(data, use_container_width=True)
-                except Exception:
+                else:
                     st.warning("Errore lettura anteprima. Rigenera il render.")
             else:
                 st.markdown(
@@ -562,9 +564,8 @@ for page in pages:
                     st.error(err)
 
             if is_rendered:
-                try:
-                    sk = page_render_key(_view["id"], page.number)
-                    data = download_bytes(sk)
+                data = _page_render_bytes.get(page.number)
+                if data is not None:
                     st.download_button(
                         "⬇️ Scarica PNG",
                         data=data,
@@ -573,5 +574,3 @@ for page in pages:
                         key=f"_dl_p{page.number}",
                         use_container_width=True,
                     )
-                except Exception:
-                    pass
