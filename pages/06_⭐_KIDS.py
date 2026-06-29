@@ -746,6 +746,35 @@ VINCOLI CRITICI — RISPETTA ESATTAMENTE:
 - Nei dialoghi usa solo testo in MAIUSCOLO breve, niente apostrofi, niente accenti
   difficili. Esempi buoni: "CIAO!", "AIUTO!", "DOVE SEI?", "ANDIAMO!", "MAMMA!"
 - Niente asterischi, niente testo cancellato, niente markdown
+
+COERENZA VISIVA DEGLI ELEMENTI RICORRENTI — REGOLA FONDAMENTALE:
+I personaggi principali hanno reference image, quindi sono coerenti automaticamente.
+MA ogni altro elemento visivo che compare in più vignette (animali secondari,
+oggetti caratteristici, ambienti specifici, vestiti, accessori) può essere
+disegnato in modo diverso ogni volta perché l'AI immagine NON ha memoria.
+
+Per evitare incoerenze (es. uccellino blu in una vignetta e giallo in un'altra):
+1. La PRIMA volta che un elemento secondario appare in una vignetta, descrivilo
+   con DETTAGLI VISIVI CONCRETI (colore esatto, forma, dimensione, eventuali
+   macchie o caratteristiche distintive).
+2. In OGNI vignetta successiva in cui ricompare, ripeti gli STESSI dettagli
+   visivi alla lettera. Non variare mai colore, forma o dettagli.
+
+Esempi corretti:
+  Vignetta 1: "Mia incontra un piccolo uccellino azzurro con la pancia bianca
+              e il becco arancione appollaiato su un ramo."
+  Vignetta 3: "L'uccellino azzurro con la pancia bianca e il becco arancione
+              vola accanto a Mia."
+  Vignetta 5: "L'uccellino azzurro con la pancia bianca e il becco arancione
+              canta felice mentre Mia ride."
+
+Esempi SBAGLIATI (da non fare):
+  Vignetta 1: "Mia trova un uccellino sul ramo."     ← troppo generico
+  Vignetta 3: "L'uccellino vola via."                ← AI sceglierà colori a caso
+
+Lo stesso vale per: cane (specifica razza/colore pelo), casa (colore tetto,
+muri, finestre), vestiti dei comprimari, oggetti magici, mezzi di trasporto.
+Sii SEMPRE esplicito sui dettagli visivi nelle description delle vignette.
 """
 
 

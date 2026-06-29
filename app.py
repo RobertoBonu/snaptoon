@@ -43,17 +43,36 @@ def _inject_css() -> None:
 
 
 def _hide_sidebar() -> None:
-    """Le schermate di accesso non hanno sidebar (vedi brief 00_Login)."""
+    """Le schermate di accesso non hanno sidebar (vedi brief 00_Login).
+
+    !important serve a vincere su qualsiasi CSS iniettato in pagina
+    (es. enforce_sidebar_visibility quando entriamo loggati e poi
+    facciamo logout: il CSS precedente potrebbe persistere brevemente).
+    """
     st.markdown(
-        "<style>[data-testid='stSidebar']{display:none;}</style>",
+        """<style>
+        [data-testid="stSidebar"],
+        section[data-testid="stSidebar"],
+        [data-testid="stSidebarNav"],
+        [data-testid="stSidebarNavItems"],
+        [data-testid="stSidebarCollapsedControl"] {
+            display: none !important;
+            visibility: hidden !important;
+            width: 0 !important;
+            min-width: 0 !important;
+            max-width: 0 !important;
+        }
+        </style>""",
         unsafe_allow_html=True,
     )
 
 
 _inject_css()
-
+# NB: enforce_sidebar_visibility() NON viene chiamato qui — verrebbe
+# applicato anche alla schermata di login, dove vincerebbe con !important
+# sul _hide_sidebar() facendo lampeggiare la sidebar. Lo invochiamo solo
+# DOPO il check auth, quando sappiamo che l'utente è loggato.
 from app_state.ui import enforce_sidebar_visibility
-enforce_sidebar_visibility()
 
 
 # ============================================================
@@ -414,4 +433,5 @@ if _user is None:
 elif _user.must_change_password:
     _render_change_password()
 else:
+    enforce_sidebar_visibility()
     _render_home(_user)
