@@ -745,6 +745,52 @@ def _render_step_4() -> None:
             st.rerun()
 
 
+def _build_kids_cover_prompt(
+    title: str,
+    cast: list[dict],
+    style_preset_id: str,
+) -> str:
+    """Prompt per la copertina del libretto kids."""
+    preset = get_preset(style_preset_id)
+    parts = []
+    parts.append(
+        "=== RENDER MODE ===\n"
+        "Vertical book cover illustration for a children's picture book. "
+        "Edge-to-edge full-bleed. Cinematic poster composition, eye-catching, "
+        "bright friendly colors. No frame, no border. The title and characters "
+        "should be the focus."
+    )
+    if preset:
+        parts.append(f"=== STYLE ===\n{preset.expansion.strip()}")
+
+    parts.append(f"=== COVER ===\nBook cover for «{title}»")
+
+    if cast:
+        cast_block = ["=== CHARACTERS ON COVER ==="]
+        for cs in cast:
+            cast_block.append(f"- {cs['name']}: {cs['description']}")
+        cast_block.append(
+            "Characters must look IDENTICAL to reference images. Hero pose, friendly expression."
+        )
+        parts.append("\n".join(cast_block))
+
+    # Titolo grande nella cover (AI-bake)
+    parts.append(
+        f"=== TITLE TEXT (DRAW IT IN THE IMAGE) ===\n"
+        f"At the top of the image, draw the title in big bold playful "
+        f"children's book font: '{title.upper()}'. Use clear readable letters, "
+        f"strong outline so it stands out from the background. No subtitle, "
+        f"no author name."
+    )
+
+    parts.append(
+        "=== AVOID ===\n"
+        "scary, dark themes, frame, border, watermark, multiple titles, "
+        "scrambled text, weird letters, misspelled words"
+    )
+    return "\n\n".join(parts)
+
+
 def _execute_full_kids_generation(
     *,
     template_id: uuid.UUID,
@@ -758,16 +804,46 @@ def _execute_full_kids_generation(
     grid_distribution: list[str],
     scene_distribution: list[dict],
 ) -> None:
-    """Esegue la pipeline completa: crea progetto, chiama Claude, genera reference, vignette."""
+    """Esegue la pipeline completa: crea progetto, chiama Claude, genera reference, vignette.
+
+    Ogni step appare gradualmente con messaggio simpatico + immagine live.
+    """
     from snaptoon_core.generator import OpenAIImageGenerator
 
-    progress = st.progress(0, text="Inizio generazione...")
-    log = st.empty()
+    # Galleria live che cresce mentre generiamo
+    st.markdown("### 🎁 Sto creando il tuo fumetto...")
+    status_slot = st.empty()  # messaggio simpatico corrente
+    gallery_container = st.container()  # qui mostriamo le immagini man mano
+
+    completed: list[dict] = []  # {kind, label, bytes, message}
+
+    def _show_status(emoji: str, msg: str) -> None:
+        status_slot.markdown(
+            f"<div style='padding:16px;background:#1A2035;border-radius:8px;"
+            f"border:1px solid #F59E0B;font-size:18px;text-align:center;'>"
+            f"<span style='font-size:32px;'>{emoji}</span><br>{msg}"
+            f"</div>",
+            unsafe_allow_html=True,
+        )
+
+    def _add_to_gallery(image_bytes: bytes, label: str, message: str) -> None:
+        completed.append({"bytes": image_bytes, "label": label})
+        with gallery_container:
+            st.success(message)
+            cols = st.columns(min(4, max(1, len(completed))))
+            # Mostra tutta la galleria aggiornata (ricreata ad ogni step)
+            for i, item in enumerate(completed):
+                with cols[i % len(cols)]:
+                    st.image(item["bytes"], caption=item["label"], use_container_width=True)
+        try:
+            st.toast(message, icon="✨")
+        except Exception:
+            pass
 
     t0 = time.time()
 
     # === 1. Crea progetto ===
-    log.write("📝 Creo il progetto...")
+    _show_status("📦", "Sto preparando la scatola magica del fumetto...")
     project_name = f"{tpl_label} — {names[0]}"
     with session_scope() as s:
         fresh_user = users_repo.get_by_id(s, _user.id)
@@ -778,10 +854,9 @@ def _execute_full_kids_generation(
         projects_repo.set_style(s, project, style_preset_id)
         project_id_local = project.id
     st.session_state[SK_PROJECT_ID] = str(project_id_local)
-    progress.progress(5, text="Progetto creato")
 
     # === 2. Adatta sceneggiatura via Claude ===
-    log.write("✍️ Claude scrive la sceneggiatura...")
+    _show_status("🪄", "Mago Claude sta inventando la storia...")
     try:
         with session_scope() as s:
             fresh_user = users_repo.get_by_id(s, _user.id)
@@ -793,6 +868,7 @@ def _execute_full_kids_generation(
                 reference_id=str(project_id_local),
             )
         pyd_script = _generate_kids_script(scintilla, names, descs, grid_distribution)
+        kids_title = pyd_script.logline or project_name
         # Save
         with session_scope() as s:
             project = projects_repo.get_by_id(s, project_id_local)
@@ -807,7 +883,9 @@ def _execute_full_kids_generation(
                     )
                 except ValueError:
                     pass  # già esiste
-        progress.progress(15, text="Sceneggiatura pronta")
+        with gallery_container:
+            st.success("📖 La storia è scritta!")
+            st.caption(f"_Logline:_ **{kids_title}**")
     except Exception as e:
         st.error(f"Errore Claude: {e}")
         with session_scope() as s:
@@ -820,13 +898,11 @@ def _execute_full_kids_generation(
         return
 
     # === 3. Save grid_distribution come page_layouts ===
-    log.write("🗂 Configuro le gabbie...")
     with session_scope() as s:
         project = projects_repo.get_by_id(s, project_id_local)
         for page_idx, grid_id in enumerate(grid_distribution, start=1):
             pl = page_layouts_repo.get_or_create(s, project, page_idx)
             page_layouts_repo.set_grid(s, pl, grid_id)
-    progress.progress(20)
 
     # === 4. Salva scene_params nei panel del script ===
     with session_scope() as s:
@@ -843,19 +919,11 @@ def _execute_full_kids_generation(
             panel.characters_in_scene = names[:]  # tutti in scena per kids
         scripts_repo.save_pydantic(s, project.script, pyd_script_db)
 
-    # === 5. Upload foto utente come reference + genera reference AI ===
-    log.write("📷 Carico le foto dei personaggi...")
-    with session_scope() as s:
-        project = projects_repo.get_by_id(s, project_id_local)
-        char_sheets = {cs.name: cs for cs in project.character_sheets}
-
+    # === 5. Genera reference per ogni personaggio ===
     generator = OpenAIImageGenerator()
-    n_steps_total = 1 + len(names) + len(scene_distribution)
-    step_count = 1
-
     char_storage_keys = {}
     for i, name in enumerate(names):
-        log.write(f"🎨 Genero reference di **{name}** ({i+1}/{len(names)})...")
+        _show_status("👤", f"Sto disegnando **{name}**...")
         try:
             ref_keys_for_gen = []
             # Se c'è foto utente, la usiamo come reference per il modello
@@ -896,6 +964,13 @@ def _execute_full_kids_generation(
                 )
                 char_storage_keys[name] = ref_storage
 
+            # Mostra il personaggio nella galleria
+            _add_to_gallery(
+                image_bytes,
+                label=name,
+                message=f"👋 Ecco **{name}**! Pronto a entrare nella storia.",
+            )
+
             # Cleanup tempfile
             for p in ref_keys_for_gen:
                 try:
@@ -912,11 +987,72 @@ def _execute_full_kids_generation(
                     reason=f"Refund kids ref: {e}",
                 )
 
-        step_count += 1
-        progress.progress(20 + int((step_count / n_steps_total) * 60))
+    # === 5.5 — Genera COPERTINA del libretto ===
+    _show_status("📕", "Sto disegnando la **copertina** del tuo libretto...")
+    try:
+        cast_block_for_cover = [{"name": n, "description": d} for n, d in zip(names, descs)]
+        cover_prompt = _build_kids_cover_prompt(kids_title, cast_block_for_cover, style_preset_id)
 
-    # === 6. Genera vignette in batch ===
-    log.write("🖼 Genero le vignette...")
+        # Reference temp files dei personaggi
+        cover_refs = []
+        for name in names:
+            rk = char_storage_keys.get(name)
+            if rk and object_exists(rk):
+                data = download_bytes(rk)
+                tmp = tempfile.NamedTemporaryFile(suffix=".png", delete=False)
+                tmp.write(data)
+                tmp.close()
+                cover_refs.append(Path(tmp.name))
+
+        with session_scope() as s:
+            fresh_user = users_repo.get_by_id(s, _user.id)
+            credits_repo.charge(
+                s, fresh_user,
+                cost=cost_for_operation("generate_panel", quality="low"),
+                operation=CreditOperation.generate_cover,
+                reason=f"KIDS copertina {kids_title}",
+                reference_id=str(project_id_local),
+            )
+
+        cover_bytes = generator._generate_bytes(
+            prompt=cover_prompt,
+            size="1024x1536",  # verticale per copertina
+            reference_images=cover_refs if cover_refs else None,
+            quality="low",
+        )
+
+        cover_storage = cover_illustration_key(project_id_local)
+        upload_bytes(cover_storage, cover_bytes, content_type="image/png")
+
+        # Save sul Cover ORM
+        with session_scope() as s:
+            project = projects_repo.get_by_id(s, project_id_local)
+            cover_orm = covers_repo.get_or_create(s, project)
+            covers_repo.update_text(s, cover_orm, title=kids_title, author="", description=scintilla)
+            covers_repo.update_illustration_key(s, cover_orm, cover_storage)
+
+        _add_to_gallery(
+            cover_bytes,
+            label="📕 Copertina",
+            message="✨ La **copertina** è pronta!!! Vediamo subito come viene?",
+        )
+
+        for p in cover_refs:
+            try:
+                p.unlink()
+            except OSError:
+                pass
+    except Exception as e:
+        st.warning(f"Copertina fallita: {e}")
+        with session_scope() as s:
+            fresh_user = users_repo.get_by_id(s, _user.id)
+            credits_repo.refund(
+                s, fresh_user,
+                amount=cost_for_operation("generate_panel", quality="low"),
+                reason=f"Refund kids cover: {e}",
+            )
+
+    # === 6. Genera vignette in batch — una alla volta con annuncio simpatico ===
     cast_block_for_panel = [{"name": n, "description": d} for n, d in zip(names, descs)]
 
     with session_scope() as s:
@@ -924,8 +1060,26 @@ def _execute_full_kids_generation(
         pyd_script_db = scripts_repo.load_pydantic(project.script)
         flat_panels = [(p, panel) for p in pyd_script_db.pages for panel in p.panels]
 
+    # Conta quante vignette per pagina (per messaggi simpatici)
+    panels_per_page: dict[int, int] = {}
+    for page, panel in flat_panels:
+        panels_per_page[page.number] = panels_per_page.get(page.number, 0) + 1
+
+    last_announced_page = 0  # tracking annunci pagina
+
     for panel_idx, ((page, panel), scene) in enumerate(zip(flat_panels, scene_distribution)):
-        log.write(f"🖼 Vignetta {panel_idx+1}/{len(flat_panels)}: pagina {page.number}, vignetta {panel.number}...")
+        # Messaggio simpatico — diverso al primo panel di ogni pagina
+        if page.number != last_announced_page:
+            if page.number == 1:
+                _show_status("📖", f"**Pagina 1** in arrivo! Facciamo le vignette?")
+            else:
+                _show_status("✨", f"**Pagina {page.number}** disponibile! Continuiamo l'avventura...")
+            last_announced_page = page.number
+        else:
+            _show_status(
+                "🎨",
+                f"Pagina {page.number} · vignetta {panel.number} di {panels_per_page[page.number]}...",
+            )
         try:
             prompt = _build_kids_panel_prompt(
                 panel, cast_block_for_panel, style_preset_id, scene,
@@ -973,6 +1127,17 @@ def _execute_full_kids_generation(
                     model="gpt-image-2",
                 )
 
+            # Aggiungi alla galleria con messaggio simpatico
+            funny_messages = [
+                f"🎨 Pagina {page.number} · vignetta {panel.number}: ecco fatta!",
+                f"✏️ Vignetta {panel.number} di pagina {page.number} dipinta!",
+                f"📖 Pagina {page.number} · vignetta {panel.number} appena uscita dal forno!",
+                f"🌈 Ecco vignetta {panel.number} di pagina {page.number}!",
+                f"🪄 Vignetta {panel.number} disegnata!",
+            ]
+            msg = funny_messages[panel_idx % len(funny_messages)]
+            _add_to_gallery(image_bytes, label=f"P{page.number}V{panel.number}", message=msg)
+
             # Cleanup
             for p in tmp_refs:
                 try:
@@ -990,13 +1155,9 @@ def _execute_full_kids_generation(
                     reason=f"Refund kids panel: {e}",
                 )
 
-        step_count += 1
-        progress.progress(20 + int((step_count / n_steps_total) * 60))
-
-    progress.progress(100, text="Fatto!")
-    log.write("✅ Generazione completata!")
-    time.sleep(1.0)
+    _show_status("🎉", "**Il tuo libretto è pronto!** Andiamo a vederlo tutto insieme...")
     st.balloons()
+    time.sleep(2.5)
     _set_step(5)
     st.rerun()
 
