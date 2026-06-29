@@ -1514,8 +1514,13 @@ def _regenerate_single_panel(
     project_id: uuid.UUID,
     page_number: int,
     panel_number: int,
-) -> tuple[bool, str | None]:
-    """Rigenera UNA vignetta. Usa stessi dati del progetto."""
+) -> tuple[bool, str | None, bytes | None]:
+    """Rigenera UNA vignetta. Ritorna (ok, err, image_bytes).
+
+    I bytes vengono ritornati per bypassare l'eventual consistency di
+    Object Storage al rerun successivo — il chiamante li mette in
+    session_state e li usa direttamente per il rendering.
+    """
     from snaptoon_core.generator import OpenAIImageGenerator
 
     cost = cost_for_operation("generate_panel", quality="medium")
@@ -1524,7 +1529,7 @@ def _regenerate_single_panel(
     with session_scope() as s:
         project = projects_repo.get_by_id(s, project_id)
         if project is None or project.script is None:
-            return False, "Progetto non trovato."
+            return False, "Progetto non trovato.", None
 
         pyd_script_db = scripts_repo.load_pydantic(project.script)
         panel = None
@@ -1536,7 +1541,7 @@ def _regenerate_single_panel(
                         break
                 break
         if panel is None:
-            return False, "Vignetta non trovata."
+            return False, "Vignetta non trovata.", None
 
         # Ricava grid_id da page_layouts per dimensionare correttamente la vignetta
         grid_id = "2x2"
@@ -1566,7 +1571,7 @@ def _regenerate_single_panel(
                 reason=f"KIDS rigenera p{page_number}v{panel_number}",
             )
     except InsufficientCreditsError as e:
-        return False, f"Crediti insufficienti: servono {e.required}, ne hai {e.available}."
+        return False, f"Crediti insufficienti: servono {e.required}, ne hai {e.available}.", None
 
     # Build prompt — size + aspect dalla cella della griglia
     size_str, aspect_key, fmt_label = _panel_size_for(grid_id, panel_number)
@@ -1622,7 +1627,7 @@ def _regenerate_single_panel(
                 s, fresh_user, amount=cost,
                 reason=f"Refund kids regen panel: {err}",
             )
-        return False, f"Errore: {err}"
+        return False, f"Errore: {err}", None
     finally:
         for p in tmp_refs:
             try:
@@ -1630,10 +1635,10 @@ def _regenerate_single_panel(
             except OSError:
                 pass
 
-    return True, None
+    return True, None, image_bytes
 
 
-def _regenerate_cover(project_id: uuid.UUID) -> tuple[bool, str | None]:
+def _regenerate_cover(project_id: uuid.UUID) -> tuple[bool, str | None, bytes | None]:
     """Rigenera la copertina."""
     from snaptoon_core.generator import OpenAIImageGenerator
 
@@ -1642,7 +1647,7 @@ def _regenerate_cover(project_id: uuid.UUID) -> tuple[bool, str | None]:
     with session_scope() as s:
         project = projects_repo.get_by_id(s, project_id)
         if project is None:
-            return False, "Progetto non trovato."
+            return False, "Progetto non trovato.", None
         style_id = project.style_id
         title = project.cover.title if project.cover else project.name
         cast = []
@@ -1663,7 +1668,7 @@ def _regenerate_cover(project_id: uuid.UUID) -> tuple[bool, str | None]:
                 reason=f"KIDS rigenera copertina",
             )
     except InsufficientCreditsError as e:
-        return False, f"Crediti insufficienti: servono {e.required}, ne hai {e.available}."
+        return False, f"Crediti insufficienti: servono {e.required}, ne hai {e.available}.", None
 
     cast_block = [{"name": c["name"], "description": c["description"]} for c in cast]
     prompt = _build_kids_cover_prompt(title, cast_block, style_id)
@@ -1702,7 +1707,7 @@ def _regenerate_cover(project_id: uuid.UUID) -> tuple[bool, str | None]:
                 s, fresh_user, amount=cost,
                 reason=f"Refund kids regen cover: {err}",
             )
-        return False, f"Errore: {err}"
+        return False, f"Errore: {err}", None
     finally:
         for p in tmp_refs:
             try:
@@ -1710,7 +1715,7 @@ def _regenerate_cover(project_id: uuid.UUID) -> tuple[bool, str | None]:
             except OSError:
                 pass
 
-    return True, None
+    return True, None, image_bytes
 
 
 def _render_step_6() -> None:
@@ -1761,9 +1766,14 @@ def _render_step_6() -> None:
     # === Copertina con bottone rigenera ===
     st.markdown("#### 📕 Copertina")
     cv_key = cover_illustration_key(project_id)
+    cv_cache_key = f"_kids_cover_bytes_{project_id}"
     col_cv_img, col_cv_btn = st.columns([3, 1])
     with col_cv_img:
-        if object_exists(cv_key):
+        # 1. Priority: bytes appena generati in session_state (evita eventual consistency)
+        fresh_cv = st.session_state.get(cv_cache_key)
+        if fresh_cv:
+            st.image(fresh_cv, use_container_width=True)
+        elif object_exists(cv_key):
             try:
                 data = download_bytes(cv_key)
                 st.image(data, use_container_width=True)
@@ -1782,8 +1792,10 @@ def _render_step_6() -> None:
             use_container_width=True,
         ):
             with st.spinner("Rigenero copertina..."):
-                ok, err = _regenerate_cover(project_id)
+                ok, err, new_bytes = _regenerate_cover(project_id)
             if ok:
+                if new_bytes:
+                    st.session_state[cv_cache_key] = new_bytes
                 st.toast("Copertina rigenerata!", icon="📕")
                 st.rerun()
             else:
@@ -1801,19 +1813,28 @@ def _render_step_6() -> None:
             with col:
                 with st.container(border=True):
                     key = (page_num, panel.number)
-                    if key in vig_keys:
+                    panel_cache_key = f"_kids_panel_bytes_{project_id}_{page_num}_{panel.number}"
+                    fresh_panel = st.session_state.get(panel_cache_key)
+
+                    # Priority: bytes appena generati > download da storage > placeholder
+                    if fresh_panel:
+                        st.image(fresh_panel, use_container_width=True)
+                        already_generated = True
+                    elif key in vig_keys:
                         try:
                             data = download_bytes(vig_keys[key])
                             st.image(data, use_container_width=True)
+                            already_generated = True
                         except Exception:
                             st.warning("Errore")
+                            already_generated = False
                     else:
                         st.caption("Non generata")
+                        already_generated = False
                     st.caption(f"P{page_num}V{panel.number}")
 
                     cost = cost_for_operation("generate_panel", quality="medium")
                     can = _user.credits_remaining >= cost
-                    already_generated = key in vig_keys
                     btn_label = (
                         f"🔄 Rigenera ({cost})" if already_generated
                         else f"✨ Genera ({cost})"
@@ -1834,8 +1855,10 @@ def _render_step_6() -> None:
                         use_container_width=True,
                     ):
                         with st.spinner(spinner_msg):
-                            ok, err = _regenerate_single_panel(project_id, page_num, panel.number)
+                            ok, err, new_bytes = _regenerate_single_panel(project_id, page_num, panel.number)
                         if ok:
+                            if new_bytes:
+                                st.session_state[panel_cache_key] = new_bytes
                             st.toast(toast_msg, icon="🎨")
                             st.rerun()
                         else:
