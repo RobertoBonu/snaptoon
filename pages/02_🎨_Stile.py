@@ -34,7 +34,7 @@ def _inject_css() -> None:
 
 _inject_css()
 
-from app_state.ui import enforce_sidebar_visibility
+from app_state.ui import enforce_sidebar_visibility, render_sidebar_nav
 enforce_sidebar_visibility()
 
 
@@ -84,6 +84,7 @@ if _current_slug is None:
 
 
 def _render_sidebar(user, project_name: str, plan_label: str, credits_left: int, credits_total: int) -> None:
+    render_sidebar_nav(user)
     with st.sidebar:
         st.markdown("**Progetto attivo:**")
         st.markdown(f"_{project_name}_")

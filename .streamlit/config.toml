@@ -12,3 +12,11 @@ maxUploadSize = 10
 
 [browser]
 gatherUsageStats = false
+
+[client]
+# Disabilita la sidebar nav generata automaticamente dal multipage di
+# Streamlit. Costruiamo la nav manualmente in app_state/ui.render_sidebar_nav()
+# solo per utenti autenticati: così nella pagina di login NON c'è alcun
+# link visibile (niente flash della sidebar). Inoltre permette di filtrare
+# i link per ruolo senza ricorrere a CSS hide.
+showSidebarNavigation = false

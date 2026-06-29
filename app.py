@@ -433,5 +433,7 @@ if _user is None:
 elif _user.must_change_password:
     _render_change_password()
 else:
+    from app_state.ui import render_sidebar_nav
     enforce_sidebar_visibility()
+    render_sidebar_nav(_user)
     _render_home(_user)

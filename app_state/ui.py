@@ -9,6 +9,78 @@ from __future__ import annotations
 import streamlit as st
 
 
+# ============================================================
+# Sidebar nav manuale (Streamlit multipage nativo è disabilitato
+# via .streamlit/config.toml → client.showSidebarNavigation = false)
+# ============================================================
+
+# Ordine dei link: HOME, Testo, Stile, Personaggi, Genera, Impagina,
+# KIDS, Account, Admin. I divisori sono inseriti come markdown <hr>.
+
+_PAGE_LABELS = {
+    "app.py": ("🏠", "Home"),
+    "pages/01_📝_Testo.py": ("📝", "Testo"),
+    "pages/02_🎨_Stile.py": ("🎨", "Stile"),
+    "pages/03_👥_Personaggi.py": ("👥", "Personaggi"),
+    "pages/04_🖼_Genera.py": ("🖼", "Genera"),
+    "pages/05_📐_Impagina.py": ("📐", "Impagina"),
+    "pages/06_⭐_KIDS.py": ("⭐", "KIDS"),
+    "pages/89_⚙️_Account.py": ("⚙️", "Account"),
+    "pages/99_🛠_Admin.py": ("🛠", "Admin"),
+}
+
+
+def _divider() -> None:
+    st.sidebar.markdown(
+        "<hr style='border:none;border-top:1px solid #1E2436;margin:8px 8px;'/>",
+        unsafe_allow_html=True,
+    )
+
+
+def render_sidebar_nav(user) -> None:
+    """Costruisce la sidebar nav manualmente per un utente autenticato.
+
+    Filtra i link in base al ruolo:
+    - role=kids → solo HOME + KIDS + Account
+    - admin    → tutto (incluso Admin + KIDS)
+    - altri    → tutto tranne KIDS + Admin
+
+    Chiamare DOPO che è stato verificato che l'utente è loggato.
+    """
+    from db.models import Role as _Role
+
+    role_val = user.role.value if hasattr(user.role, "value") else str(user.role)
+    is_admin = bool(getattr(user, "is_admin", False))
+    is_kids = (role_val == "kids")
+
+    with st.sidebar:
+        # Blocco 1 — Home
+        st.page_link("app.py", label="🏠 Home")
+
+        # Blocco 2 — Flusso standard (non kids)
+        if not is_kids:
+            _divider()
+            st.page_link("pages/01_📝_Testo.py", label="📝 Testo")
+            st.page_link("pages/02_🎨_Stile.py", label="🎨 Stile")
+            st.page_link("pages/03_👥_Personaggi.py", label="👥 Personaggi")
+            st.page_link("pages/04_🖼_Genera.py", label="🖼 Genera")
+            st.page_link("pages/05_📐_Impagina.py", label="📐 Impagina")
+
+        # Blocco 3 — KIDS (admin + role kids)
+        if is_admin or is_kids:
+            _divider()
+            st.page_link("pages/06_⭐_KIDS.py", label="⭐ KIDS")
+
+        # Blocco 4 — Account (sempre)
+        _divider()
+        st.page_link("pages/89_⚙️_Account.py", label="⚙️ Account")
+
+        # Blocco 5 — Admin (solo admin)
+        if is_admin:
+            _divider()
+            st.page_link("pages/99_🛠_Admin.py", label="🛠 Admin")
+
+
 def enforce_sidebar_visibility() -> None:
     """Fissa la sidebar SEMPRE visibile, non chiudibile.
 
