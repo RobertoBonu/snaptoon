@@ -23,24 +23,17 @@ def upgrade() -> None:
     # Aggiungi valore 'kids' all'enum role_enum (PostgreSQL specifico)
     op.execute("ALTER TYPE role_enum ADD VALUE IF NOT EXISTS 'kids'")
 
-    # Crea tabella kids_templates
-    # NB: length_target_enum esiste già (creato nella migration initial),
-    # quindi create_type=False per evitare 'DuplicateObject'.
+    # Crea tabella kids_templates.
+    # NB: length_target è VARCHAR (non enum PostgreSQL) per evitare
+    # 'DuplicateObject' su length_target_enum già esistente. L'enum
+    # Python LengthTarget(str, Enum) gestisce la validazione lato app.
     op.create_table(
         "kids_templates",
         sa.Column("id", UUID(as_uuid=True), primary_key=True),
         sa.Column("slug", sa.String(length=64), nullable=False),
         sa.Column("label", sa.String(length=255), nullable=False),
         sa.Column("n_characters", sa.Integer(), nullable=False),
-        sa.Column(
-            "length_target",
-            sa.Enum(
-                "striscia", "breve", "medio", "lungo",
-                name="length_target_enum",
-                create_type=False,
-            ),
-            nullable=False,
-        ),
+        sa.Column("length_target", sa.String(length=16), nullable=False),
         sa.Column("grid_distribution", JSONB(astext_type=sa.Text()), nullable=False),
         sa.Column("scene_distribution", JSONB(astext_type=sa.Text()), nullable=False),
         sa.Column("is_active", sa.Boolean(), nullable=False, server_default="true"),

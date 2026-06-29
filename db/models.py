@@ -447,10 +447,10 @@ class KidsTemplate(UUIDPrimaryKeyMixin, TimestampMixin, UpdatedAtMixin, Base):
     slug: Mapped[str] = mapped_column(String(64), nullable=False)
     label: Mapped[str] = mapped_column(String(255), nullable=False)
     n_characters: Mapped[int] = mapped_column(Integer, nullable=False)
-    length_target: Mapped[LengthTarget] = mapped_column(
-        Enum(LengthTarget, name="length_target_enum", values_callable=lambda x: [e.value for e in x]),
-        nullable=False,
-    )
+    # length_target memorizzato come VARCHAR per evitare collisioni su
+    # length_target_enum già esistente. LengthTarget(str, Enum) gestisce
+    # la validazione/conversione a livello applicativo.
+    length_target: Mapped[str] = mapped_column(String(16), nullable=False)
     grid_distribution: Mapped[list] = mapped_column(JSONB, nullable=False, default=list)
     scene_distribution: Mapped[list] = mapped_column(JSONB, nullable=False, default=list)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)

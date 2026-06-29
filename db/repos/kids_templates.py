@@ -41,11 +41,14 @@ def upsert(
     scene_distribution: list,
     notes: str = "",
 ) -> KidsTemplate:
+    # LengthTarget(str, Enum) → .value per VARCHAR
+    lt_value = length_target.value if hasattr(length_target, "value") else str(length_target)
+
     existing = get_by_slug(session, slug)
     if existing is not None:
         existing.label = label
         existing.n_characters = n_characters
-        existing.length_target = length_target
+        existing.length_target = lt_value
         existing.grid_distribution = grid_distribution
         existing.scene_distribution = scene_distribution
         existing.notes = notes
@@ -55,7 +58,7 @@ def upsert(
         slug=slug,
         label=label,
         n_characters=n_characters,
-        length_target=length_target,
+        length_target=lt_value,
         grid_distribution=grid_distribution,
         scene_distribution=scene_distribution,
         notes=notes,
