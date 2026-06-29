@@ -91,11 +91,22 @@ from db.repos import users as users_repo
 from db.repos import vignettes as vignettes_repo
 from db.repos.credits import InsufficientCreditsError
 from db.session import session_scope
-from snaptoon_core.layout import GRIDS, export_pdf, render_page
-from snaptoon_core.llm import DEFAULT_MODEL, client as llm_client
+# NB: snaptoon_core.layout, .llm, .styles_library NON sono importati al
+# top-level perché pesanti (PIL/reportlab, anthropic SDK, libreria preset
+# da 98 elementi). Caricano ~12s su Replit al primo accesso bloccando
+# l'apertura della dashboard. Sono importati lazy nelle funzioni che li usano:
+#   - snaptoon_core.layout  → solo in _generate_kids_pdf
+#   - snaptoon_core.llm     → solo in _generate_kids_script
+#   - snaptoon_core.styles_library.get_preset → _get_preset() lazy wrapper sotto
 from snaptoon_core.models import Character, Dialogue, Page, Panel
 from snaptoon_core.models import Script as PydScript
-from snaptoon_core.styles_library import get_preset
+
+
+def _get_preset(preset_id: str):
+    """Lazy wrapper su snaptoon_core.styles_library.get_preset.
+    Evita di caricare la libreria preset (~2-3s) al top del file."""
+    from snaptoon_core.styles_library import get_preset as _gp
+    return _gp(preset_id)
 from storage.client import download_bytes, upload_bytes
 from storage.images import invalidate_image_cache, load_image_bytes
 from storage.keys import (
@@ -467,7 +478,7 @@ def _render_step_1() -> None:
                 ):
                     st.session_state[SK_STYLE] = slug
                     st.rerun()
-                preset = get_preset(preset_id)
+                preset = _get_preset(preset_id)
                 if preset:
                     st.caption(preset.expansion[:140] + "...")
 
@@ -988,7 +999,7 @@ def _slug(text: str) -> str:
 
 
 def _build_kids_reference_prompt(name: str, desc: str, style_preset_id: str) -> str:
-    preset = get_preset(style_preset_id)
+    preset = _get_preset(style_preset_id)
     parts = []
     if preset:
         parts.append(f"=== STYLE ===\n{preset.expansion.strip()}")
@@ -1037,7 +1048,7 @@ def _build_kids_panel_prompt(
     scene_params: dict,
     panel_format: str = "square format",
 ) -> str:
-    preset = get_preset(style_preset_id)
+    preset = _get_preset(style_preset_id)
     parts = []
     parts.append(
         f"=== RENDER MODE ===\n"
@@ -1211,7 +1222,7 @@ def _build_kids_cover_prompt(
     style_preset_id: str,
 ) -> str:
     """Prompt per la copertina del libretto kids."""
-    preset = get_preset(style_preset_id)
+    preset = _get_preset(style_preset_id)
     parts = []
     parts.append(
         "=== RENDER MODE ===\n"
