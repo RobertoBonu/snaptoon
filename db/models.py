@@ -446,6 +446,31 @@ class CastArchiveEntry(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     notes: Mapped[str] = mapped_column(Text, default="", nullable=False)
 
 
+class AdminStyle(UUIDPrimaryKeyMixin, TimestampMixin, UpdatedAtMixin, Base):
+    """Stili visivi creati/curati dall'admin, disponibili a tutti gli utenti.
+
+    Si affiancano ai 98 preset hardcoded della libreria visual-prompt-engine.
+    Permettono di aggiungere stili senza redeploy.
+
+    Schema compatibile con StylePreset di snaptoon_core.styles_library:
+    label + category + expansion + extra_negative_terms + is_handmade.
+    """
+
+    __tablename__ = "admin_styles"
+    __table_args__ = (
+        UniqueConstraint("slug", name="uq_admin_styles_slug"),
+    )
+
+    slug: Mapped[str] = mapped_column(String(255), nullable=False)
+    label: Mapped[str] = mapped_column(String(255), nullable=False)
+    category: Mapped[str] = mapped_column(String(64), nullable=False, default="Personali")
+    expansion: Mapped[str] = mapped_column(Text, nullable=False)
+    negative_terms: Mapped[str] = mapped_column(Text, default="", nullable=False)
+    is_handmade: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    notes: Mapped[str] = mapped_column(Text, default="", nullable=False)
+
+
 class AdminAudit(UUIDPrimaryKeyMixin, Base):
     """Log azioni admin (creazione utenti, grant crediti, disable account)."""
 
