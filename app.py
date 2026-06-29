@@ -72,7 +72,16 @@ _inject_css()
 # applicato anche alla schermata di login, dove vincerebbe con !important
 # sul _hide_sidebar() facendo lampeggiare la sidebar. Lo invochiamo solo
 # DOPO il check auth, quando sappiamo che l'utente è loggato.
-from app_state.ui import enforce_sidebar_visibility
+from app_state.ui import enforce_sidebar_visibility, show_page_loading
+
+# Loader full-screen overlay (z-index 9999) attivo DURANTE tutto:
+# - i ~3s di import del backend
+# - il check auth
+# - il render del form/dashboard sottostante
+# Solo alla FINE rimosso → l'utente vede la pagina già pronta, niente
+# rendering progressivo a step. Senza questo, vedeva: nero → frame box
+# vuoto → form parziale → form completo.
+_app_loader = show_page_loading("SnapToon si sta preparando...")
 
 
 # ============================================================
@@ -430,10 +439,13 @@ with session_scope() as s:
 
 if _user is None:
     _render_login()
+    _app_loader.empty()  # form pronto, rimuovi loader
 elif _user.must_change_password:
     _render_change_password()
+    _app_loader.empty()
 else:
     from app_state.ui import render_sidebar_nav
     enforce_sidebar_visibility()
     render_sidebar_nav(_user)
     _render_home(_user)
+    _app_loader.empty()
