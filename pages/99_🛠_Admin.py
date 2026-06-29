@@ -205,6 +205,7 @@ with tab_users:
                                 Role.autore_base: Plan.creator,
                                 Role.autore_premium: Plan.pro,
                                 Role.editore: Plan.pro,
+                                Role.kids: Plan.creator,
                             }
                             new_user = users_repo.create_user(
                                 s,
