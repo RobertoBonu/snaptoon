@@ -1813,16 +1813,30 @@ def _render_step_6() -> None:
 
                     cost = cost_for_operation("generate_panel", quality="medium")
                     can = _user.credits_remaining >= cost
+                    already_generated = key in vig_keys
+                    btn_label = (
+                        f"🔄 Rigenera ({cost})" if already_generated
+                        else f"✨ Genera ({cost})"
+                    )
+                    spinner_msg = (
+                        f"Rigenero P{page_num}V{panel.number}..." if already_generated
+                        else f"Genero P{page_num}V{panel.number}..."
+                    )
+                    toast_msg = (
+                        f"P{page_num}V{panel.number} rigenerata!" if already_generated
+                        else f"P{page_num}V{panel.number} generata!"
+                    )
                     if st.button(
-                        f"🔄 Rigenera ({cost})",
+                        btn_label,
                         key=f"_regen_p{page_num}v{panel.number}",
                         disabled=not can,
+                        type="primary" if not already_generated else "secondary",
                         use_container_width=True,
                     ):
-                        with st.spinner(f"Rigenero P{page_num}V{panel.number}..."):
+                        with st.spinner(spinner_msg):
                             ok, err = _regenerate_single_panel(project_id, page_num, panel.number)
                         if ok:
-                            st.toast(f"P{page_num}V{panel.number} rigenerata!", icon="🎨")
+                            st.toast(toast_msg, icon="🎨")
                             st.rerun()
                         else:
                             st.error(err)
