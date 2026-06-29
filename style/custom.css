@@ -32,6 +32,17 @@ footer                            { display: none !important; }
    SIDEBAR
    ============================================================ */
 
+/* DEFAULT: sidebar nascosta. Python decide se mostrarla:
+   - utenti loggati → enforce_sidebar_visibility() la mostra con !important
+   - schermata login → resta nascosta
+   Senza questa regola, Streamlit la renderizza VISIBILE prima che
+   Python possa intervenire → flash della sidebar sul login. */
+[data-testid="stSidebar"],
+[data-testid="stSidebarCollapsedControl"] {
+  display: none !important;
+  visibility: hidden !important;
+}
+
 [data-testid="stSidebar"] {
   background-color: #0A0E17 !important;
   border-right: 1px solid #1E2436 !important;
