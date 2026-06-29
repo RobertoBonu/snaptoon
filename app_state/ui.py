@@ -28,21 +28,21 @@ def enforce_sidebar_visibility() -> None:
     # ai non-admin. Streamlit mostra tutti i pages/*.py come link sidebar a
     # qualunque utente: bisogna nasconderli a livello CSS.
     #
-    # Resolution priority:
-    # 1. session_state cache (popolato da app.py o auth_required)
-    # 2. fallback: lookup DB diretto (così funziona anche se la cache non c'è)
-    is_admin = bool(st.session_state.get("snaptoon_user_is_admin", False))
-    if not is_admin:
-        try:
-            from auth.sessions import current_user as _current_user
-            from db.session import session_scope as _session_scope
-            with _session_scope() as _s:
-                _u = _current_user(_s)
-                if _u is not None:
-                    is_admin = _u.is_admin
-                    st.session_state["snaptoon_user_is_admin"] = is_admin
-        except Exception:
-            pass
+    # SEMPRE lookup DB (no cache session_state): la cache può essere stale
+    # da una sessione precedente con ruolo diverso, e mostrerebbe Admin
+    # a utenti non-admin. Costo: 1 query in più per render.
+    is_admin = False
+    try:
+        from auth.sessions import current_user as _current_user
+        from db.session import session_scope as _session_scope
+        with _session_scope() as _s:
+            _u = _current_user(_s)
+            if _u is not None:
+                is_admin = _u.is_admin
+                # Aggiorna cache (per coerenza con altri consumer)
+                st.session_state["snaptoon_user_is_admin"] = is_admin
+    except Exception:
+        pass
 
     # Nasconde gli ultimi N nav items per role:
     # - non-admin: nascondi solo "Admin" (ultimo, file 99_🛠_Admin.py)
@@ -51,9 +51,14 @@ def enforce_sidebar_visibility() -> None:
     if not is_admin:
         admin_link_hide_css = """
         /* Nascondi il link Admin (ultimo nav item, file 99_🛠_Admin.py)
-           per gli utenti che non hanno role=admin. */
-        [data-testid="stSidebarNavItems"] > *:last-child {
+           per gli utenti che non hanno role=admin. Usa multipli selettori
+           per robustezza tra versioni Streamlit. */
+        [data-testid="stSidebarNavItems"] > *:last-child,
+        [data-testid="stSidebarNav"] > ul > li:last-child,
+        [data-testid="stSidebarNavItems"] a[href*="Admin"],
+        [data-testid="stSidebarNav"] a[href*="Admin"] {
             display: none !important;
+            visibility: hidden !important;
         }
         """
 

@@ -68,19 +68,8 @@ _cfg = role_config(_user.role)
 # Sidebar
 # ============================================================
 with st.sidebar:
-    st.markdown(
-        """
-        <div class="snaptoon-sidebar-logo">
-          <span class="snaptoon-sidebar-logo__wordmark">
-            SnapToon<span class="snaptoon-sidebar-logo__dot"></span>
-          </span>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
-    st.caption(_user.email)
-    st.caption(f"**{_cfg.label}** · {_user.credits_remaining}/{_user.credits_total_this_period} crediti")
-    st.divider()
+    # Email + ruolo + crediti sono mostrati nel contenuto principale della
+    # pagina Account, non servono ridondanti in sidebar.
     if st.button("🚪 Esci", key="_sb_logout_account", use_container_width=True):
         with session_scope() as s:
             logout(s)
