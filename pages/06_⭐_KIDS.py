@@ -15,7 +15,6 @@ from __future__ import annotations
 
 import hashlib
 import json
-import logging
 import re
 import tempfile
 import time
@@ -24,38 +23,12 @@ from pathlib import Path
 
 import streamlit as st
 
-# ============================================================
-# PROFILING TEMPORANEO — rimuovi dopo aver trovato il bottleneck
-# ============================================================
-_PROFILE_T0 = time.perf_counter()
-_PROFILE_LAST = _PROFILE_T0
-_profile_log = logging.getLogger("kids.profile")
-_profile_log.setLevel(logging.INFO)
-if not _profile_log.handlers:
-    _h = logging.StreamHandler()
-    _h.setFormatter(logging.Formatter("[KIDS-PROF] %(message)s"))
-    _profile_log.addHandler(_h)
-
-
-def _prof(label: str) -> None:
-    """Logga delta-time da inizio file + delta dall'ultimo checkpoint."""
-    global _PROFILE_LAST
-    now = time.perf_counter()
-    total = now - _PROFILE_T0
-    delta = now - _PROFILE_LAST
-    _profile_log.info(f"{total*1000:7.0f}ms total | +{delta*1000:6.0f}ms | {label}")
-    _PROFILE_LAST = now
-
-
-_prof("file entry, streamlit imported")
-
 st.set_page_config(
     page_title="KIDS — SnapToon",
     page_icon="⭐",
     layout="wide",
     initial_sidebar_state="expanded",
 )
-_prof("set_page_config done")
 
 
 def _inject_css() -> None:
@@ -65,11 +38,9 @@ def _inject_css() -> None:
 
 
 _inject_css()
-_prof("css injected")
 
 from app_state.ui import enforce_sidebar_visibility, render_sidebar_nav
 enforce_sidebar_visibility()
-_prof("enforce_sidebar_visibility done")
 
 
 # ============================================================
@@ -116,7 +87,6 @@ from storage.keys import (
     reference_key,
     vignette_key,
 )
-_prof("backend imports done")
 
 
 # ============================================================
@@ -124,7 +94,6 @@ _prof("backend imports done")
 # ============================================================
 with session_scope() as _s:
     _user = current_user(_s)
-_prof("current_user query done")
 
 if _user is None:
     st.error("Devi accedere per usare questa pagina.")
@@ -294,9 +263,7 @@ st.divider()
 
 
 def _render_dashboard() -> None:
-    _prof("dashboard: enter")
     libri = _list_kids_projects(_user.id)
-    _prof(f"dashboard: list_kids_projects done ({len(libri)} libretti)")
 
     col_h1, col_h2 = st.columns([3, 1])
     with col_h1:
