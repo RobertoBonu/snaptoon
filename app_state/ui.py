@@ -66,6 +66,27 @@ def enforce_sidebar_visibility() -> None:
         f"""
         <style>
         /* ============================================================
+           Sidebar nav divisori in 3 (o 4 per admin) sezioni:
+             HOME
+             ───
+             📝 Testo · 🎨 Stile · 👥 Personaggi · 🖼 Genera · 📐 Impagina
+             ───
+             ⚙️ Account
+             ─── (solo admin)
+             🛠 Admin
+
+           I divisori sono border-top sui nav item 2 (sotto HOME),
+           7 (sopra Account), 8 (sopra Admin).
+           ============================================================ */
+        [data-testid="stSidebarNavItems"] > *:nth-child(2),
+        [data-testid="stSidebarNavItems"] > *:nth-child(7),
+        [data-testid="stSidebarNavItems"] > *:nth-child(8) {{
+            border-top: 1px solid #1E2436 !important;
+            padding-top: 8px !important;
+            margin-top: 8px !important;
+        }}
+
+        /* ============================================================
            Sidebar SEMPRE visibile, qualunque sia lo stato aria-expanded.
            Sovrascrive il CSS dell'agente che può applicarci transform
            translateX(-100%) per "nasconderla".
