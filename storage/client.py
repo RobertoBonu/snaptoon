@@ -52,11 +52,22 @@ class _ReplitBackend:
         return self._client.download_as_bytes(key)
 
     def object_exists(self, key: str) -> bool:
+        """Check esistenza senza scaricare il blob intero.
+
+        Prima implementazione faceva download_as_bytes per check, che è
+        catastrofico in latenza (es. 30+ secondi per una dashboard con 5
+        libretti). L'SDK Replit espone `list` con prefix per filtrare.
+        """
         try:
-            self._client.download_as_bytes(key)
-            return True
+            results = self._client.list(prefix=key)
+            return any(getattr(o, "name", None) == key for o in results)
         except Exception:
-            return False
+            # Fallback: SDK senza list() → cadi sul download (lento ma corretto)
+            try:
+                self._client.download_as_bytes(key)
+                return True
+            except Exception:
+                return False
 
     def delete_object(self, key: str) -> None:
         try:
