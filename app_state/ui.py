@@ -40,6 +40,11 @@ def _divider() -> None:
 def render_sidebar_nav(user) -> None:
     """Costruisce la sidebar nav manualmente per un utente autenticato.
 
+    Usa Material Icons come icone (st.page_link icon=":material/...:")
+    per ottenere lo stesso look line-style del custom.css originale,
+    senza dipendere dalla sidebar nativa di Streamlit (che farebbe
+    lampeggiare sul login).
+
     Filtra i link in base al ruolo:
     - role=kids → solo HOME + KIDS + Account
     - admin    → tutto (incluso Admin + KIDS)
@@ -47,38 +52,36 @@ def render_sidebar_nav(user) -> None:
 
     Chiamare DOPO che è stato verificato che l'utente è loggato.
     """
-    from db.models import Role as _Role
-
     role_val = user.role.value if hasattr(user.role, "value") else str(user.role)
     is_admin = bool(getattr(user, "is_admin", False))
     is_kids = (role_val == "kids")
 
     with st.sidebar:
         # Blocco 1 — Home
-        st.page_link("app.py", label="🏠 Home")
+        st.page_link("app.py", label="Home", icon=":material/home:")
 
         # Blocco 2 — Flusso standard (non kids)
         if not is_kids:
             _divider()
-            st.page_link("pages/01_📝_Testo.py", label="📝 Testo")
-            st.page_link("pages/02_🎨_Stile.py", label="🎨 Stile")
-            st.page_link("pages/03_👥_Personaggi.py", label="👥 Personaggi")
-            st.page_link("pages/04_🖼_Genera.py", label="🖼 Genera")
-            st.page_link("pages/05_📐_Impagina.py", label="📐 Impagina")
+            st.page_link("pages/01_📝_Testo.py", label="Testo", icon=":material/edit:")
+            st.page_link("pages/02_🎨_Stile.py", label="Stile", icon=":material/palette:")
+            st.page_link("pages/03_👥_Personaggi.py", label="Personaggi", icon=":material/group:")
+            st.page_link("pages/04_🖼_Genera.py", label="Genera", icon=":material/image:")
+            st.page_link("pages/05_📐_Impagina.py", label="Impagina", icon=":material/dashboard:")
 
         # Blocco 3 — KIDS (admin + role kids)
         if is_admin or is_kids:
             _divider()
-            st.page_link("pages/06_⭐_KIDS.py", label="⭐ KIDS")
+            st.page_link("pages/06_⭐_KIDS.py", label="KIDS", icon=":material/star:")
 
         # Blocco 4 — Account (sempre)
         _divider()
-        st.page_link("pages/89_⚙️_Account.py", label="⚙️ Account")
+        st.page_link("pages/89_⚙️_Account.py", label="Account", icon=":material/settings:")
 
         # Blocco 5 — Admin (solo admin)
         if is_admin:
             _divider()
-            st.page_link("pages/99_🛠_Admin.py", label="🛠 Admin")
+            st.page_link("pages/99_🛠_Admin.py", label="Admin", icon=":material/build:")
 
 
 def enforce_sidebar_visibility() -> None:
