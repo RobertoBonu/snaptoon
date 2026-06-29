@@ -140,6 +140,8 @@ SK_SCINTILLA = "_kids_scintilla"
 SK_CHAR_NAMES = "_kids_char_names"
 SK_CHAR_DESCS = "_kids_char_descs"
 SK_CHAR_PHOTOS = "_kids_char_photos"  # bytes
+SK_PYD_SCRIPT = "_kids_pyd_script"  # script generato (dict da Pydantic)
+SK_REGEN_FEEDBACK = "_kids_regen_feedback"
 SK_PROJECT_ID = "_kids_project_id"
 SK_GEN_PROGRESS = "_kids_gen_progress"
 
@@ -155,6 +157,7 @@ def _set_step(n: int) -> None:
 def _reset_wizard() -> None:
     for k in [SK_STEP, SK_TEMPLATE_ID, SK_STYLE, SK_SCINTILLA,
               SK_CHAR_NAMES, SK_CHAR_DESCS, SK_CHAR_PHOTOS,
+              SK_PYD_SCRIPT, SK_REGEN_FEEDBACK,
               SK_PROJECT_ID, SK_GEN_PROGRESS]:
         st.session_state.pop(k, None)
 
@@ -168,7 +171,7 @@ st.caption("Crea un libretto illustrato per bambini in 5 passaggi.")
 
 # Step indicator
 step = _step()
-steps_labels = ["Template", "Scintilla", "Personaggi", "Genera", "Esporta"]
+steps_labels = ["Template", "Scintilla", "Personaggi", "Storia", "Genera", "Esporta"]
 indicator_html = "<div style='display:flex;gap:12px;margin:16px 0;'>"
 for i, lbl in enumerate(steps_labels, start=1):
     color = "#F59E0B" if i == step else ("#10B981" if i < step else "#475569")
@@ -415,12 +418,193 @@ def _render_step_3() -> None:
         ):
             st.session_state[SK_CHAR_DESCS] = descs
             st.session_state[SK_CHAR_PHOTOS] = photos
+            # Invalida script precedente (descrizioni cambiate)
+            st.session_state.pop(SK_PYD_SCRIPT, None)
             _set_step(4)
             st.rerun()
 
 
 # ============================================================
-# STEP 4 — Genera tutto
+# STEP 4 — Anteprima Storia (genera con Claude, approva o rigenera)
+# ============================================================
+
+
+def _do_generate_story(scintilla: str, names: list[str], descs: list[str],
+                       grid_distribution: list[str], feedback: str = "") -> tuple[bool, str | None]:
+    """Chiama Claude per la storia + salva in session_state. Returns (ok, err)."""
+    cost = cost_for_operation("adapt_script")
+    try:
+        with session_scope() as s:
+            fresh_user = users_repo.get_by_id(s, _user.id)
+            credits_repo.charge(
+                s, fresh_user,
+                cost=cost,
+                operation=CreditOperation.adapt_script,
+                reason=f"KIDS storia (preview)",
+            )
+    except InsufficientCreditsError as e:
+        return False, f"Crediti insufficienti: servono {e.required}, ne hai {e.available}."
+
+    try:
+        pyd_script = _generate_kids_script(scintilla, names, descs, grid_distribution, feedback)
+        # Salva in session_state come dict per serializzazione safe
+        st.session_state[SK_PYD_SCRIPT] = pyd_script.model_dump()
+        return True, None
+    except Exception as e:
+        err = str(e)[:500]
+        with session_scope() as s:
+            fresh_user = users_repo.get_by_id(s, _user.id)
+            credits_repo.refund(
+                s, fresh_user,
+                amount=cost,
+                reason=f"Refund kids story: {err}",
+            )
+        return False, f"Errore Claude: {err}"
+
+
+def _render_step_4_storia() -> None:
+    st.markdown("### Step 4 — Ecco la tua storia! 📖")
+
+    template_id = st.session_state[SK_TEMPLATE_ID]
+    with session_scope() as s:
+        tpl = kids_templates_repo.get_by_id(s, template_id)
+        if tpl is None:
+            st.error("Template non valido.")
+            return
+        grid_distribution = list(tpl.grid_distribution)
+        n_pages = len(grid_distribution)
+
+    scintilla = st.session_state[SK_SCINTILLA]
+    names = st.session_state[SK_CHAR_NAMES]
+    descs = st.session_state[SK_CHAR_DESCS]
+
+    # Se non c'è ancora una storia in memoria, generala
+    if SK_PYD_SCRIPT not in st.session_state:
+        with st.spinner("✍️ Claude sta scrivendo la tua storia..."):
+            ok, err = _do_generate_story(scintilla, names, descs, grid_distribution, feedback="")
+        if not ok:
+            st.error(err)
+            if st.button("← Torna indietro", use_container_width=True):
+                _set_step(3)
+                st.rerun()
+            return
+        st.rerun()  # ricarica con la storia disponibile
+
+    # Storia presente — mostra in formato colorato
+    pyd_dict = st.session_state[SK_PYD_SCRIPT]
+    logline = pyd_dict.get("logline", "")
+    pages = pyd_dict.get("pages", [])
+
+    # Card centrale con la storia
+    st.markdown(
+        f"""
+        <div style='background:linear-gradient(135deg, #1A2035 0%, #2D1B4E 100%);
+                    border-radius:16px;padding:24px;margin:16px 0;
+                    border:2px solid #F59E0B;'>
+            <div style='font-size:14px;color:#F59E0B;text-transform:uppercase;
+                        letter-spacing:0.1em;margin-bottom:8px;'>✨ La tua storia</div>
+            <div style='font-size:22px;font-weight:600;color:#F1F5F9;
+                        line-height:1.5;font-style:italic;'>
+                "{logline}"
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    # Riassunto: mostra pagina per pagina
+    st.markdown("##### 📚 Come si svolge:")
+    for pg in pages:
+        with st.expander(f"📖 Pagina {pg['number']} ({len(pg.get('panels', []))} vignette)", expanded=False):
+            for pn in pg.get("panels", []):
+                desc = pn.get("description", "")
+                dlg_text = pn.get("dialogue_text") if isinstance(pn, dict) else None
+                dlg_speaker = pn.get("dialogue_speaker") if isinstance(pn, dict) else None
+                # Compatibilità con vecchio formato (dialogues list)
+                if "dialogues" in pn and pn["dialogues"]:
+                    d = pn["dialogues"][0]
+                    dlg_text = d.get("text")
+                    dlg_speaker = d.get("speaker")
+
+                st.markdown(f"**🎬 Vignetta {pn['number']}** — {desc}")
+                if dlg_text:
+                    speaker_str = f"**{dlg_speaker}**: " if dlg_speaker else ""
+                    st.markdown(f"  💬 {speaker_str}_{dlg_text}_")
+                st.markdown("")
+
+    st.divider()
+
+    # Box rigenera (toggle)
+    show_regen = st.session_state.get("_kids_show_regen", False)
+
+    col_back, col_regen, col_ok = st.columns([1, 1, 2])
+    with col_back:
+        if st.button("← Indietro", use_container_width=True, key="_step4_back"):
+            _set_step(3)
+            st.rerun()
+    with col_regen:
+        if st.button(
+            "🔄 Rigenera storia",
+            use_container_width=True,
+            key="_step4_regen_toggle",
+        ):
+            st.session_state["_kids_show_regen"] = not show_regen
+            st.rerun()
+    with col_ok:
+        if st.button(
+            "✨ Mi piace! Genera le immagini →",
+            type="primary",
+            use_container_width=True,
+            key="_step4_next",
+        ):
+            _set_step(5)
+            st.rerun()
+
+    if show_regen:
+        st.markdown("---")
+        with st.container(border=True):
+            st.markdown("##### 🔄 Rigenera con un suggerimento")
+            st.caption(
+                "Vuoi cambiare qualcosa? Scrivi qui cosa modificare e Claude "
+                "scriverà una nuova versione tenendo conto del tuo feedback."
+            )
+            feedback = st.text_area(
+                "Note opzionali",
+                value=st.session_state.get(SK_REGEN_FEEDBACK, ""),
+                placeholder="Es. rendila più allegra, meno paurosa, aggiungi un finale a sorpresa, "
+                            "fai parlare di più Mia, ambientala in inverno...",
+                height=100,
+                label_visibility="collapsed",
+            )
+
+            cost = cost_for_operation("adapt_script")
+            st.caption(f"💰 Rigenerare costa **{cost} crediti**.")
+
+            col_cancel, col_go = st.columns(2)
+            with col_cancel:
+                if st.button("Annulla", use_container_width=True, key="_kids_regen_cancel"):
+                    st.session_state["_kids_show_regen"] = False
+                    st.rerun()
+            with col_go:
+                if st.button(
+                    "🔄 Rigenera adesso",
+                    type="primary",
+                    use_container_width=True,
+                    key="_kids_regen_go",
+                ):
+                    st.session_state[SK_REGEN_FEEDBACK] = feedback
+                    with st.spinner("✍️ Claude sta riscrivendo..."):
+                        ok, err = _do_generate_story(scintilla, names, descs, grid_distribution, feedback)
+                    if ok:
+                        st.session_state["_kids_show_regen"] = False
+                        st.toast("Nuova storia pronta!", icon="✨")
+                        st.rerun()
+                    else:
+                        st.error(err)
+
+
+# ============================================================
+# STEP 5 — Genera tutto
 # ============================================================
 
 CLAUDE_KIDS_SYSTEM = """Sei un autore di libri illustrati per bambini (5-8 anni).
@@ -480,8 +664,13 @@ def _generate_kids_script(
     names: list[str],
     descs: list[str],
     grid_distribution: list[str],
+    feedback: str = "",
 ) -> PydScript:
-    """Chiama Claude per produrre uno script con gabbie pre-fissate."""
+    """Chiama Claude per produrre uno script con gabbie pre-fissate.
+
+    feedback: note opzionali dall'utente per ri-orientare una rigenerazione
+              (es. "rendi più allegra", "meno paurosa", "aggiungi un nonno").
+    """
     n_pages = len(grid_distribution)
     capacities = [GRID_CAPACITY[g] for g in grid_distribution]
 
@@ -490,6 +679,14 @@ def _generate_kids_script(
         f"  Pagina {i+1}: {capacities[i]} vignett{'a' if capacities[i] == 1 else 'e'}"
         for i in range(n_pages)
     ])
+
+    feedback_block = ""
+    if feedback.strip():
+        feedback_block = (
+            f"\n\nNOTE AGGIUNTIVE DELL'AUTORE (considera questi suggerimenti "
+            f"per cambiare/migliorare la storia rispetto a una versione precedente):\n"
+            f"{feedback.strip()}\n"
+        )
 
     user_msg = f"""Scrivi un fumetto per bambini.
 
@@ -501,7 +698,7 @@ PERSONAGGI:
 
 STRUTTURA OBBLIGATORIA:
 {page_structure}
-
+{feedback_block}
 Output JSON con logline + pages (ognuna con panels).
 Ogni panel ha description (concreta, visualizzabile) + dialogue_speaker + dialogue_text.
 Se la vignetta non ha dialogo, metti dialogue_speaker=null e dialogue_text=null.
@@ -660,8 +857,8 @@ def _hash_prompt(prompt: str, *extra: str) -> str:
     return h.hexdigest()
 
 
-def _render_step_4() -> None:
-    st.markdown("### Step 4 — Genera il fumetto")
+def _render_step_5() -> None:
+    st.markdown("### Step 5 — Crea il fumetto!")
 
     # Mostra recap delle scelte
     template_id = st.session_state[SK_TEMPLATE_ID]
@@ -691,14 +888,14 @@ def _render_step_4() -> None:
         st.caption(f"Pagine: {n_pages} · Vignette: {n_panels}")
         st.caption(f"Scintilla: _{scintilla[:120]}{'…' if len(scintilla) > 120 else ''}_")
 
-    # Costi
-    cost_script = cost_for_operation("adapt_script")
+    # Costi (lo script è già stato pagato in step 4, non lo conto qui)
     cost_per_ref = cost_for_operation("generate_reference")
     cost_per_panel = cost_for_operation("generate_panel", quality="low")
-    cost_total = cost_script + cost_per_ref * len(names) + cost_per_panel * n_panels
+    cost_cover = cost_for_operation("generate_panel", quality="low")
+    cost_total = cost_per_ref * len(names) + cost_cover + cost_per_panel * n_panels
     st.caption(
-        f"💰 Costo stimato: **{cost_total} crediti** "
-        f"({cost_script} script + {cost_per_ref * len(names)} reference + "
+        f"💰 Costo immagini: **{cost_total} crediti** "
+        f"({cost_per_ref * len(names)} reference + {cost_cover} copertina + "
         f"{cost_per_panel * n_panels} vignette)"
     )
 
@@ -735,13 +932,13 @@ def _render_step_4() -> None:
     else:
         st.info("Generazione completata.")
         if st.button("📖 Vai all'anteprima", type="primary", use_container_width=True):
-            _set_step(5)
+            _set_step(6)
             st.rerun()
 
     col_back, _ = st.columns(2)
     with col_back:
-        if st.button("← Indietro", use_container_width=True, key="_step4_back"):
-            _set_step(3)
+        if st.button("← Indietro alla storia", use_container_width=True, key="_step5_back"):
+            _set_step(4)
             st.rerun()
 
 
@@ -855,19 +1052,14 @@ def _execute_full_kids_generation(
         project_id_local = project.id
     st.session_state[SK_PROJECT_ID] = str(project_id_local)
 
-    # === 2. Adatta sceneggiatura via Claude ===
-    _show_status("🪄", "Mago Claude sta inventando la storia...")
+    # === 2. Carica lo script PRE-APPROVATO dallo step 4 ===
+    _show_status("📖", "La storia è già pronta dallo step precedente...")
+    pyd_dict = st.session_state.get(SK_PYD_SCRIPT)
+    if not pyd_dict:
+        st.error("Nessuno script approvato. Torna allo Step 4 per generare/approvare la storia.")
+        return
     try:
-        with session_scope() as s:
-            fresh_user = users_repo.get_by_id(s, _user.id)
-            credits_repo.charge(
-                s, fresh_user,
-                cost=cost_for_operation("adapt_script"),
-                operation=CreditOperation.adapt_script,
-                reason=f"KIDS adapt script per «{project_name}»",
-                reference_id=str(project_id_local),
-            )
-        pyd_script = _generate_kids_script(scintilla, names, descs, grid_distribution)
+        pyd_script = PydScript.model_validate(pyd_dict)
         kids_title = pyd_script.logline or project_name
         # Save
         with session_scope() as s:
@@ -884,17 +1076,10 @@ def _execute_full_kids_generation(
                 except ValueError:
                     pass  # già esiste
         with gallery_container:
-            st.success("📖 La storia è scritta!")
+            st.success("📖 La storia è approvata!")
             st.caption(f"_Logline:_ **{kids_title}**")
     except Exception as e:
-        st.error(f"Errore Claude: {e}")
-        with session_scope() as s:
-            fresh_user = users_repo.get_by_id(s, _user.id)
-            credits_repo.refund(
-                s, fresh_user,
-                amount=cost_for_operation("adapt_script"),
-                reason=f"Refund adapt_script kids fallito: {e}",
-            )
+        st.error(f"Errore caricamento script: {e}")
         return
 
     # === 3. Save grid_distribution come page_layouts ===
@@ -1158,17 +1343,17 @@ def _execute_full_kids_generation(
     _show_status("🎉", "**Il tuo libretto è pronto!** Andiamo a vederlo tutto insieme...")
     st.balloons()
     time.sleep(2.5)
-    _set_step(5)
+    _set_step(6)
     st.rerun()
 
 
 # ============================================================
-# STEP 5 — Anteprima + esporta
+# STEP 6 — Anteprima + esporta
 # ============================================================
 
 
-def _render_step_5() -> None:
-    st.markdown("### Step 5 — Il tuo fumetto è pronto!")
+def _render_step_6() -> None:
+    st.markdown("### Step 6 — Il tuo fumetto è pronto!")
 
     project_id_raw = st.session_state.get(SK_PROJECT_ID)
     if not project_id_raw:
@@ -1331,6 +1516,8 @@ elif step == 2:
 elif step == 3:
     _render_step_3()
 elif step == 4:
-    _render_step_4()
+    _render_step_4_storia()
 elif step == 5:
     _render_step_5()
+elif step == 6:
+    _render_step_6()
