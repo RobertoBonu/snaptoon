@@ -36,8 +36,11 @@ def _inject_css() -> None:
 
 _inject_css()
 
-from app_state.ui import enforce_sidebar_visibility, render_sidebar_nav
+from app_state.ui import enforce_sidebar_visibility, render_sidebar_nav, show_page_loading
 enforce_sidebar_visibility()
+
+# Loading overlay durante gli import (~3s)
+_page_loader = show_page_loading("Apro l'editor di impaginazione...")
 
 
 # ============================================================
@@ -66,6 +69,9 @@ from appearance import to_balloon_config
 # ============================================================
 with session_scope() as _s:
     _user = current_user(_s)
+
+# Backend pronto: rimuovi loading overlay
+_page_loader.empty()
 
 if _user is None:
     st.error("Devi accedere per usare questa pagina.")
