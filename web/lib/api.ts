@@ -240,6 +240,44 @@ export interface PagesList {
   pages: PageInfo[];
 }
 
+// === Admin ===
+
+export interface AdminUser {
+  id: string;
+  email: string;
+  role: string;
+  is_admin: boolean;
+  is_active: boolean;
+  plan: string;
+  credits_total: number;
+  credits_used: number;
+  credits_remaining: number;
+  must_change_password: boolean;
+  created_at: string;
+  last_login_at?: string | null;
+  project_count: number;
+}
+
+export interface AdminUserList {
+  users: AdminUser[];
+}
+
+export interface AdminStats {
+  total_users: number;
+  active_users: number;
+  admin_count: number;
+  users_by_role: Record<string, number>;
+  total_projects: number;
+  active_last_7_days: number;
+}
+
+export interface AdminRoleInfo {
+  key: string;
+  label: string;
+  monthly_credits: number;
+  max_projects: number;
+}
+
 /**
  * Fetch dell'API con gestione standardizzata di errori.
  * - credentials: 'include' invia il cookie auth
