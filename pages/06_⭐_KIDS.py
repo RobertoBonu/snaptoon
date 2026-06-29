@@ -897,18 +897,45 @@ def _build_kids_reference_prompt(name: str, desc: str, style_preset_id: str) -> 
     return "\n\n".join(parts)
 
 
+def _panel_size_for(grid_id: str, panel_number: int) -> tuple[str, str, str]:
+    """Restituisce (openai_size, aspect_ratio_key, human_format) per una cella.
+
+    OpenAI gpt-image-2 accetta solo 3 size: 1024x1024, 1024x1536 (2:3 verticale),
+    1536x1024 (3:2 orizzontale). Mappiamo ogni cella della griglia alla forma
+    che meglio riempie senza tagli.
+
+    Mappatura griglie Kids (pagina libro = verticale 2:3):
+    - splash: 1 cella full-page → 2:3 verticale
+    - 1+2: panel 1 grande orizzontale → 3:2; panel 2,3 verticali piccole → 2:3
+    - 2x2: 4 celle (2 col × 2 righe) di pagina verticale → ciascuna 2:3
+    """
+    if grid_id == "splash":
+        return ("1024x1536", "2_3", "vertical portrait, tall format")
+    if grid_id == "1+2":
+        if panel_number == 1:
+            return ("1536x1024", "3_2", "horizontal panoramic, wide format")
+        return ("1024x1536", "2_3", "vertical portrait, tall format")
+    if grid_id == "2x2":
+        return ("1024x1536", "2_3", "vertical portrait, tall format")
+    # Griglie non-Kids (fallback)
+    return ("1024x1024", "1_1", "square format")
+
+
 def _build_kids_panel_prompt(
     panel: Panel,
     cast: list[dict],  # {name, desc}
     style_preset_id: str,
     scene_params: dict,
+    panel_format: str = "square format",
 ) -> str:
     preset = get_preset(style_preset_id)
     parts = []
     parts.append(
-        "=== RENDER MODE ===\n"
-        "Full-bleed single comic panel for children's book. Bright friendly colors. "
-        "Edge-to-edge, no external frame or page border."
+        f"=== RENDER MODE ===\n"
+        f"Full-bleed single comic panel for children's book in {panel_format}. "
+        f"Bright friendly colors. Edge-to-edge, no external frame or page border. "
+        f"Compose the scene to fill the entire {panel_format} — characters, action "
+        f"and any speech bubble must fit comfortably inside without being cropped."
     )
     if preset:
         parts.append(f"=== STYLE ===\n{preset.expansion.strip()}")
@@ -1393,8 +1420,12 @@ def _execute_full_kids_generation(
                 f"Pagina {page.number} · vignetta {panel.number} di {panels_per_page[page.number]}...",
             )
         try:
+            # Ricava grid_id + size in base alla cella della griglia
+            grid_id_for_page = grid_distribution[page.number - 1] if page.number - 1 < len(grid_distribution) else "2x2"
+            size_str, aspect_key, fmt_label = _panel_size_for(grid_id_for_page, panel.number)
+
             prompt = _build_kids_panel_prompt(
-                panel, cast_block_for_panel, style_preset_id, scene,
+                panel, cast_block_for_panel, style_preset_id, scene, panel_format=fmt_label,
             )
             # Reference temp files
             tmp_refs = []
@@ -1413,12 +1444,12 @@ def _execute_full_kids_generation(
                     s, fresh_user,
                     cost=cost_for_operation("generate_panel", quality="medium"),
                     operation=CreditOperation.generate_panel,
-                    reason=f"KIDS vignetta p{page.number}v{panel.number}",
+                    reason=f"KIDS vignetta p{page.number}v{panel.number} ({aspect_key})",
                 )
 
             image_bytes = generator._generate_bytes(
                 prompt=prompt,
-                size="1024x1024",
+                size=size_str,
                 reference_images=tmp_refs if tmp_refs else None,
                 quality="medium",
             )
@@ -1434,7 +1465,7 @@ def _execute_full_kids_generation(
                     storage_key=vk,
                     prompt_hash=_hash_prompt(prompt),
                     quality="medium",
-                    aspect_ratio_key="1_1",
+                    aspect_ratio_key=aspect_key,
                     provider="openai",
                     model="gpt-image-2",
                 )
@@ -1507,6 +1538,13 @@ def _regenerate_single_panel(
         if panel is None:
             return False, "Vignetta non trovata."
 
+        # Ricava grid_id da page_layouts per dimensionare correttamente la vignetta
+        grid_id = "2x2"
+        for pl in project.page_layouts:
+            if pl.page_number == page_number:
+                grid_id = pl.grid_id
+                break
+
         style_id = project.style_id
         cast = []
         for cs in project.character_sheets:
@@ -1530,14 +1568,15 @@ def _regenerate_single_panel(
     except InsufficientCreditsError as e:
         return False, f"Crediti insufficienti: servono {e.required}, ne hai {e.available}."
 
-    # Build prompt
+    # Build prompt — size + aspect dalla cella della griglia
+    size_str, aspect_key, fmt_label = _panel_size_for(grid_id, panel_number)
     cast_block = [{"name": c["name"], "description": c["description"]} for c in cast]
     scene_params = {
         "shot_distance": panel.shot_distance,
         "shot_angle": panel.shot_angle,
         "mood": panel.mood,
     }
-    prompt = _build_kids_panel_prompt(panel, cast_block, style_id, scene_params)
+    prompt = _build_kids_panel_prompt(panel, cast_block, style_id, scene_params, panel_format=fmt_label)
 
     # Download reference temp
     tmp_refs = []
@@ -1554,7 +1593,7 @@ def _regenerate_single_panel(
         generator = OpenAIImageGenerator()
         image_bytes = generator._generate_bytes(
             prompt=prompt,
-            size="1024x1024",
+            size=size_str,
             reference_images=tmp_refs if tmp_refs else None,
             quality="medium",
         )
@@ -1570,7 +1609,7 @@ def _regenerate_single_panel(
                 storage_key=vk,
                 prompt_hash=_hash_prompt(prompt, str(time.time())),  # invalida cache
                 quality="medium",
-                aspect_ratio_key="1_1",
+                aspect_ratio_key=aspect_key,
                 provider="openai",
                 model="gpt-image-2",
             )
