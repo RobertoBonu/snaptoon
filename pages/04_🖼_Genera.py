@@ -105,19 +105,6 @@ if _current_slug is None:
 
 def _render_sidebar(user, project_name: str, plan_label: str, credits_left: int, credits_total: int) -> None:
     with st.sidebar:
-        st.markdown(
-            """
-            <div class="snaptoon-sidebar-logo">
-              <span class="snaptoon-sidebar-logo__wordmark">
-                SnapToon<span class="snaptoon-sidebar-logo__dot"></span>
-              </span>
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
-        st.caption(user.email)
-        st.caption(f"Piano: **{plan_label}** · {credits_left}/{credits_total} crediti")
-        st.divider()
         st.markdown("**Progetto attivo:**")
         st.markdown(f"_{project_name}_")
         st.divider()
@@ -1008,8 +995,16 @@ def _generate_cover_illustration(
     cast_names: list[str],
     preset_expansion: str,
     cast_view: list[dict],
+    aspect_ratio_key: str | None = None,
+    shot_distance_key: str | None = None,
+    shot_angle_key: str | None = None,
+    mood_key: str | None = None,
 ) -> tuple[bool, str | None]:
-    """Genera l'illustrazione di copertina via OpenAI."""
+    """Genera l'illustrazione di copertina via OpenAI.
+
+    aspect_ratio/distance/angle/mood: vedi snaptoon_core.scene per i valori.
+    Se non specificati, usa default verticale 2:3.
+    """
     from snaptoon_core.generator import OpenAIImageGenerator
 
     cost = cost_for_operation("generate_panel", quality="medium")
@@ -1034,6 +1029,25 @@ def _generate_cover_illustration(
         except InsufficientCreditsError as e:
             return False, f"Crediti insufficienti: servono {e.required}, ne hai {e.available}."
 
+    # Scene clauses (regia)
+    scene_parts: list[str] = []
+    if aspect_ratio_key:
+        opt = next((o for o in ASPECT_RATIOS if o.key == aspect_ratio_key), None)
+        if opt:
+            scene_parts.append(f"FORMAT: {opt.prompt_en}.")
+    if shot_distance_key:
+        opt = next((o for o in SHOT_DISTANCES if o.key == shot_distance_key), None)
+        if opt:
+            scene_parts.append(f"SHOT DISTANCE: {opt.prompt_en}.")
+    if shot_angle_key:
+        opt = next((o for o in SHOT_ANGLES if o.key == shot_angle_key), None)
+        if opt:
+            scene_parts.append(f"CAMERA ANGLE: {opt.prompt_en}.")
+    if mood_key:
+        opt = next((o for o in MOODS if o.key == mood_key), None)
+        if opt:
+            scene_parts.append(f"MOOD: {opt.prompt_en}.")
+
     # Build prompt
     cast_in_cover = [cs for cs in cast_view if cs["name"] in cast_names]
     parts = [
@@ -1043,6 +1057,8 @@ def _generate_cover_illustration(
         f"=== STYLE ===\n{preset_expansion.strip()}",
         f"=== COVER ILLUSTRATION ===\n{description.strip()}",
     ]
+    if scene_parts:
+        parts.append("=== DIRECTING ===\n" + " ".join(scene_parts))
     if cast_in_cover:
         cast_block = ["=== CHARACTERS ON COVER ==="]
         for cs in cast_in_cover:
@@ -1065,6 +1081,9 @@ def _generate_cover_illustration(
     tmp_files: list[Path] = []
     storage_key_path = cover_illustration_key(project_id)
 
+    # Risolvi size OpenAI dall'aspect_ratio (default verticale 2:3)
+    cover_size = _resolve_openai_size(aspect_ratio_key) if aspect_ratio_key else "1024x1536"
+
     try:
         for rk in ref_keys:
             data = download_bytes(rk)
@@ -1076,7 +1095,7 @@ def _generate_cover_illustration(
         generator = OpenAIImageGenerator()
         image_bytes = generator._generate_bytes(
             prompt=prompt,
-            size="1024x1536",  # verticale 2:3 per copertina
+            size=cover_size,
             reference_images=tmp_files if tmp_files else None,
             quality="medium",
         )
@@ -1124,13 +1143,19 @@ def _load_cover_view(project_id) -> dict:
         if project is None:
             return {}
         cover = covers_repo.get_or_create(s, project)
+        payload = cover.payload or {}
         return {
             "title": cover.title,
             "subtitle": cover.subtitle,
             "author": cover.author,
             "description": cover.description,
             "illustration_key": cover.illustration_storage_key,
-            "characters_in_scene": (cover.payload or {}).get("characters_in_scene", []),
+            "characters_in_scene": payload.get("characters_in_scene", []),
+            # Scene params (salvati nel payload JSONB)
+            "aspect_ratio": payload.get("aspect_ratio"),
+            "shot_distance": payload.get("shot_distance"),
+            "shot_angle": payload.get("shot_angle"),
+            "mood": payload.get("mood"),
         }
 
 
@@ -1160,6 +1185,63 @@ with st.expander("📕 Copertina", expanded=False):
             help="Le reference image dei personaggi selezionati saranno usate per la consistency.",
         )
 
+        # ============================================================
+        # 🎬 SCENA copertina
+        # ============================================================
+        st.markdown("---")
+        st.markdown("**🎬 Scena della copertina**")
+        st.caption("Parametri di regia: formato, inquadratura, angolo, mood.")
+
+        # Aspect ratio
+        cv_aspect_opts = [("(default verticale 2:3)", None)] + [(o.label, o.key) for o in ASPECT_RATIOS]
+        cv_aspect_labels = [lbl for lbl, _ in cv_aspect_opts]
+        cv_cur_aspect = cover_view.get("aspect_ratio")
+        cv_aspect_idx = next(
+            (i for i, (_, k) in enumerate(cv_aspect_opts) if k == cv_cur_aspect), 0
+        )
+        cv_aspect_label = st.selectbox(
+            "📐 Formato copertina",
+            cv_aspect_labels, index=cv_aspect_idx,
+            key="_cov_aspect",
+        )
+        cv_aspect_key = next(k for lbl, k in cv_aspect_opts if lbl == cv_aspect_label)
+
+        # Distanza
+        cv_dist_opts = [("(default)", None)] + [(o.label, o.key) for o in SHOT_DISTANCES]
+        cv_dist_labels = [lbl for lbl, _ in cv_dist_opts]
+        cv_cur_dist = cover_view.get("shot_distance")
+        cv_dist_idx = next((i for i, (_, k) in enumerate(cv_dist_opts) if k == cv_cur_dist), 0)
+        cv_dist_label = st.selectbox(
+            "🎥 Distanza inquadratura",
+            cv_dist_labels, index=cv_dist_idx,
+            key="_cov_dist",
+        )
+        cv_dist_key = next(k for lbl, k in cv_dist_opts if lbl == cv_dist_label)
+
+        # Angolo
+        cv_angle_opts = [("(default)", None)] + [(o.label, o.key) for o in SHOT_ANGLES]
+        cv_angle_labels = [lbl for lbl, _ in cv_angle_opts]
+        cv_cur_angle = cover_view.get("shot_angle")
+        cv_angle_idx = next((i for i, (_, k) in enumerate(cv_angle_opts) if k == cv_cur_angle), 0)
+        cv_angle_label = st.selectbox(
+            "🎞 Angolo",
+            cv_angle_labels, index=cv_angle_idx,
+            key="_cov_angle",
+        )
+        cv_angle_key = next(k for lbl, k in cv_angle_opts if lbl == cv_angle_label)
+
+        # Mood
+        cv_mood_opts = [("(default)", None)] + [(o.label, o.key) for o in MOODS]
+        cv_mood_labels = [lbl for lbl, _ in cv_mood_opts]
+        cv_cur_mood = cover_view.get("mood")
+        cv_mood_idx = next((i for i, (_, k) in enumerate(cv_mood_opts) if k == cv_cur_mood), 0)
+        cv_mood_label = st.selectbox(
+            "🎭 Mood",
+            cv_mood_labels, index=cv_mood_idx,
+            key="_cov_mood",
+        )
+        cv_mood_key = next(k for lbl, k in cv_mood_opts if lbl == cv_mood_label)
+
         if st.form_submit_button("💾 Salva copertina", type="secondary"):
             with session_scope() as s:
                 project = projects_repo.get_by_id(s, _view["id"])
@@ -1172,6 +1254,10 @@ with st.expander("📕 Copertina", expanded=False):
                     )
                     payload = dict(cover.payload or {})
                     payload["characters_in_scene"] = cv_cast
+                    payload["aspect_ratio"] = cv_aspect_key
+                    payload["shot_distance"] = cv_dist_key
+                    payload["shot_angle"] = cv_angle_key
+                    payload["mood"] = cv_mood_key
                     covers_repo.update_payload(s, cover, payload)
             st.toast("Copertina salvata.", icon="📕")
             st.rerun()
@@ -1201,6 +1287,10 @@ with st.expander("📕 Copertina", expanded=False):
                     cast_names=cover_view.get("characters_in_scene", []),
                     preset_expansion=_preset.expansion,
                     cast_view=_view["cast"],
+                    aspect_ratio_key=cover_view.get("aspect_ratio"),
+                    shot_distance_key=cover_view.get("shot_distance"),
+                    shot_angle_key=cover_view.get("shot_angle"),
+                    mood_key=cover_view.get("mood"),
                 )
             if success:
                 st.toast("Illustrazione copertina generata.", icon="📕")

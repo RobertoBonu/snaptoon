@@ -85,19 +85,6 @@ if _current_slug is None:
 
 def _render_sidebar(user, project_name: str, plan_label: str, credits_left: int, credits_total: int) -> None:
     with st.sidebar:
-        st.markdown(
-            """
-            <div class="snaptoon-sidebar-logo">
-              <span class="snaptoon-sidebar-logo__wordmark">
-                SnapToon<span class="snaptoon-sidebar-logo__dot"></span>
-              </span>
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
-        st.caption(user.email)
-        st.caption(f"Piano: **{plan_label}** · {credits_left}/{credits_total} crediti")
-        st.divider()
         st.markdown("**Progetto attivo:**")
         st.markdown(f"_{project_name}_")
         st.divider()
