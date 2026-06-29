@@ -98,6 +98,42 @@ export interface KidsProjectCreateIn {
   characters: KidsCharacterIn[];
 }
 
+export interface KidsPanel {
+  number: number;
+  description: string;
+  dialogue_speaker?: string | null;
+  dialogue_text?: string | null;
+}
+
+export interface KidsPage {
+  number: number;
+  panels: KidsPanel[];
+}
+
+export interface KidsStory {
+  logline: string;
+  pages: KidsPage[];
+}
+
+export interface KidsVignetteStatus {
+  page_number: number;
+  panel_number: number;
+  generated: boolean;
+  aspect_ratio_key?: string | null;
+}
+
+export interface KidsProjectDetails {
+  id: string;
+  slug: string;
+  name: string;
+  style_id?: string | null;
+  style_slug?: string | null;
+  has_story: boolean;
+  story?: KidsStory | null;
+  has_cover: boolean;
+  vignettes: KidsVignetteStatus[];
+}
+
 /**
  * Fetch dell'API con gestione standardizzata di errori.
  * - credentials: 'include' invia il cookie auth

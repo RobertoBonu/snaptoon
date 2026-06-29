@@ -19,6 +19,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from api.routers import account as account_router
 from api.routers import auth as auth_router
 from api.routers import kids as kids_router
+from api.routers import kids_generation as kids_gen_router
 from api.routers import projects as projects_router
 
 app = FastAPI(
@@ -44,6 +45,7 @@ app.include_router(auth_router.router, prefix="/api/auth", tags=["auth"])
 app.include_router(projects_router.router, prefix="/api/projects", tags=["projects"])
 app.include_router(account_router.router, prefix="/api/account", tags=["account"])
 app.include_router(kids_router.router, prefix="/api/kids", tags=["kids"])
+app.include_router(kids_gen_router.router, prefix="/api/kids", tags=["kids-generation"])
 
 
 @app.get("/api/health")
