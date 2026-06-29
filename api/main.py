@@ -16,7 +16,9 @@ if str(PROJECT_ROOT) not in sys.path:
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from api.routers import account as account_router
 from api.routers import auth as auth_router
+from api.routers import projects as projects_router
 
 app = FastAPI(
     title="SnapToon API",
@@ -38,6 +40,8 @@ app.add_middleware(
 )
 
 app.include_router(auth_router.router, prefix="/api/auth", tags=["auth"])
+app.include_router(projects_router.router, prefix="/api/projects", tags=["projects"])
+app.include_router(account_router.router, prefix="/api/account", tags=["account"])
 
 
 @app.get("/api/health")
