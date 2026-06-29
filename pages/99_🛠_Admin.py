@@ -35,7 +35,7 @@ def _inject_css() -> None:
 
 _inject_css()
 
-from app_state.ui import enforce_sidebar_visibility
+from app_state.ui import enforce_sidebar_visibility, render_sidebar_nav
 enforce_sidebar_visibility()
 
 
@@ -75,6 +75,8 @@ if _user.role != Role.admin:
 # ============================================================
 # Sidebar
 # ============================================================
+render_sidebar_nav(_user)
+
 with st.sidebar:
     if st.button("🚪 Esci", key="_sb_logout_admin", use_container_width=True):
         with session_scope() as s:

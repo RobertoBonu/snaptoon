@@ -27,7 +27,7 @@ def _inject_css() -> None:
 
 _inject_css()
 
-from app_state.ui import enforce_sidebar_visibility
+from app_state.ui import enforce_sidebar_visibility, render_sidebar_nav
 enforce_sidebar_visibility()
 
 
@@ -67,6 +67,8 @@ _cfg = role_config(_user.role)
 # ============================================================
 # Sidebar
 # ============================================================
+render_sidebar_nav(_user)
+
 with st.sidebar:
     # Email + ruolo + crediti sono mostrati nel contenuto principale della
     # pagina Account, non servono ridondanti in sidebar.
