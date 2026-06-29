@@ -1,18 +1,20 @@
-"""Definizione dei piani di abbonamento + costi operazioni.
+"""Definizione di ruoli (autoritativi per permessi) e piani (legacy).
 
-Pricing roadmap (MVP):
-- Free Trial: 7 giorni, 30 crediti, 1 progetto, qualità Media
-- Creator:    €19/mese,  200 crediti, 5 progetti, qualità Bassa+Media
-- Pro:        €49/mese,  600 crediti, ∞ progetti, qualità Bassa+Media+Alta
+I 4 ruoli e i loro limiti:
+- admin           : 10000 crediti/mese, tutto sbloccato
+- autore_base     : 200  crediti/mese, max 5 progetti, qualità Bassa+Media
+- autore_premium  : 600  crediti/mese, ∞ progetti, anche qualità Alta
+- editore         : 1000 crediti/mese, ∞ progetti, tutto + IDML export (futuro)
 
-Tutti i piani senza Stripe in MVP: admin assegna manualmente da pannello.
+PLAN_CONFIG resta come legacy tracking commerciale (Free Trial / Creator / Pro)
+ma i permessi reali sono ora basati su ROLE_CONFIG.
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from db.models import Plan
+from db.models import Plan, Role
 
 
 @dataclass(frozen=True)
@@ -79,6 +81,105 @@ PLAN_CONFIG: dict[Plan, PlanConfig] = {
 
 def plan_config(plan: Plan) -> PlanConfig:
     return PLAN_CONFIG[plan]
+
+
+# ============================================================
+# ROLE-BASED CONFIG (autoritativo)
+# ============================================================
+
+
+@dataclass(frozen=True)
+class RoleConfig:
+    """Configurazione di un ruolo: limiti + qualità ammesse + features."""
+
+    role: Role
+    label: str
+    monthly_credits: int
+    max_projects: int  # 0 = illimitato
+    allowed_qualities: tuple[str, ...]
+    features: tuple[str, ...]
+    can_access_admin: bool = False
+    can_use_bookshop: bool = False
+    can_export_idml: bool = False
+
+
+ROLE_CONFIG: dict[Role, RoleConfig] = {
+    Role.admin: RoleConfig(
+        role=Role.admin,
+        label="Admin",
+        monthly_credits=10000,
+        max_projects=0,
+        allowed_qualities=("low", "medium", "high"),
+        can_access_admin=True,
+        can_use_bookshop=True,
+        can_export_idml=True,
+        features=(
+            "Accesso pannello admin",
+            "10.000 crediti al mese",
+            "Progetti illimitati",
+            "Tutte le qualità AI",
+            "Tutte le funzionalità sbloccate",
+        ),
+    ),
+    Role.autore_base: RoleConfig(
+        role=Role.autore_base,
+        label="Autore Base",
+        monthly_credits=200,
+        max_projects=5,
+        allowed_qualities=("low", "medium"),
+        features=(
+            "200 crediti al mese",
+            "5 progetti",
+            "Qualità Bassa + Media",
+            "Export PDF",
+        ),
+    ),
+    Role.autore_premium: RoleConfig(
+        role=Role.autore_premium,
+        label="Autore Premium",
+        monthly_credits=600,
+        max_projects=0,
+        allowed_qualities=("low", "medium", "high"),
+        features=(
+            "600 crediti al mese",
+            "Progetti illimitati",
+            "Qualità Bassa + Media + Alta",
+            "Export PDF",
+            "Priorità di generazione",
+        ),
+    ),
+    Role.editore: RoleConfig(
+        role=Role.editore,
+        label="Editore",
+        monthly_credits=1000,
+        max_projects=0,
+        allowed_qualities=("low", "medium", "high"),
+        can_use_bookshop=True,
+        can_export_idml=True,
+        features=(
+            "1.000 crediti al mese",
+            "Progetti illimitati",
+            "Qualità Bassa + Media + Alta",
+            "Pubblicazione nel bookshop",
+            "Export IDML tipografico (Adobe InDesign)",
+        ),
+    ),
+}
+
+
+def role_config(role: Role) -> RoleConfig:
+    return ROLE_CONFIG[role]
+
+
+def quality_allowed_for_role(role: Role, quality: str) -> bool:
+    return quality in ROLE_CONFIG[role].allowed_qualities
+
+
+def project_limit_reached_for_role(role: Role, current_count: int) -> bool:
+    cfg = ROLE_CONFIG[role]
+    if cfg.max_projects == 0:
+        return False
+    return current_count >= cfg.max_projects
 
 
 # ============================================================

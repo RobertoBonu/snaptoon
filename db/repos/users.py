@@ -9,7 +9,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from ..base import utcnow
-from ..models import Plan, User
+from ..models import Plan, Role, User
 
 
 def get_by_id(session: Session, user_id: uuid.UUID | str) -> User | None:
@@ -76,11 +76,30 @@ def set_active(session: Session, user: User, active: bool) -> None:
 
 
 def set_plan(session: Session, user: User, plan: Plan, new_period_credits: int) -> None:
-    """Cambia piano e RIPARTE il periodo da zero crediti usati."""
+    """Cambia piano (LEGACY) e RIPARTE il periodo da zero crediti usati."""
     user.plan = plan
     user.credits_total_this_period = new_period_credits
     user.credits_used_this_period = 0
     user.period_started_at = utcnow()
+
+
+def set_role(
+    session: Session,
+    user: User,
+    role: Role,
+    *,
+    reset_period_credits: int | None = None,
+) -> None:
+    """Cambia ruolo dell'utente. Aggiorna anche is_admin per backward compat.
+
+    Se `reset_period_credits` è impostato, riparte il periodo crediti.
+    """
+    user.role = role
+    user.is_admin = (role == Role.admin)
+    if reset_period_credits is not None:
+        user.credits_total_this_period = reset_period_credits
+        user.credits_used_this_period = 0
+        user.period_started_at = utcnow()
 
 
 def mark_onboarding_seen(session: Session, user: User) -> None:

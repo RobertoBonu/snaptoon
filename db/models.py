@@ -45,11 +45,28 @@ from .base import Base, TimestampMixin, UUIDPrimaryKeyMixin, UpdatedAtMixin, utc
 
 
 class Plan(str, enum.Enum):
-    """Piano abbonamento utente."""
+    """LEGACY — piano abbonamento. Manteniamo per backward compat
+    e come traccia commerciale, ma le decisioni di permessi e qualità
+    sono ora basate su Role."""
 
     free_trial = "free_trial"
     creator = "creator"
     pro = "pro"
+
+
+class Role(str, enum.Enum):
+    """Ruolo utente. Determina permessi, limiti, qualità AI ammesse.
+
+    - admin            : super-utente con accesso al pannello admin
+    - autore_base      : creator standard (Bassa + Media quality)
+    - autore_premium   : creator avanzato (anche Alta quality)
+    - editore          : pubblica nel bookshop + accesso a export IDML (futuro)
+    """
+
+    admin = "admin"
+    autore_base = "autore_base"
+    autore_premium = "autore_premium"
+    editore = "editore"
 
 
 class LengthTarget(str, enum.Enum):
@@ -98,7 +115,15 @@ class User(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     must_change_password: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     has_seen_onboarding: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
-    # Piano + crediti del periodo corrente
+    # Ruolo (autoritativo per permessi/qualità). is_admin resta come flag
+    # legacy ma è derivabile da role == Role.admin.
+    role: Mapped[Role] = mapped_column(
+        Enum(Role, name="role_enum", values_callable=lambda x: [e.value for e in x]),
+        default=Role.autore_base,
+        nullable=False,
+    )
+
+    # Piano commerciale (LEGACY tracking — ora i permessi vengono da role)
     plan: Mapped[Plan] = mapped_column(
         Enum(Plan, name="plan_enum", values_callable=lambda x: [e.value for e in x]),
         default=Plan.free_trial,
