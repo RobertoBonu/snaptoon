@@ -1,6 +1,6 @@
 ---
 name: SnapToon environment quirks
-description: Non-obvious env/routing/setup facts for the SnapToon Streamlit app in the pnpm-workspace artifact monorepo
+description: Non-obvious env/routing/setup facts for SnapToon (V2 stack: Next.js + FastAPI) in the pnpm-workspace artifact monorepo
 ---
 
 # Streamlit reachability through the artifact proxy
@@ -12,7 +12,7 @@ the proxy has no route to it, so `/` returns 404 and the preview shows
 
 **Fix:** register the Streamlit app as a `kind = "web"` artifact at `artifacts/snaptoon`
 with a service `localPort = 5000`, `paths = ["/"]`. This makes the proxy route `/`
-(and Streamlit's `/_stcore/*`, `/static/*`) to 5000 while `/api` still hits the api-server.
+(and Streamlit's `/_stcore/*`, `/static/*`) to 5000. (Legacy/historical — superseded by the V2 stack documented below.)
 
 **Why:** there is no Streamlit/Python artifact type in `createArtifact`, but the proxy
 and `listArtifacts` read artifact.toml files from disk, so a hand-written web artifact.toml
@@ -171,6 +171,17 @@ notebook also resets on these restarts (state lost).
 - `next.config.ts` sets `allowedDevOrigins` from REPLIT_DEV_DOMAIN/REPLIT_DOMAINS so
   the Next dev server accepts the Replit iframe proxy origin for /_next/* (else a
   cross-origin warning that breaks in future Next majors).
+- **Proxy `/api` ownership matters (most-specific-path wins):** the monorepo template's
+  `api-server` artifact claimed `paths=["/api"]`, so the :80 proxy routed EVERY `/api/*`
+  to that (essentially empty) Express server — 404 "Cannot GET /api/..." — instead of to
+  SnapToon's own Next self-proxy → FastAPI. Symptom: `/` renders fine but V2 login/admin/
+  projects all break in the browser. SnapToon's Next must OWN `/api`. Fix applied: removed
+  the api-server artifact entirely so `/api/*` falls through to SnapToon's `/` catch-all.
+  **Gotchas:** an artifact-managed workflow can't be deleted (`removeWorkflow` →
+  PROHIBITED_ACTION "managed by an artifact"); delete the artifact DIRECTORY instead
+  (`rm -rf artifacts/api-server`) — it's glob-registered via `pnpm-workspace` `artifacts/*`,
+  so removing the dir deregisters the artifact AND its workflow. Run `pnpm install` after to
+  drop it from the lockfile. Verify with `curl localhost:80/api/health` = 200.
 
 ## Two main-agent gotchas learned here
 - `verifyAndReplaceArtifactToml` CANNOT change the artifact `version` field
