@@ -951,6 +951,9 @@ Ogni panel ha description (concreta, visualizzabile) + dialogue_speaker + dialog
 Se la vignetta non ha dialogo, metti dialogue_speaker=null e dialogue_text=null.
 """
 
+    # Lazy import (anthropic SDK pesa ~2-3s)
+    from snaptoon_core.llm import DEFAULT_MODEL, client as llm_client
+
     response = llm_client().messages.create(
         model=DEFAULT_MODEL,
         max_tokens=8000,
@@ -1994,6 +1997,9 @@ def _render_step_6() -> None:
 
 def _generate_kids_pdf(project_id: uuid.UUID) -> None:
     """Renderizza tutte le pagine + export PDF."""
+    # Lazy import (PIL/reportlab pesano ~3-5s)
+    from snaptoon_core.layout import GRIDS, export_pdf, render_page
+
     with st.spinner("Renderizzo il PDF..."):
         with session_scope() as s:
             project = projects_repo.get_by_id(s, project_id)
