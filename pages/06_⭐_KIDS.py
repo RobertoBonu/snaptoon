@@ -130,9 +130,13 @@ KIDS_STYLE_MAP = {
     "manga": ("Manga", "japanese_preschool_anime"),
 }
 
+# Set di style_id riconducibili a progetti Kids (per filtrare la dashboard)
+KIDS_STYLE_PRESET_IDS = {preset_id for _, preset_id in KIDS_STYLE_MAP.values()}
+
 GRID_CAPACITY = {"splash": 1, "1+2": 3, "2x2": 4}
 
 # Session-state keys
+SK_VIEW = "_kids_view"  # "dashboard" | "wizard"
 SK_STEP = "_kids_step"
 SK_TEMPLATE_ID = "_kids_template_id"
 SK_STYLE = "_kids_style"
@@ -155,11 +159,27 @@ def _set_step(n: int) -> None:
 
 
 def _reset_wizard() -> None:
-    for k in [SK_STEP, SK_TEMPLATE_ID, SK_STYLE, SK_SCINTILLA,
+    for k in [SK_VIEW, SK_STEP, SK_TEMPLATE_ID, SK_STYLE, SK_SCINTILLA,
               SK_CHAR_NAMES, SK_CHAR_DESCS, SK_CHAR_PHOTOS,
               SK_PYD_SCRIPT, SK_REGEN_FEEDBACK,
               SK_PROJECT_ID, SK_GEN_PROGRESS]:
         st.session_state.pop(k, None)
+
+
+def _list_kids_projects(user_id) -> list[dict]:
+    """Restituisce i progetti dell'utente che usano uno stile Kids."""
+    with session_scope() as s:
+        projects = projects_repo.list_by_owner(s, user_id)
+        return [
+            {
+                "id": p.id, "slug": p.slug, "name": p.name,
+                "style_id": p.style_id,
+                "created_at": p.created_at,
+                "updated_at": p.updated_at,
+            }
+            for p in projects
+            if p.style_id in KIDS_STYLE_PRESET_IDS
+        ]
 
 
 # ============================================================
@@ -167,26 +187,133 @@ def _reset_wizard() -> None:
 # ============================================================
 
 st.title("⭐ SnapToon KIDS")
-st.caption("Crea un libretto illustrato per bambini in 5 passaggi.")
 
-# Step indicator
+# Decide: dashboard o wizard
+current_view = st.session_state.get(SK_VIEW)
+if current_view is None:
+    # Prima visita: vedi se ci sono già libretti
+    existing = _list_kids_projects(_user.id)
+    if existing:
+        st.session_state[SK_VIEW] = "dashboard"
+    else:
+        st.session_state[SK_VIEW] = "wizard"
+        _set_step(1)
+    current_view = st.session_state[SK_VIEW]
+
+# Step indicator solo in modalità wizard
 step = _step()
-steps_labels = ["Template", "Scintilla", "Personaggi", "Storia", "Genera", "Esporta"]
-indicator_html = "<div style='display:flex;gap:12px;margin:16px 0;'>"
-for i, lbl in enumerate(steps_labels, start=1):
-    color = "#F59E0B" if i == step else ("#10B981" if i < step else "#475569")
-    bg = "#1A2035" if i == step else "transparent"
-    indicator_html += (
-        f"<div style='flex:1;padding:8px 12px;border-radius:6px;background:{bg};"
-        f"border:1px solid {color};color:{color};font-weight:500;font-size:13px;"
-        f"text-align:center;'>"
-        f"{i}. {lbl}"
-        "</div>"
-    )
-indicator_html += "</div>"
-st.markdown(indicator_html, unsafe_allow_html=True)
+if current_view == "wizard":
+    st.caption("Crea un libretto illustrato per bambini.")
+    steps_labels = ["Template", "Scintilla", "Personaggi", "Storia", "Genera", "Esporta"]
+    indicator_html = "<div style='display:flex;gap:12px;margin:16px 0;'>"
+    for i, lbl in enumerate(steps_labels, start=1):
+        color = "#F59E0B" if i == step else ("#10B981" if i < step else "#475569")
+        bg = "#1A2035" if i == step else "transparent"
+        indicator_html += (
+            f"<div style='flex:1;padding:8px 12px;border-radius:6px;background:{bg};"
+            f"border:1px solid {color};color:{color};font-weight:500;font-size:13px;"
+            f"text-align:center;'>"
+            f"{i}. {lbl}"
+            "</div>"
+        )
+    indicator_html += "</div>"
+    st.markdown(indicator_html, unsafe_allow_html=True)
+else:
+    st.caption("I tuoi libretti illustrati per bambini.")
 
 st.divider()
+
+
+# ============================================================
+# DASHBOARD — lista libretti esistenti
+# ============================================================
+
+
+def _render_dashboard() -> None:
+    libri = _list_kids_projects(_user.id)
+
+    col_h1, col_h2 = st.columns([3, 1])
+    with col_h1:
+        st.markdown(f"### 📚 I miei libretti ({len(libri)})")
+    with col_h2:
+        if st.button("+ Nuovo libretto", type="primary", use_container_width=True):
+            _reset_wizard()
+            st.session_state[SK_VIEW] = "wizard"
+            _set_step(1)
+            st.rerun()
+
+    if not libri:
+        st.info("Non hai ancora libretti. Clicca **+ Nuovo libretto** per iniziare.")
+        return
+
+    st.markdown("")
+    cols_per_row = 3
+    for row_start in range(0, len(libri), cols_per_row):
+        row = libri[row_start:row_start + cols_per_row]
+        cols = st.columns(cols_per_row)
+        for col, lib in zip(cols, row):
+            with col:
+                with st.container(border=True):
+                    cover_key = cover_illustration_key(lib["id"])
+                    if object_exists(cover_key):
+                        try:
+                            data = download_bytes(cover_key)
+                            st.image(data, use_container_width=True)
+                        except Exception:
+                            st.markdown(
+                                "<div style='background:#161B26;height:200px;"
+                                "border-radius:8px;display:flex;align-items:center;"
+                                "justify-content:center;color:#475569;'>📕 (cover non disponibile)</div>",
+                                unsafe_allow_html=True,
+                            )
+                    else:
+                        st.markdown(
+                            "<div style='background:#161B26;height:200px;"
+                            "border-radius:8px;display:flex;align-items:center;"
+                            "justify-content:center;color:#475569;'>📕</div>",
+                            unsafe_allow_html=True,
+                        )
+
+                    st.markdown(f"**{lib['name']}**")
+                    st.caption(f"Creato il {lib['created_at'].strftime('%d/%m/%Y')}")
+
+                    col_open, col_del = st.columns([2, 1])
+                    with col_open:
+                        if st.button(
+                            "📖 Apri",
+                            key=f"_open_kid_{lib['id']}",
+                            type="primary",
+                            use_container_width=True,
+                        ):
+                            st.session_state[SK_PROJECT_ID] = str(lib["id"])
+                            st.session_state[SK_VIEW] = "wizard"
+                            _set_step(6)
+                            st.rerun()
+                    with col_del:
+                        confirm_key = f"_confirm_del_kid_{lib['id']}"
+                        if st.session_state.get(confirm_key):
+                            if st.button(
+                                "❌",
+                                key=f"_del_kid_yes_{lib['id']}",
+                                use_container_width=True,
+                                help="Conferma elimina",
+                            ):
+                                with session_scope() as s:
+                                    proj = projects_repo.get_by_id(s, lib["id"])
+                                    if proj is not None:
+                                        projects_repo.soft_delete(s, proj)
+                                st.session_state.pop(confirm_key, None)
+                                st.toast("Libretto eliminato.", icon="🗑")
+                                st.rerun()
+                        else:
+                            if st.button(
+                                "🗑",
+                                key=f"_del_kid_{lib['id']}",
+                                use_container_width=True,
+                                help="Elimina",
+                            ):
+                                st.session_state[confirm_key] = True
+                                st.rerun()
 
 
 # ============================================================
@@ -1348,8 +1475,203 @@ def _execute_full_kids_generation(
 
 
 # ============================================================
-# STEP 6 — Anteprima + esporta
+# STEP 6 — Anteprima + esporta + rigenera singole vignette/cover
 # ============================================================
+
+
+def _regenerate_single_panel(
+    project_id: uuid.UUID,
+    page_number: int,
+    panel_number: int,
+) -> tuple[bool, str | None]:
+    """Rigenera UNA vignetta. Usa stessi dati del progetto."""
+    from snaptoon_core.generator import OpenAIImageGenerator
+
+    cost = cost_for_operation("generate_panel", quality="low")
+
+    # Carica context dal DB
+    with session_scope() as s:
+        project = projects_repo.get_by_id(s, project_id)
+        if project is None or project.script is None:
+            return False, "Progetto non trovato."
+
+        pyd_script_db = scripts_repo.load_pydantic(project.script)
+        panel = None
+        for pg in pyd_script_db.pages:
+            if pg.number == page_number:
+                for p in pg.panels:
+                    if p.number == panel_number:
+                        panel = p
+                        break
+                break
+        if panel is None:
+            return False, "Vignetta non trovata."
+
+        style_id = project.style_id
+        cast = []
+        for cs in project.character_sheets:
+            ref = next((r for r in cs.references if r.slot_number == 1), None)
+            cast.append({
+                "name": cs.name,
+                "description": cs.visual_description,
+                "ref_key": ref.storage_key if ref else None,
+            })
+
+    # Charge
+    try:
+        with session_scope() as s:
+            fresh_user = users_repo.get_by_id(s, _user.id)
+            credits_repo.charge(
+                s, fresh_user,
+                cost=cost,
+                operation=CreditOperation.generate_panel,
+                reason=f"KIDS rigenera p{page_number}v{panel_number}",
+            )
+    except InsufficientCreditsError as e:
+        return False, f"Crediti insufficienti: servono {e.required}, ne hai {e.available}."
+
+    # Build prompt
+    cast_block = [{"name": c["name"], "description": c["description"]} for c in cast]
+    scene_params = {
+        "shot_distance": panel.shot_distance,
+        "shot_angle": panel.shot_angle,
+        "mood": panel.mood,
+    }
+    prompt = _build_kids_panel_prompt(panel, cast_block, style_id, scene_params)
+
+    # Download reference temp
+    tmp_refs = []
+    try:
+        for c in cast:
+            rk = c.get("ref_key")
+            if rk and object_exists(rk):
+                data = download_bytes(rk)
+                tmp = tempfile.NamedTemporaryFile(suffix=".png", delete=False)
+                tmp.write(data)
+                tmp.close()
+                tmp_refs.append(Path(tmp.name))
+
+        generator = OpenAIImageGenerator()
+        image_bytes = generator._generate_bytes(
+            prompt=prompt,
+            size="1024x1024",
+            reference_images=tmp_refs if tmp_refs else None,
+            quality="low",
+        )
+
+        vk = vignette_key(project_id, page_number, panel_number)
+        upload_bytes(vk, image_bytes, content_type="image/png")
+
+        with session_scope() as s:
+            project = projects_repo.get_by_id(s, project_id)
+            vignettes_repo.upsert(
+                s, project=project,
+                page_number=page_number, panel_number=panel_number,
+                storage_key=vk,
+                prompt_hash=_hash_prompt(prompt, str(time.time())),  # invalida cache
+                quality="low",
+                aspect_ratio_key="1_1",
+                provider="openai",
+                model="gpt-image-2",
+            )
+
+    except Exception as e:
+        err = str(e)[:300]
+        with session_scope() as s:
+            fresh_user = users_repo.get_by_id(s, _user.id)
+            credits_repo.refund(
+                s, fresh_user, amount=cost,
+                reason=f"Refund kids regen panel: {err}",
+            )
+        return False, f"Errore: {err}"
+    finally:
+        for p in tmp_refs:
+            try:
+                p.unlink()
+            except OSError:
+                pass
+
+    return True, None
+
+
+def _regenerate_cover(project_id: uuid.UUID) -> tuple[bool, str | None]:
+    """Rigenera la copertina."""
+    from snaptoon_core.generator import OpenAIImageGenerator
+
+    cost = cost_for_operation("generate_panel", quality="low")
+
+    with session_scope() as s:
+        project = projects_repo.get_by_id(s, project_id)
+        if project is None:
+            return False, "Progetto non trovato."
+        style_id = project.style_id
+        title = project.cover.title if project.cover else project.name
+        cast = []
+        for cs in project.character_sheets:
+            ref = next((r for r in cs.references if r.slot_number == 1), None)
+            cast.append({
+                "name": cs.name,
+                "description": cs.visual_description,
+                "ref_key": ref.storage_key if ref else None,
+            })
+
+    try:
+        with session_scope() as s:
+            fresh_user = users_repo.get_by_id(s, _user.id)
+            credits_repo.charge(
+                s, fresh_user, cost=cost,
+                operation=CreditOperation.generate_cover,
+                reason=f"KIDS rigenera copertina",
+            )
+    except InsufficientCreditsError as e:
+        return False, f"Crediti insufficienti: servono {e.required}, ne hai {e.available}."
+
+    cast_block = [{"name": c["name"], "description": c["description"]} for c in cast]
+    prompt = _build_kids_cover_prompt(title, cast_block, style_id)
+
+    tmp_refs = []
+    try:
+        for c in cast:
+            rk = c.get("ref_key")
+            if rk and object_exists(rk):
+                data = download_bytes(rk)
+                tmp = tempfile.NamedTemporaryFile(suffix=".png", delete=False)
+                tmp.write(data)
+                tmp.close()
+                tmp_refs.append(Path(tmp.name))
+
+        generator = OpenAIImageGenerator()
+        image_bytes = generator._generate_bytes(
+            prompt=prompt,
+            size="1024x1536",
+            reference_images=tmp_refs if tmp_refs else None,
+            quality="low",
+        )
+
+        cover_key = cover_illustration_key(project_id)
+        upload_bytes(cover_key, image_bytes, content_type="image/png")
+
+        with session_scope() as s:
+            project = projects_repo.get_by_id(s, project_id)
+            cover_orm = covers_repo.get_or_create(s, project)
+            covers_repo.update_illustration_key(s, cover_orm, cover_key)
+    except Exception as e:
+        err = str(e)[:300]
+        with session_scope() as s:
+            fresh_user = users_repo.get_by_id(s, _user.id)
+            credits_repo.refund(
+                s, fresh_user, amount=cost,
+                reason=f"Refund kids regen cover: {err}",
+            )
+        return False, f"Errore: {err}"
+    finally:
+        for p in tmp_refs:
+            try:
+                p.unlink()
+            except OSError:
+                pass
+
+    return True, None
 
 
 def _render_step_6() -> None:
@@ -1377,47 +1699,94 @@ def _render_step_6() -> None:
     st.caption(f"Progetto: **{proj_name}**")
     st.markdown(f"_{pyd_script_db.logline}_")
 
-    st.markdown(f"**{len(flat_panels)} vignette generate**")
+    # Bottoni in alto (azioni globali)
+    col_t1, col_t2, col_t3 = st.columns(3)
+    with col_t1:
+        if st.button("📚 Tutti i libretti", use_container_width=True, key="_step6_back_dash"):
+            st.session_state[SK_VIEW] = "dashboard"
+            st.session_state.pop(SK_PROJECT_ID, None)
+            st.session_state.pop(SK_STEP, None)
+            st.rerun()
+    with col_t2:
+        if st.button("+ Nuovo libretto", use_container_width=True, key="_step6_new"):
+            _reset_wizard()
+            st.session_state[SK_VIEW] = "wizard"
+            _set_step(1)
+            st.rerun()
+    with col_t3:
+        if st.button("📥 Genera PDF", type="primary", use_container_width=True, key="_step6_pdf"):
+            _generate_kids_pdf(project_id)
+
     st.divider()
 
-    # Grid vignette 4 per riga
+    # === Copertina con bottone rigenera ===
+    st.markdown("#### 📕 Copertina")
+    cv_key = cover_illustration_key(project_id)
+    col_cv_img, col_cv_btn = st.columns([3, 1])
+    with col_cv_img:
+        if object_exists(cv_key):
+            try:
+                data = download_bytes(cv_key)
+                st.image(data, width=320)
+            except Exception:
+                st.warning("Errore lettura copertina.")
+        else:
+            st.info("Copertina non disponibile.")
+    with col_cv_btn:
+        cost = cost_for_operation("generate_panel", quality="low")
+        can = _user.credits_remaining >= cost
+        if st.button(
+            f"🔄 Rigenera copertina\n({cost} cr)",
+            key="_kids_regen_cover",
+            disabled=not can,
+            help=None if can else f"Servono {cost} crediti.",
+            use_container_width=True,
+        ):
+            with st.spinner("Rigenero copertina..."):
+                ok, err = _regenerate_cover(project_id)
+            if ok:
+                st.toast("Copertina rigenerata!", icon="📕")
+                st.rerun()
+            else:
+                st.error(err)
+
+    st.divider()
+    st.markdown(f"#### 🖼 Vignette ({len(flat_panels)})")
+
+    # Grid vignette con bottone rigenera per ciascuna
     cols_per_row = 4
     for row_start in range(0, len(flat_panels), cols_per_row):
         row = flat_panels[row_start:row_start + cols_per_row]
         cols = st.columns(cols_per_row)
         for col, (page_num, panel) in zip(cols, row):
             with col:
-                key = (page_num, panel.number)
-                if key in vig_keys:
-                    try:
-                        data = download_bytes(vig_keys[key])
-                        st.image(data, use_container_width=True)
-                        st.caption(f"P{page_num}V{panel.number}")
-                    except Exception:
-                        st.warning(f"P{page_num}V{panel.number}: errore")
-                else:
-                    st.caption(f"P{page_num}V{panel.number}: non generata")
+                with st.container(border=True):
+                    key = (page_num, panel.number)
+                    if key in vig_keys:
+                        try:
+                            data = download_bytes(vig_keys[key])
+                            st.image(data, use_container_width=True)
+                        except Exception:
+                            st.warning("Errore")
+                    else:
+                        st.caption("Non generata")
+                    st.caption(f"P{page_num}V{panel.number}")
 
-    st.divider()
-
-    # Bottoni finali
-    col_e1, col_e2, col_e3 = st.columns(3)
-    with col_e1:
-        if st.button("← Apri in modalità Pro (Genera)", use_container_width=True):
-            appstate.set_current_project_slug(project.slug if hasattr(project, "slug") else None)
-            # Fallback: ricarica la pagina Genera
-            try:
-                st.switch_page("pages/04_🖼_Genera.py")
-            except Exception:
-                pass
-    with col_e2:
-        if st.button("🔄 Nuovo libretto", use_container_width=True):
-            _reset_wizard()
-            _set_step(1)
-            st.rerun()
-    with col_e3:
-        if st.button("📥 Genera PDF", type="primary", use_container_width=True):
-            _generate_kids_pdf(project_id)
+                    cost = cost_for_operation("generate_panel", quality="low")
+                    can = _user.credits_remaining >= cost
+                    if st.button(
+                        f"🔄 Rigenera ({cost})",
+                        key=f"_regen_p{page_num}v{panel.number}",
+                        disabled=not can,
+                        use_container_width=True,
+                    ):
+                        with st.spinner(f"Rigenero P{page_num}V{panel.number}..."):
+                            ok, err = _regenerate_single_panel(project_id, page_num, panel.number)
+                        if ok:
+                            st.toast(f"P{page_num}V{panel.number} rigenerata!", icon="🎨")
+                            st.rerun()
+                        else:
+                            st.error(err)
 
 
 def _generate_kids_pdf(project_id: uuid.UUID) -> None:
@@ -1509,15 +1878,21 @@ def _generate_kids_pdf(project_id: uuid.UUID) -> None:
 # Router
 # ============================================================
 
-if step == 1:
-    _render_step_1()
-elif step == 2:
-    _render_step_2()
-elif step == 3:
-    _render_step_3()
-elif step == 4:
-    _render_step_4_storia()
-elif step == 5:
-    _render_step_5()
-elif step == 6:
-    _render_step_6()
+if current_view == "dashboard":
+    _render_dashboard()
+elif current_view == "wizard":
+    if step == 1:
+        _render_step_1()
+    elif step == 2:
+        _render_step_2()
+    elif step == 3:
+        _render_step_3()
+    elif step == 4:
+        _render_step_4_storia()
+    elif step == 5:
+        _render_step_5()
+    elif step == 6:
+        _render_step_6()
+    else:
+        _set_step(1)
+        st.rerun()
