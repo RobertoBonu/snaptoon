@@ -165,8 +165,8 @@ function HeroSection() {
 function ProductsSection() {
   const cards = [
     {
-      title: "Generatore Tavole",
-      desc: "Genera fumetti completi da una semplice descrizione.",
+      title: "LA TUA IDEA",
+      desc: "Adatta soggetto, sceneggiatura e dialoghi senza inventare nulla",
       img: "/__mockup/images/card-generator.png",
       actions: ["Prova ora"]
     },
