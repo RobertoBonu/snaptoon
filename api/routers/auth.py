@@ -102,11 +102,18 @@ def require_user(snaptoon_token: str | None = Cookie(default=None, alias=COOKIE_
         user = users_repo.get_by_id(s, user_uuid)
         if user is None:
             raise HTTPException(status_code=401, detail="User not found")
+        role_value = (
+            user.role.value if hasattr(user.role, "value") else str(user.role)
+        )
+        # is_admin viene DERIVATO da role (single source of truth) per evitare
+        # disallineamento tra le due colonne (caso visto in produzione su
+        # SnapToon V2 — role=admin ma is_admin=False).
+        is_admin = (role_value == "admin") or bool(user.is_admin)
         return {
             "id": str(user.id),
             "email": user.email,
-            "role": user.role.value if hasattr(user.role, "value") else str(user.role),
-            "is_admin": user.is_admin,
+            "role": role_value,
+            "is_admin": is_admin,
             "must_change_password": user.must_change_password,
         }
 
