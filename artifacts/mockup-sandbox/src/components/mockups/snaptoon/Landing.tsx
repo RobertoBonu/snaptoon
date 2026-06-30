@@ -195,7 +195,7 @@ function ProductsSection() {
       <div className="container">
         <div style={{ textAlign: "center", marginBottom: "64px", maxWidth: "800px", margin: "0 auto 64px auto" }}>
           <h2 style={{ fontSize: "clamp(2rem, 3vw, 2.5rem)", fontWeight: 700, color: "#F1F5F9", letterSpacing: "-0.02em", marginBottom: "16px" }}>
-            Un nuovo modo di creare: tutto ciò che ti serve per trasformare qualsiasi testo in un fumetto.
+            Tutto ciò che ti serve per trasformare la tua creatività in un fumetto.
           </h2>
           <p style={{ fontSize: "1.125rem", color: "#94A3B8" }}>
             I nostri ultimi modelli e strumenti
