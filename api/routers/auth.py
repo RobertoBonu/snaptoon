@@ -14,6 +14,7 @@ from jose import JWTError, jwt
 from pydantic import BaseModel, EmailStr
 
 from auth import login as auth_login
+from db.models import Role
 from db.repos import users as users_repo
 from db.session import session_scope
 
@@ -106,7 +107,10 @@ def require_user(snaptoon_token: str | None = Cookie(default=None, alias=COOKIE_
             "id": str(user.id),
             "email": user.email,
             "role": user.role.value if hasattr(user.role, "value") else str(user.role),
-            "is_admin": user.is_admin,
+            # is_admin è DERIVATO dal ruolo (single source of truth): la colonna
+            # legacy users.is_admin può desincronizzarsi (es. UPDATE manuale del
+            # solo `role`), causando "role=admin ma niente accesso admin".
+            "is_admin": user.role == Role.admin,
             "must_change_password": user.must_change_password,
         }
 
@@ -122,7 +126,7 @@ def login_endpoint(req: LoginRequest, response: Response) -> UserOut:
             id=str(user.id),
             email=user.email,
             role=user.role.value if hasattr(user.role, "value") else str(user.role),
-            is_admin=user.is_admin,
+            is_admin=user.role == Role.admin,
             must_change_password=user.must_change_password,
         )
     response.set_cookie(

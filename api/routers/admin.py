@@ -101,7 +101,7 @@ def _user_to_out(u, project_count: int = 0) -> AdminUserOut:
         id=str(u.id),
         email=u.email,
         role=u.role.value if hasattr(u.role, "value") else str(u.role),
-        is_admin=u.is_admin,
+        is_admin=(u.role == Role.admin),
         is_active=u.is_active,
         plan=u.plan.value if hasattr(u.plan, "value") else str(u.plan),
         credits_total=u.credits_total_this_period,
@@ -141,7 +141,7 @@ def get_stats(admin: dict = Depends(require_admin)) -> AdminStatsOut:
         users = users_repo.list_all(s, include_inactive=True)
         total = len(users)
         active = sum(1 for u in users if u.is_active)
-        admins = sum(1 for u in users if u.is_admin)
+        admins = sum(1 for u in users if u.role == Role.admin)
         by_role: dict[str, int] = {}
         total_projects = 0
         for u in users:
