@@ -42,6 +42,16 @@ proxy returns 502 at `/`. `.replit` `[workflows]` is empty so nothing auto-start
 =200. This is NOT an app bug — the app starts fine every time. The code_execution
 notebook also resets on these restarts (state lost).
 
+# Recurring: 500 "Internal Server Error" after a platform merge/reconcile (corrupt .next)
+After a task is merged and the post-merge reconcile runs while the Next dev server is live,
+the V2 Next build cache gets corrupted: every route returns HTTP 500 and the workflow log
+floods with `ENOENT ... web/.next/server/app/<route>/page/app-build-manifest.json` and
+`web/.next/static/development/_buildManifest.js.tmp.*`. This is NOT an app/code bug and a
+plain workflow restart alone does NOT fix it (the stale `.next` persists).
+**Fix:** `rm -rf web/.next` then restart workflow `artifacts/snaptoon: SnapToon`; verify
+`curl localhost:80/{,esplora,...}` = 200. (Distinct from the 502 "not_started" case above,
+which is just stopped workflows.)
+
 # Git push/commit mechanics in the main agent sandbox
 - `git commit` is BLOCKED in the main agent ("Destructive git operations are not
   allowed"). The platform auto-creates a checkpoint commit at the END of each turn
