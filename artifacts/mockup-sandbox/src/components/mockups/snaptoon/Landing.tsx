@@ -172,7 +172,7 @@ function ProductsSection() {
     },
     {
       title: "Stili Artistici",
-      desc: "Manga, Cartoon, Noir, Acquerello e molto altro.",
+      desc: "Oltre 100 stili di illustrazione, inquadrature, balloon e griglie.",
       img: "/__mockup/images/card-styles.png",
       actions: ["Prova ora", "Scopri di più"]
     },
