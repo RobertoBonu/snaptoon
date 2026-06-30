@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { NavIcon } from "./_NavIcons";
 
 const USERS = [
   { email: "marco.rossi@example.com", plan: "Creator", cred: 142, total: 200, created: "01/07/26", active: true, last: "03/07 14:23" },
@@ -42,7 +43,7 @@ export function Admin() {
         </div>
         {[{ icon: "🏠", l: "Home" }, { icon: "💳", l: "Account" }, { icon: "🛠", l: "Admin", active: true }].map(n => (
           <div key={n.l} style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 16px", borderRadius: 6, margin: "2px 6px", fontSize: 14, fontWeight: 500, color: (n as any).active ? "#F59E0B" : "#64748B", background: (n as any).active ? "#1A2035" : "transparent", borderLeft: (n as any).active ? "3px solid #F59E0B" : "3px solid transparent", cursor: "pointer" }}>
-            <span>{n.icon}</span><span>{n.l}</span>
+            <NavIcon label={n.l} active={(n as { active?: boolean }).active} /><span>{n.l}</span>
           </div>
         ))}
         <div style={{ flex: 1 }} />

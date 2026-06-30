@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { NavIcon } from "./_NavIcons";
 
 const NAV = [
   { icon: "📝", label: "Testo", active: true },
@@ -42,7 +43,7 @@ function Sidebar({ compact }: { compact?: boolean }) {
       <div style={{ fontSize: 10, fontWeight: 600, color: "#334155", textTransform: "uppercase", letterSpacing: ".08em", padding: "0.25rem 1.25rem" }}>Navigazione</div>
       {NAV.map(n => (
         <div key={n.label} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 20px", borderRadius: 6, margin: "2px 8px", fontSize: 14, fontWeight: 500, color: n.active ? "#F59E0B" : "#64748B", background: n.active ? "#1A2035" : "transparent", borderLeft: n.active ? "3px solid #F59E0B" : "3px solid transparent", cursor: "pointer" }}>
-          <span>{n.icon}</span><span>{n.label}</span>
+          <NavIcon label={n.label} active={(n as { active?: boolean }).active} /><span>{n.label}</span>
         </div>
       ))}
       <div style={{ flex: 1 }} />

@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { NavIcon } from "./_NavIcons";
 
 const NAV_SIDE = [
   { icon: "🏠", label: "Home" },
@@ -47,12 +48,12 @@ export function Account() {
         <div style={{ height: 1, background: "#1E2436", margin: "0.5rem 0" }} />
         {NAV_SIDE.map(n => (
           <div key={n.label} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 20px", borderRadius: 6, margin: "2px 8px", fontSize: 14, fontWeight: 500, color: "#64748B", cursor: "pointer" }}>
-            <span>{n.icon}</span><span>{n.label}</span>
+            <NavIcon label={n.label} /><span>{n.label}</span>
           </div>
         ))}
         <div style={{ height: 1, background: "#1E2436", margin: "0.5rem 0" }} />
         <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 20px", borderRadius: 6, margin: "2px 8px", fontSize: 14, fontWeight: 500, color: "#F59E0B", background: "#1A2035", borderLeft: "3px solid #F59E0B", cursor: "pointer" }}>
-          <span>💳</span><span>Account</span>
+          <NavIcon label="Account" active /><span>Account</span>
         </div>
         <div style={{ flex: 1 }} />
       </div>
