@@ -199,8 +199,9 @@ two places: `web/app/app/layout.tsx` (top-level vertical sidebar — server comp
 auth cookie; path-dependent active state must be moved to a client child like
 `web/components/AppSidebarNav.tsx` via `usePathname`) and `web/app/app/projects/[slug]/layout.tsx`
 (the per-project editor steps — Testo/Stile/Personaggi/Genera/Impagina — rendered as a HORIZONTAL
-client tab bar, NOT a vertical sidebar like the mockup). `lucide-react` is NOT installed in `web/`,
-so use inline-SVG line icons (shared `web/components/NavIcon.tsx`) rather than reaching for a lib.
+client tab bar, NOT a vertical sidebar like the mockup). The in-app nav uses inline-SVG line
+icons (shared `web/components/NavIcon.tsx`); `lucide-react` IS now installed in standalone `web/`
+(added via `cd web && pnpm add <pkg> --ignore-workspace`) and is used by the public landing.
 **How to apply:** when the user says nav/icons "still look old", change `web/`, not the mockups.
 
 # Dev preview "appears then disappears" = unhandled hydration error, NOT a server crash
