@@ -278,6 +278,63 @@ export interface AdminRoleInfo {
   max_projects: number;
 }
 
+// === Esplora ===
+
+export interface EsploraAsset {
+  id: string;
+  section: string;
+  title: string;
+  caption: string;
+  position: number;
+  has_image: boolean;
+  image_url?: string | null;
+  prompt: string;
+  is_active: boolean;
+}
+
+export interface EsploraSection {
+  key: string;
+  label: string;
+  aspect: string;
+  items: EsploraAsset[];
+}
+
+export interface EsploraSectionsOut {
+  sections: EsploraSection[];
+}
+
+/**
+ * Upload di un'immagine per un asset Esplora (multipart/form-data).
+ * Non usa apiFetch perché quello forza Content-Type application/json.
+ */
+export async function uploadEsploraImage(
+  assetId: string,
+  file: File
+): Promise<EsploraAsset> {
+  const fd = new FormData();
+  fd.append("file", file);
+  const res = await fetch(`/api/admin/esplora/assets/${assetId}/upload`, {
+    method: "POST",
+    credentials: "include",
+    body: fd,
+  });
+  if (res.status === 401) {
+    if (typeof window !== "undefined") window.location.href = "/login";
+    throw new Error("Sessione scaduta");
+  }
+  if (!res.ok) {
+    let detail = `HTTP ${res.status}`;
+    try {
+      const data = await res.json();
+      if (data?.detail) detail = data.detail;
+    } catch {
+      /* ignore */
+    }
+    throw new Error(detail);
+  }
+  return res.json();
+}
+
 /**
  * Fetch dell'API con gestione standardizzata di errori.
  * - credentials: 'include' invia il cookie auth

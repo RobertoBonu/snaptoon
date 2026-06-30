@@ -44,6 +44,11 @@ def page_render_key(project_id: uuid.UUID | str, page: int) -> str:
     return f"pages/{_stringify(project_id)}/page{page:02d}.png"
 
 
+def esplora_asset_key(section: str, asset_id: uuid.UUID | str) -> str:
+    """Storage key per un asset della pagina pubblica /esplora."""
+    return f"esplora/{section}/{_stringify(asset_id)}.png"
+
+
 def pdf_export_key(project_id: uuid.UUID | str, ts: datetime | None = None) -> str:
     if ts is None:
         ts = datetime.now(timezone.utc)

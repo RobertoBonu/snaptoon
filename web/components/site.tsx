@@ -207,14 +207,16 @@ export function MediaFrame({
         <div style={{ width: 44, height: 44, borderRadius: 12, background: "rgba(245,158,11,0.10)", border: `1px solid ${accent}40`, display: "flex", alignItems: "center", justifyContent: "center", color: accent, fontSize: 20 }}>▦</div>
         {label && <span style={{ fontSize: 12, color: "#64748B", lineHeight: 1.4, maxWidth: 220 }}>{label}</span>}
       </div>
-      <img
-        src={src}
-        alt={alt || ""}
-        style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }}
-        onError={(e) => {
-          e.currentTarget.style.display = "none";
-        }}
-      />
+      {src ? (
+        <img
+          src={src}
+          alt={alt || ""}
+          style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }}
+          onError={(e) => {
+            e.currentTarget.style.display = "none";
+          }}
+        />
+      ) : null}
     </div>
   );
 }

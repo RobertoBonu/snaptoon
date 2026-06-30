@@ -1,33 +1,29 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { SiteShell, MediaFrame } from "@/components/site";
+import { apiFetch, type EsploraSectionsOut, type EsploraSection } from "@/lib/api";
 
-const COPERTINE = [
-  { label: "Cover · Avventura per bambini", caption: "Avventura per bambini · Stile Flat", img: "/images/esplora/cover-1.png" },
-  { label: "Cover · Manga shonen", caption: "Manga shonen · Stile Tokyo-Mecha", img: "/images/esplora/cover-2.png" },
-  { label: "Cover · Romance", caption: "Romance · Stile Acquerello", img: "/images/esplora/cover-3.png" },
-  { label: "Cover · Sci-fi", caption: "Sci-fi · Stile Cyber-Neon", img: "/images/esplora/cover-4.png" },
-  { label: "Cover · Horror", caption: "Horror · Stile Noir", img: "/images/esplora/cover-5.png" },
-  { label: "Cover · Fantasy", caption: "Fantasy · Stile Inchiostro", img: "/images/esplora/cover-6.png" },
-];
-
-const TAVOLE = [
-  { label: "Tavola · Splash + 2x2", caption: "Splash + 2x2 · Stile Noir", img: "/images/esplora/tavola-1.png" },
-  { label: "Tavola · Griglia 1+2", caption: "Griglia 1+2 · Stile Disney", img: "/images/esplora/tavola-2.png" },
-  { label: "Tavola · Fila singola", caption: "Fila singola · Stile Manga", img: "/images/esplora/tavola-3.png" },
-  { label: "Tavola · Mosaico 3x3", caption: "Mosaico 3x3 · Stile Acquerello", img: "/images/esplora/tavola-4.png" },
-];
-
-const PERSONAGGI = [
-  { name: "Mia", desc: "Eroina ribelle, 17 anni", img: "/images/esplora/char-1.png" },
-  { name: "Kael", desc: "Mercenario cibernetico", img: "/images/esplora/char-2.png" },
-  { name: "Nonna Rosa", desc: "Custode dei segreti", img: "/images/esplora/char-3.png" },
-  { name: "Dr. Vex", desc: "Antagonista geniale", img: "/images/esplora/char-4.png" },
-  { name: "Bun", desc: "Robot da compagnia", img: "/images/esplora/char-5.png" },
-  { name: "Aria", desc: "Pilota stellare", img: "/images/esplora/char-6.png" },
-  { name: "Otto", desc: "Detective stanco", img: "/images/esplora/char-7.png" },
-  { name: "Lumi", desc: "Spirito del bosco", img: "/images/esplora/char-8.png" },
-];
+const SECTION_META: Record<string, { heading: string; subtitle: string; minCol: string; gap: string }> = {
+  copertine: {
+    heading: "📕 Copertine",
+    subtitle: "Dalla scintilla narrativa alla cover finita, con titolo già integrato nell'illustrazione.",
+    minCol: "300px",
+    gap: "24px",
+  },
+  tavole: {
+    heading: "🖼 Tavole",
+    subtitle: "Vignette con balloon, scene, inquadrature e mood scelti da te. SnapToon impagina tutto.",
+    minCol: "440px",
+    gap: "24px",
+  },
+  personaggi: {
+    heading: "👥 Personaggi",
+    subtitle: "Reference image coerenti in ogni vignetta. Lo stesso volto, lo stesso costume, da pagina 1 a pagina 100.",
+    minCol: "220px",
+    gap: "20px",
+  },
+};
 
 function SectionHead({ title, subtitle }: { title: string; subtitle: string }) {
   return (
@@ -38,7 +34,50 @@ function SectionHead({ title, subtitle }: { title: string; subtitle: string }) {
   );
 }
 
+function PersonaggiGrid({ sec }: { sec: EsploraSection }) {
+  const meta = SECTION_META.personaggi;
+  return (
+    <div style={{ display: "grid", gridTemplateColumns: `repeat(auto-fill, minmax(${meta.minCol}, 1fr))`, gap: meta.gap }}>
+      {sec.items.map((p) => (
+        <div key={p.id} className="product-card">
+          <MediaFrame src={p.image_url || ""} label={p.title} aspect={sec.aspect} rounded={0} />
+          <div style={{ padding: "16px" }}>
+            <div style={{ fontSize: "15px", fontWeight: 700, color: "#F1F5F9" }}>{p.title}</div>
+            <div style={{ fontSize: "13px", color: "#94A3B8", marginTop: "4px" }}>{p.caption}</div>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function CardGrid({ sec }: { sec: EsploraSection }) {
+  const meta = SECTION_META[sec.key] ?? SECTION_META.copertine;
+  return (
+    <div style={{ display: "grid", gridTemplateColumns: `repeat(auto-fill, minmax(${meta.minCol}, 1fr))`, gap: meta.gap }}>
+      {sec.items.map((c) => (
+        <div key={c.id}>
+          <div className="lift" style={{ borderRadius: 14, overflow: "hidden", border: "1px solid #1E2436" }}>
+            <MediaFrame src={c.image_url || ""} label={c.title} aspect={sec.aspect} rounded={0} />
+          </div>
+          <p style={{ fontSize: "13px", color: "#94A3B8", marginTop: "10px" }}>{c.caption}</p>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export default function EsploraPage() {
+  const [sections, setSections] = useState<EsploraSection[] | null>(null);
+
+  useEffect(() => {
+    apiFetch<EsploraSectionsOut>("/api/esplora/assets")
+      .then((d) => setSections(d.sections))
+      .catch(() => setSections([]));
+  }, []);
+
+  const bySection = (key: string) => sections?.find((s) => s.key === key);
+
   return (
     <SiteShell active="/esplora">
       {/* Hero */}
@@ -56,52 +95,33 @@ export default function EsploraPage() {
       {/* Copertine */}
       <section className="section" style={{ paddingTop: "40px", paddingBottom: "60px" }}>
         <div className="lp-container">
-          <SectionHead title="📕 Copertine" subtitle="Dalla scintilla narrativa alla cover finita, con titolo già integrato nell'illustrazione." />
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: "24px" }}>
-            {COPERTINE.map((c) => (
-              <div key={c.label}>
-                <div className="lift" style={{ borderRadius: 14, overflow: "hidden", border: "1px solid #1E2436" }}>
-                  <MediaFrame src={c.img} label={c.label} aspect="3 / 4" rounded={0} />
-                </div>
-                <p style={{ fontSize: "13px", color: "#94A3B8", marginTop: "10px" }}>{c.caption}</p>
-              </div>
-            ))}
-          </div>
+          <SectionHead title={SECTION_META.copertine.heading} subtitle={SECTION_META.copertine.subtitle} />
+          {(() => {
+            const sec = bySection("copertine");
+            return sec ? <CardGrid sec={sec} /> : null;
+          })()}
         </div>
       </section>
 
       {/* Tavole */}
       <section className="section" style={{ paddingTop: "40px", paddingBottom: "60px", background: "#0A0E17", borderTop: "1px solid #1E2436", borderBottom: "1px solid #1E2436" }}>
         <div className="lp-container">
-          <SectionHead title="🖼 Tavole" subtitle="Vignette con balloon, scene, inquadrature e mood scelti da te. SnapToon impagina tutto." />
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(440px, 1fr))", gap: "24px" }}>
-            {TAVOLE.map((t) => (
-              <div key={t.label}>
-                <div className="lift" style={{ borderRadius: 14, overflow: "hidden", border: "1px solid #1E2436" }}>
-                  <MediaFrame src={t.img} label={t.label} aspect="4 / 3" rounded={0} />
-                </div>
-                <p style={{ fontSize: "13px", color: "#94A3B8", marginTop: "10px" }}>{t.caption}</p>
-              </div>
-            ))}
-          </div>
+          <SectionHead title={SECTION_META.tavole.heading} subtitle={SECTION_META.tavole.subtitle} />
+          {(() => {
+            const sec = bySection("tavole");
+            return sec ? <CardGrid sec={sec} /> : null;
+          })()}
         </div>
       </section>
 
       {/* Personaggi */}
       <section className="section" style={{ paddingTop: "60px", paddingBottom: "60px" }}>
         <div className="lp-container">
-          <SectionHead title="👥 Personaggi" subtitle="Reference image coerenti in ogni vignetta. Lo stesso volto, lo stesso costume, da pagina 1 a pagina 100." />
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: "20px" }}>
-            {PERSONAGGI.map((p) => (
-              <div key={p.name} className="product-card">
-                <MediaFrame src={p.img} label={p.name} aspect="1 / 1" rounded={0} />
-                <div style={{ padding: "16px" }}>
-                  <div style={{ fontSize: "15px", fontWeight: 700, color: "#F1F5F9" }}>{p.name}</div>
-                  <div style={{ fontSize: "13px", color: "#94A3B8", marginTop: "4px" }}>{p.desc}</div>
-                </div>
-              </div>
-            ))}
-          </div>
+          <SectionHead title={SECTION_META.personaggi.heading} subtitle={SECTION_META.personaggi.subtitle} />
+          {(() => {
+            const sec = bySection("personaggi");
+            return sec ? <PersonaggiGrid sec={sec} /> : null;
+          })()}
         </div>
       </section>
 

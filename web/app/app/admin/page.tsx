@@ -162,12 +162,20 @@ export default function AdminPage() {
             Gestione utenti, ruoli, crediti.
           </p>
         </div>
-        <button
-          onClick={() => setShowCreate(!showCreate)}
-          className="bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] text-[var(--color-bg)] font-semibold px-5 py-2.5 rounded-lg"
-        >
-          + Nuovo utente
-        </button>
+        <div className="flex gap-2">
+          <a
+            href="/app/admin/esplora"
+            className="border border-[var(--color-border)] hover:bg-[var(--color-bg-elev)] text-[var(--color-fg)] font-semibold px-5 py-2.5 rounded-lg"
+          >
+            🖼 Asset Esplora
+          </a>
+          <button
+            onClick={() => setShowCreate(!showCreate)}
+            className="bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] text-[var(--color-bg)] font-semibold px-5 py-2.5 rounded-lg"
+          >
+            + Nuovo utente
+          </button>
+        </div>
       </header>
 
       {error && (

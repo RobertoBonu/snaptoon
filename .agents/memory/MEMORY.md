@@ -1,2 +1,3 @@
 - [SnapToon environment quirks](snaptoon-env.md) — SnapToon `/` runs the V2 stack (Next.js + FastAPI), not Streamlit; main-agent git/artifact-toml/pkill gotchas inside.
+- [Esplora assets](esplora-assets.md) — public /esplora gallery is DB+storage driven; hidden (is_active=false) assets must 404 in BOTH list and direct image-serve.
 - [Admin gating — role is source of truth](admin-gating.md) — derive is_admin from role==admin at read time; stored is_admin column can desync; no prod DB writes from main agent.

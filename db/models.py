@@ -505,6 +505,29 @@ class AdminStyle(UUIDPrimaryKeyMixin, TimestampMixin, UpdatedAtMixin, Base):
     notes: Mapped[str] = mapped_column(Text, default="", nullable=False)
 
 
+class EsploraAsset(UUIDPrimaryKeyMixin, TimestampMixin, UpdatedAtMixin, Base):
+    """Asset mostrati nella pagina pubblica /esplora, curati dall'admin.
+
+    Tre sezioni: copertine, tavole, personaggi. Ogni asset ha metadati
+    (titolo, didascalia, posizione) e un'immagine opzionale in object storage.
+    L'admin può caricare/generare/rigenerare/eliminare l'immagine.
+    """
+
+    __tablename__ = "esplora_assets"
+    __table_args__ = (
+        Index("ix_esplora_assets_section_position", "section", "position"),
+    )
+
+    section: Mapped[str] = mapped_column(String(32), nullable=False, index=True)
+    # ^ copertine | tavole | personaggi
+    title: Mapped[str] = mapped_column(String(255), nullable=False, default="")
+    caption: Mapped[str] = mapped_column(String(500), nullable=False, default="")
+    position: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    storage_key: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    prompt: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+
+
 class AdminAudit(UUIDPrimaryKeyMixin, Base):
     """Log azioni admin (creazione utenti, grant crediti, disable account)."""
 
