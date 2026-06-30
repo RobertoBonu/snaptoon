@@ -192,6 +192,17 @@ notebook also resets on these restarts (state lost).
   also grep/echo "next dev"), pkill kills your own shell (exit 143). Kill by explicit
   PID instead, or use patterns that can't appear in your own command line.
 
+# Canvas mockups ≠ the real V2 app (a recurring source of "I still see the old UI")
+The `artifacts/mockup-sandbox` Snaptoon components are a SEPARATE design/redesign surface;
+editing them does NOT change what a logged-in user sees. The REAL authenticated nav lives in
+two places: `web/app/app/layout.tsx` (top-level vertical sidebar — server component, reads
+auth cookie; path-dependent active state must be moved to a client child like
+`web/components/AppSidebarNav.tsx` via `usePathname`) and `web/app/app/projects/[slug]/layout.tsx`
+(the per-project editor steps — Testo/Stile/Personaggi/Genera/Impagina — rendered as a HORIZONTAL
+client tab bar, NOT a vertical sidebar like the mockup). `lucide-react` is NOT installed in `web/`,
+so use inline-SVG line icons (shared `web/components/NavIcon.tsx`) rather than reaching for a lib.
+**How to apply:** when the user says nav/icons "still look old", change `web/`, not the mockups.
+
 # Dev preview "appears then disappears" = unhandled hydration error, NOT a server crash
 Symptom: Replit preview pane (and canvas artifact iframe) flashes the page then shows
 "Your SnapToon artifact encountered an error". Server is fully healthy (`/`=200,

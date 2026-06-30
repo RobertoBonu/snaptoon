@@ -3,13 +3,14 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { use } from "react";
+import { NavIcon } from "@/components/NavIcon";
 
 const TABS = [
-  { slug: "testo", label: "📝 Testo" },
-  { slug: "stile", label: "🎨 Stile" },
-  { slug: "personaggi", label: "👥 Personaggi" },
-  { slug: "genera", label: "🖼 Genera" },
-  { slug: "impagina", label: "📐 Impagina" },
+  { slug: "testo", icon: "testo", label: "Testo" },
+  { slug: "stile", icon: "stile", label: "Stile" },
+  { slug: "personaggi", icon: "personaggi", label: "Personaggi" },
+  { slug: "genera", icon: "genera", label: "Genera" },
+  { slug: "impagina", icon: "impagina", label: "Impagina" },
 ];
 
 export default function ProjectLayout({
@@ -49,13 +50,15 @@ export default function ProjectLayout({
                 <Link
                   key={t.slug}
                   href={href}
-                  className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
+                  aria-current={active ? "page" : undefined}
+                  className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
                     active
                       ? "text-[var(--color-accent)] border-[var(--color-accent)]"
                       : "text-[var(--color-fg-muted)] border-transparent hover:text-[var(--color-fg)] hover:border-[var(--color-border)]"
                   }`}
                 >
-                  {t.label}
+                  <NavIcon name={t.icon} size={16} />
+                  <span>{t.label}</span>
                 </Link>
               );
             })}

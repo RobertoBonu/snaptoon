@@ -1,6 +1,7 @@
 import { cookies } from "next/headers";
 import Link from "next/link";
 import LogoutButton from "@/components/LogoutButton";
+import AppSidebarNav from "@/components/AppSidebarNav";
 
 /**
  * Layout per la zona autenticata (/app/*).
@@ -40,23 +41,11 @@ export default async function AppLayout({
             href="/app"
             className="text-xl font-bold text-[var(--color-accent)] hover:text-[var(--color-accent-hover)] transition-colors"
           >
-            📚 SnapToon
+            SnapToon
           </Link>
         </div>
 
-        <nav className="flex-1 px-2 py-2 space-y-0.5 overflow-y-auto">
-          <SidebarLink href="/app" icon="📚" label="I miei progetti" />
-          <div className="my-2 border-t border-[var(--color-border)]" />
-          <SidebarLink href="/app/kids" icon="⭐" label="KIDS" />
-          <div className="my-2 border-t border-[var(--color-border)]" />
-          <SidebarLink href="/app/account" icon="⚙️" label="Account" />
-          {isAdmin && (
-            <>
-              <div className="my-2 border-t border-[var(--color-border)]" />
-              <SidebarLink href="/app/admin" icon="🛠" label="Admin" />
-            </>
-          )}
-        </nav>
+        <AppSidebarNav isAdmin={isAdmin} />
 
         <div className="p-3 border-t border-[var(--color-border)]">
           <LogoutButton />
@@ -65,25 +54,5 @@ export default async function AppLayout({
 
       <main className="flex-1 overflow-auto">{children}</main>
     </div>
-  );
-}
-
-function SidebarLink({
-  href,
-  icon,
-  label,
-}: {
-  href: string;
-  icon: string;
-  label: string;
-}) {
-  return (
-    <Link
-      href={href}
-      className="flex items-center gap-3 px-3 py-2 text-sm font-medium text-[var(--color-fg-muted)] hover:bg-[var(--color-bg-elev)] hover:text-[var(--color-fg)] rounded-md transition-colors"
-    >
-      <span className="text-base">{icon}</span>
-      <span>{label}</span>
-    </Link>
   );
 }
