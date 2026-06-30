@@ -83,7 +83,7 @@ function Header() {
 
           {/* Desktop Nav */}
           <nav style={{ display: "none", alignItems: "center", gap: "8px" }} className="md-flex">
-            {["SnapToon", "Crea", "Esplora", "Pricing"].map((item) => (
+            {["Esplora", "Crea", "BookShop", "Abbonamenti"].map((item) => (
               <a key={item} style={{ fontSize: "14px", fontWeight: 500, color: "#94A3B8", padding: "8px 16px", borderRadius: "6px", cursor: "pointer", transition: "color 0.2s" }} onMouseOver={(e) => (e.currentTarget.style.color = "#F1F5F9")} onMouseOut={(e) => (e.currentTarget.style.color = "#94A3B8")}>
                 {item}
               </a>
