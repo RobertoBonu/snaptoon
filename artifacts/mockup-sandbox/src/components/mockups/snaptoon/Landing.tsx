@@ -89,7 +89,7 @@ function Header() {
 
         {/* Actions */}
         <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-          <button className="btn btn-secondary" style={{ padding: "8px 16px" }}>Accedi</button>
+          <a href="/login" className="btn btn-secondary" style={{ padding: "8px 16px", textDecoration: "none" }}>Accedi</a>
           <button className="btn btn-primary" style={{ padding: "8px 16px" }}>Prova SnapToon</button>
         </div>
 
