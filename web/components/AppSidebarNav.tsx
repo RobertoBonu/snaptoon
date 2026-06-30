@@ -15,7 +15,7 @@ const ITEMS: Item[] = [
   {
     href: "/app",
     icon: "home",
-    label: "I miei progetti",
+    label: "I MIEI PROGETTI",
     isActive: (p) => p === "/app" || p.startsWith("/app/projects"),
   },
   {
