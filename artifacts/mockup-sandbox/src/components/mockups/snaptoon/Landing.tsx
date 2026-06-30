@@ -249,7 +249,7 @@ function WorkflowSection() {
       <div className="container" style={{ position: "relative", zIndex: 1 }}>
         <div style={{ textAlign: "center", marginBottom: "64px" }}>
           <h2 style={{ fontSize: "clamp(2rem, 3vw, 2.75rem)", fontWeight: 700, color: "#F1F5F9", letterSpacing: "-0.02em", marginBottom: "16px", maxWidth: "600px", margin: "0 auto 16px auto", lineHeight: 1.1 }}>
-            Costruisci i Workflow<br />su Misura per Te
+            Un Workflow su Misura per Te
           </h2>
           <p style={{ fontSize: "1.125rem", color: "#94A3B8", maxWidth: "640px", margin: "0 auto 32px auto" }}>
             Crea flussi personalizzati che collegano più modelli e passaggi intermedi per il pieno controllo delle tue creazioni.
