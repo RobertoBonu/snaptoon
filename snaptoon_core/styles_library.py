@@ -16,7 +16,7 @@ Ogni preset ha:
 from __future__ import annotations
 
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from functools import lru_cache
 from pathlib import Path
 
@@ -154,6 +154,45 @@ def _parse_md_file(text: str, is_custom: bool = False) -> list[StylePreset]:
     return presets
 
 
+def _dedupe_ids(presets: list[StylePreset]) -> list[StylePreset]:
+    """Garantisce id univoci (gli id sono usati come chiave React e come
+    style_id persistito).
+
+    Due label identiche producono lo stesso slug. Se il preset è un doppione
+    esatto (stessa label/categoria/expansion) viene scartato; se invece ha
+    contenuto diverso ma id collidente, gli si assegna un id univoco con
+    suffisso numerico (deterministico in base all'ordine del file).
+    """
+    by_id: dict[str, StylePreset] = {}
+    out: list[StylePreset] = []
+    for p in presets:
+        existing = by_id.get(p.id)
+        if existing is None:
+            by_id[p.id] = p
+            out.append(p)
+            continue
+        if (
+            existing.label == p.label
+            and existing.category == p.category
+            and existing.expansion == p.expansion
+            and existing.extra_negative_terms == p.extra_negative_terms
+            and existing.is_handmade == p.is_handmade
+            and existing.is_custom == p.is_custom
+        ):
+            # Doppione esatto → scarta
+            continue
+        # Collisione di slug con contenuto diverso → id univoco
+        n = 2
+        new_id = f"{p.id}_{n}"
+        while new_id in by_id:
+            n += 1
+            new_id = f"{p.id}_{n}"
+        unique = replace(p, id=new_id)
+        by_id[new_id] = unique
+        out.append(unique)
+    return out
+
+
 @lru_cache(maxsize=1)
 def _load_all() -> tuple[StylePreset, ...]:
     """Carica preset ufficiali + custom dell'utente. Custom in cima."""
@@ -169,7 +208,7 @@ def _load_all() -> tuple[StylePreset, ...]:
         text = LIBRARY_FILE.read_text(encoding="utf-8")
         all_presets.extend(_parse_md_file(text, is_custom=False))
 
-    return tuple(all_presets)
+    return tuple(_dedupe_ids(all_presets))
 
 
 def reload_library() -> None:
