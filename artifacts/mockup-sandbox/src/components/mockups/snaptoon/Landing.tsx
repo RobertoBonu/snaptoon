@@ -184,7 +184,7 @@ function ProductsSection() {
     },
     {
       title: "Impaginazione Smart",
-      desc: "Publishing rapido per Ebook, WebToon, Stampa digitale e tipografica.",
+      desc: "Publishing rapido per Ebook, WebToon, Stampa tipografica.",
       img: "/__mockup/images/card-layout.png",
       actions: ["Prova ora", "Scopri di più"]
     }
