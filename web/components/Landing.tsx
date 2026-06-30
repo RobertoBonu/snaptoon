@@ -170,7 +170,7 @@ function WorkflowSection() {
             Un Workflow su Misura per Te
           </h2>
           <p style={{ fontSize: "1.125rem", color: "#94A3B8", maxWidth: "640px", margin: "0 auto 32px auto" }}>
-            Crea flussi personalizzati che collegano più modelli e passaggi intermedi per il pieno controllo delle tue creazioni.
+            Flussi semplificati per darti il pieno controllo delle tue creazioni.
           </p>
           <button className="btn" style={{ background: "transparent", border: "1px solid #F59E0B", color: "#F59E0B", borderRadius: "100px", padding: "10px 24px" }}>
             Scopri di più sui Workflow
