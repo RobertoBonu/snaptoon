@@ -191,3 +191,20 @@ notebook also resets on these restarts (state lost).
   shell running your command — if your command text contains the pattern (e.g. you
   also grep/echo "next dev"), pkill kills your own shell (exit 143). Kill by explicit
   PID instead, or use patterns that can't appear in your own command line.
+
+# Dev preview "appears then disappears" = unhandled hydration error, NOT a server crash
+Symptom: Replit preview pane (and canvas artifact iframe) flashes the page then shows
+"Your SnapToon artifact encountered an error". Server is fully healthy (`/`=200,
+api/health=200, no traceback, no OOM, no restart loop) — so it is NOT a backend crash and
+restarting the workflow does NOT fix it.
+**Cause:** a React hydration mismatch on `/` throws an *unhandled* client error
+(browser console `Method -unhandlederror: "Hydration failed..."`). The Replit preview's
+error monitor catches that unhandled error and shows the overlay; the SSR HTML paints first
+(page appears) then hydration throws (page disappears). A one-shot `screenshot` can still
+succeed because it captures before the error fires — do NOT use a passing screenshot to
+conclude "no error"; check the browser console for `unhandlederror`.
+**Why the mismatch (static landing has no Date/random/window):** attributes injected into
+`<html>`/`<body>` by browser extensions or the preview proxy differ server vs client.
+**Fix:** add `suppressHydrationWarning` to BOTH `<html>` and `<body>` in `web/app/layout.tsx`.
+This silences the html/body-level mismatch so no unhandled error is thrown → overlay stops.
+(Earlier notes calling this hydration warning "benign" were WRONG for the preview pane.)
