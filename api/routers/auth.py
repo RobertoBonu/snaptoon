@@ -20,7 +20,36 @@ from db.session import session_scope
 router = APIRouter()
 
 # JWT config
-JWT_SECRET = os.getenv("JWT_SECRET", "dev-secret-change-in-production-please")
+#
+# JWT_SECRET firma i cookie di sessione: se prevedibile, un attaccante può
+# forgiare token e impersonare qualsiasi utente (incluso admin).
+#
+# Strategia:
+# - Su Replit (env REPL_ID o REPLIT_DEPLOYMENT presenti) → JWT_SECRET DEVE
+#   esistere, altrimenti l'app si rifiuta di partire (fail-fast).
+# - In dev locale (no Replit env) → fallback su una stringa esplicita di
+#   sviluppo, con warning chiaro nei log.
+def _resolve_jwt_secret() -> str:
+    env_secret = os.getenv("JWT_SECRET", "").strip()
+    is_replit = bool(os.getenv("REPL_ID") or os.getenv("REPLIT_DEPLOYMENT"))
+    if env_secret:
+        return env_secret
+    if is_replit:
+        raise RuntimeError(
+            "JWT_SECRET non impostato. Aggiungi un Replit Secret 'JWT_SECRET' "
+            "con una stringa random lunga (>=32 chars). Genera con: "
+            "python -c \"import secrets; print(secrets.token_urlsafe(48))\""
+        )
+    # Solo dev locale fuori da Replit
+    import warnings
+    warnings.warn(
+        "JWT_SECRET non impostato — uso fallback DEV. NON usare in produzione.",
+        stacklevel=2,
+    )
+    return "snaptoon-dev-local-only-DO-NOT-USE-IN-PRODUCTION"
+
+
+JWT_SECRET = _resolve_jwt_secret()
 JWT_ALGO = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24 * 7  # 7 giorni
 COOKIE_NAME = "snaptoon_token"
