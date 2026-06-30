@@ -84,7 +84,7 @@ function HeroSection() {
 function ProductsSection() {
   const cards = [
     {
-      title: "LA TUA IDEA",
+      title: "Writing Room",
       desc: "Adatta soggetto, sceneggiatura e dialoghi senza inventare nulla",
       img: "/images/card-generator.png",
       actions: ["Prova ora"],
