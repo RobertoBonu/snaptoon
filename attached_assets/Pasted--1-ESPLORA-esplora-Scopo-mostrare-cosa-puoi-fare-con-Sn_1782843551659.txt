@@ -1,0 +1,250 @@
+---
+
+# 1. ESPLORA `/esplora`
+
+**Scopo**: mostrare cosa puoi fare con SnapToon. È la pagina che convince chi non ha mai provato.
+
+### Struttura
+
+**Hero**
+- Titolo grande: *"Dai un'occhiata a cosa si può creare"*
+- Sottotitolo: *"Copertine, tavole e personaggi nati da poche parole. Tutti generati dai nostri autori con l'AI di SnapToon, in pochi minuti."*
+- Niente CTA qui (l'utente sta esplorando)
+
+**Sezione 1 — Copertine** (grid 3 colonne)
+- Heading: *"📕 Copertine"*
+- Sottotitolo: *"Dalla scintilla narrativa alla cover finita, con titolo già integrato nell'illustrazione."*
+- Grid: 6 cover (mockup) con caption breve sotto ognuna (genere/stile)
+- Esempi caption: *"Avventura per bambini · Stile Flat"*, *"Manga shonen · Stile Tokyo-Mecha"*, *"Romance · Stile Acquerello"*
+
+**Sezione 2 — Tavole** (grid 2 colonne)
+- Heading: *"🖼 Tavole"*
+- Sottotitolo: *"Vignette con balloon, scene, inquadrature e mood scelti da te. SnapToon impagina tutto."*
+- Grid: 4 tavole intere (mockup) con caption sotto: *"Splash + 2x2 · Stile Noir"*, *"Griglia 1+2 · Stile Disney"*, ecc.
+
+**Sezione 3 — Personaggi** (grid 4 colonne)
+- Heading: *"👥 Personaggi"*
+- Sottotitolo: *"Reference image coerenti in ogni vignetta. Lo stesso volto, lo stesso costume, da pagina 1 a pagina 100."*
+- Grid: 8 character sheet (mockup) con nome + descrizione breve
+
+**CTA finale**
+- Box centrato: *"Pronto a creare il tuo?"*
+- Bottone: *"Inizia gratis →"* → `/login` (o signup quando ci sarà)
+
+### Nota implementazione
+Le immagini mockup le metti in `web/public/images/esplora/` e le linki come `<Image src="..." />` di Next.js.
+
+---
+
+# 2. CREA `/crea`
+
+**Scopo**: spiegare il workflow Pro. Pagina lunga, tipo guida visiva.
+
+### Struttura
+
+**Hero**
+- Titolo: *"5 passi. Dal foglio bianco al fumetto stampabile."*
+- Sottotitolo: *"SnapToon ti accompagna passo passo. Tu scrivi l'idea, l'AI fa il resto — sempre sotto il tuo controllo."*
+- Mockup screenshot a destra: la dashboard "I miei progetti"
+
+**Step 1 — Testo**
+- Heading: *"1. 📝 Testo — Scrivi la scintilla"*
+- Body: *"Incolla un soggetto, un racconto breve o anche solo un'idea di poche righe. Claude la trasforma in sceneggiatura strutturata: logline, personaggi, pagine, vignette, dialoghi. Tu approvi o rigeneri con un suggerimento."*
+- Screenshot a fianco: la pagina /testo con script generato
+- Highlight: *"Costa 5 crediti per generazione + rigenerazioni con feedback"*
+
+**Step 2 — Stile**
+- Heading: *"2. 🎨 Stile — Scegli il look"*
+- Body: *"98 stili visivi pronti: dal flat illustrato per bambini al noir cinematografico, dal manga giapponese al fumetto franco-belga. Filtra per categoria, scegli e procedi."*
+- Mockup grid stili a fianco
+- Highlight: *"Lo stile è applicato automaticamente a tutte le vignette del progetto"*
+
+**Step 3 — Personaggi**
+- Heading: *"3. 👥 Personaggi — Il tuo cast"*
+- Body: *"Crea i personaggi della storia con nome e descrizione visiva. SnapToon genera una reference image AI per ognuno e la riutilizza in ogni vignetta successiva. Il volto di Mia rimane Mia, sempre."*
+- Mockup card personaggio con reference image
+- Highlight: *"1 credito per reference. Rigenera quanto vuoi finché non sei soddisfatto"*
+
+**Step 4 — Genera**
+- Heading: *"4. 🖼 Genera — Componi le vignette"*
+- Body: *"Per ogni vignetta decidi:*
+  - *Inquadratura — dal close-up al campo lungo*
+  - *Angolo — dal cinematic basso al volo d'uccello*
+  - *Mood — dall'azione drammatica al lirico*
+  - *Formato — quadrato, verticale o panoramico"*
+- *"I balloon sono disegnati direttamente nell'immagine dall'AI, leggibili e coerenti con lo stile."*
+- Screenshot pagina /genera con scene selector
+- Highlight: *"1 credito a vignetta (qualità Medium). Quality High disponibile su Premium"*
+
+**Step 5 — Impagina**
+- Heading: *"5. 📐 Impagina — La pagina finita"*
+- Body: *"Scegli la griglia per ogni pagina: splash, 2x2, 1+2, fila singola. Le vignette si dispongono automaticamente. Esporta in PDF stampabile."*
+- Mockup pagina completa rendered
+- Highlight: *"Esportazione PDF inclusa in tutti i piani"*
+
+**Callout — Modalità KIDS**
+- Box ambra: *"Vuoi creare un libretto per bambini? Prova la modalità ⭐ KIDS"*
+- *"Wizard semplificato in 6 step. Template pre-fissati. Storia, copertina e illustrazioni generate in 3 minuti. Perfetto per genitori, insegnanti, biblioteche."*
+- Bottone: *"Scopri KIDS →"* (linka a una sezione di /esplora o pagina dedicata)
+
+**CTA finale**
+- *"Bastano 5 minuti per la tua prima tavola."*
+- Bottone: *"Inizia gratis →"*
+
+---
+
+# 3. BOOKSHOP `/bookshop`
+
+**Scopo**: vetrina e-commerce. Per ora MVP "vetrina" senza pagamenti reali (li si aggiunge con Stripe in seguito).
+
+### Struttura
+
+**Hero**
+- Titolo: *"Bookshop SnapToon"*
+- Sottotitolo: *"Fumetti, graphic novel, libri illustrati e libretti KIDS firmati da autori e editori indipendenti. Tutto creato con SnapToon."*
+
+**Filtri** (sticky in alto)
+- Categoria: *Tutti / Fumetti / Graphic Novel / Libri illustrati / KIDSToons*
+- Prezzo: *Tutti / Gratuiti / A pagamento*
+- Ordina: *Più recenti / Più venduti / Prezzo crescente*
+
+**Grid prodotti** (4 colonne desktop, 2 mobile)
+Card prodotto:
+- Cover image (2:3)
+- Titolo
+- Autore (con badge "Editore" se editore)
+- Categoria
+- Prezzo (es. `€4,99` / `Gratis`)
+- Bottone "Anteprima" (sfoglia prime 3 pagine) + Bottone "Acquista" (placeholder per ora)
+
+**Sezione 1 — KIDSToons in evidenza** (3 card grandi)
+- Heading: *"⭐ KIDSToons — Per i più piccoli"*
+- Caption: *"Libretti illustrati 5-8 anni, formato 16 pagine + copertina"*
+
+**Sezione 2 — Graphic Novel** (3 card)
+- Heading: *"📕 Graphic Novel"*
+- Caption: *"Storie lunghe, narrazione adulta, stile cinematografico"*
+
+**Sezione 3 — Fumetti seriali** (3 card)
+- Heading: *"📚 Fumetti"*
+- Caption: *"Episodi 6-16 pagine, perfetti per il binge reading"*
+
+**Sezione 4 — Libri illustrati** (3 card)
+- Heading: *"📖 Libri illustrati"*
+- Caption: *"Tradizione picture-book con il twist dell'AI"*
+
+**Callout per editori**
+- Box scuro: *"Sei un editore? Vendi sul Bookshop"*
+- *"Con il piano Editore pubblichi senza commissioni fisse, ricevi report dettagliati sulle vendite e mantieni il 100% del ricavato. SnapToon resta in background."*
+- Bottone: *"Diventa editore →"* → `/abbonamenti#editore`
+
+**CTA finale**
+- *"Hai creato qualcosa di bello? Mettilo in vetrina."*
+- Bottone: *"Pubblica un'opera →"* (per ora linka a una mailto info@snaptoon.art)
+
+### Nota implementazione MVP
+- Niente pagamenti veri (la integrazione Stripe la faremo dopo)
+- Il bottone "Acquista" mostra un toast: *"Lancio Bookshop in arrivo. Iscriviti alla newsletter per essere avvisato"* con campo email
+- Le card prodotto sono mockup statici per ora (lista in un file `web/data/bookshop.ts`)
+
+---
+
+# 4. ABBONAMENTI `/abbonamenti`
+
+**Scopo**: tabella pricing comparativa + CTA per ogni piano.
+
+### Struttura
+
+**Hero**
+- Titolo: *"Scegli il piano giusto per te"*
+- Sottotitolo: *"Un credito = un'immagine generata dall'AI (qualità Medium). Niente sorprese: gli abbonamenti si rinnovano mensilmente e puoi disdire quando vuoi."*
+
+**Toggle Mensile / Annuale** (annuale = -20%)
+- Per ora MVP solo Mensile
+
+**Grid 4 piani** (1 colonna mobile, 4 desktop)
+
+### 🌟 Kids — €4,99/mese
+*Per genitori, insegnanti, biblioteche*
+- ✅ 100 crediti/mese
+- ✅ 5 libretti
+- ✅ Modalità KIDS guidata
+- ✅ Qualità Medium
+- ✅ Export PDF stampabile
+- ✅ 3 stili dedicati ai bambini
+- ❌ Modalità Pro
+- ❌ Bookshop
+- *CTA*: "Inizia con Kids →"
+
+### 🎨 Base — €19/mese  ⭐ *Più popolare*
+*Per autori indie e hobbisti*
+- ✅ 200 crediti/mese
+- ✅ 5 progetti
+- ✅ Modalità Pro completa
+- ✅ Modalità KIDS inclusa
+- ✅ 98 stili visivi
+- ✅ Qualità Low + Medium
+- ✅ Export PDF stampabile
+- ❌ Qualità High
+- ❌ Bookshop
+- *CTA*: "Inizia con Base →"
+
+### 🚀 Premium — €49/mese
+*Per autori prolifici*
+- ✅ 600 crediti/mese
+- ✅ Progetti illimitati
+- ✅ Tutto di Base, più:
+- ✅ Qualità High (4 cr/immagine)
+- ✅ Reference image avanzate
+- ✅ Stili custom su richiesta
+- ✅ Supporto prioritario
+- ❌ Bookshop
+- *CTA*: "Vai Premium →"
+
+### 📚 Editore — €99/mese
+*Per case editrici e collettivi*
+- ✅ 1000 crediti/mese
+- ✅ Progetti illimitati
+- ✅ Tutto di Premium, più:
+- ✅ **Bookshop**: vendi senza commissioni
+- ✅ Account multi-utente (fino a 5)
+- ✅ Report vendite e analytics
+- ✅ Branding personalizzato
+- ✅ Account manager dedicato
+- *CTA*: "Diventa editore →"
+
+**Tabella comparativa dettagliata** (sotto i 4 box)
+Una tabella con tutte le feature in righe e i 4 piani in colonne. Tipo:
+
+| Feature | Kids | Base | Premium | Editore |
+|---|---|---|---|---|
+| Crediti/mese | 100 | 200 | 600 | 1000 |
+| Progetti | 5 | 5 | Illimitati | Illimitati |
+| Modalità KIDS | ✅ | ✅ | ✅ | ✅ |
+| Modalità Pro | ❌ | ✅ | ✅ | ✅ |
+| Stili | 3 | 98 | 98 + custom | 98 + custom |
+| Qualità Low | — | ✅ | ✅ | ✅ |
+| Qualità Medium | ✅ | ✅ | ✅ | ✅ |
+| Qualità High | ❌ | ❌ | ✅ | ✅ |
+| Export PDF | ✅ | ✅ | ✅ | ✅ |
+| Bookshop venditore | ❌ | ❌ | ❌ | ✅ |
+| Account multi-utente | ❌ | ❌ | ❌ | 5 |
+| Supporto | Email | Email | Prioritario | Manager dedicato |
+
+**FAQ** (accordion)
+- *"Cos'è un credito?"* — Un'immagine generata dall'AI a qualità Medium. Le qualità Low e High hanno consumi diversi (vedi tabella).
+- *"Cosa succede se finisco i crediti?"* — Puoi acquistare pacchetti extra senza cambiare piano. Oppure aspetti il rinnovo mensile.
+- *"Posso passare da un piano all'altro?"* — Sì, in qualsiasi momento. Il cambio è immediato e pro-rated.
+- *"Posso disdire?"* — Sì, in qualsiasi momento. Resti attivo fino a fine periodo già pagato.
+- *"I crediti scadono?"* — I crediti del piano scadono col rinnovo mensile. I pacchetti extra restano per 12 mesi.
+- *"Le opere create sono mie?"* — Sì, al 100%. SnapToon non rivendica diritti su quello che generi.
+
+**CTA finale**
+- *"Hai dubbi? Contattaci."*
+- Bottone: *"Scrivici →"* → mailto:info@snaptoon.art
+
+### Nota implementazione
+- Per ora MVP senza Stripe: i bottoni CTA portano a un form di "richiesta attivazione" che ti invia un'email
+- Stripe + checkout reale arrivano nella fase successiva (1-2 settimane di lavoro extra)
+
+---

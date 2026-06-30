@@ -10,100 +10,15 @@ import {
   Settings2,
   Zap,
 } from "lucide-react";
+import { SiteShell } from "@/components/site";
 
 export default function Landing() {
   return (
-    <div style={{ backgroundColor: "#0D1017", minHeight: "100vh", fontFamily: "'Inter', sans-serif", color: "#E2E8F0", overflowX: "hidden" }}>
-      <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
-        * { box-sizing: border-box; }
-
-        /* Typography utilities */
-        .text-primary { color: #F1F5F9; }
-        .text-secondary { color: #94A3B8; }
-        .text-tertiary { color: #64748B; }
-        .text-amber { color: #F59E0B; }
-
-        /* Button styles */
-        .btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; font-size: 14px; font-weight: 600; padding: 10px 20px; border-radius: 8px; cursor: pointer; transition: all 0.2s ease; border: none; text-decoration: none; }
-        .btn-primary { background: #F59E0B; color: #0D1017; }
-        .btn-primary:hover { background: #FBBF24; transform: translateY(-1px); box-shadow: 0 4px 12px rgba(245, 158, 11, 0.2); }
-        .btn-secondary { background: transparent; border: 1px solid #2D3748; color: #E2E8F0; }
-        .btn-secondary:hover { background: #161B26; border-color: #475569; }
-        .btn-ghost { background: transparent; color: #94A3B8; padding: 8px 16px; }
-        .btn-ghost:hover { color: #F1F5F9; background: rgba(255,255,255,0.05); }
-
-        /* Animation utilities */
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
-        .animate-fade-in { animation: fadeIn 0.8s ease forwards; }
-
-        /* Layout utilities */
-        .lp-container { max-width: 1280px; margin: 0 auto; padding: 0 24px; }
-        .section { padding: 100px 0; }
-
-        /* Product Cards */
-        .product-card { background: #161B26; border: 1px solid #1E2436; border-radius: 16px; overflow: hidden; transition: all 0.3s ease; display: flex; flex-direction: column; }
-        .product-card:hover { border-color: #2D3748; transform: translateY(-4px); box-shadow: 0 12px 32px rgba(0,0,0,0.4); }
-
-        /* Node Editor */
-        .node-card { background: #161B26; border: 1px solid #2D3748; border-radius: 12px; padding: 16px; box-shadow: 0 8px 24px rgba(0,0,0,0.5); z-index: 10; position: relative; width: 280px; }
-        .node-header { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; border-bottom: 1px solid #1E2436; padding-bottom: 12px; }
-        .node-port { width: 10px; height: 10px; background: #0D1017; border: 2px solid #64748B; border-radius: 50%; position: absolute; top: 50%; transform: translateY(-50%); }
-        .node-port.in { left: -6px; }
-        .node-port.out { right: -6px; border-color: #F59E0B; }
-        .node-port.out.active { background: #F59E0B; box-shadow: 0 0 8px #F59E0B; }
-      `}</style>
-
-      <Header />
-
-      <main>
-        <HeroSection />
-        <ProductsSection />
-        <WorkflowSection />
-      </main>
-
-      <Footer />
-    </div>
-  );
-}
-
-function Header() {
-  return (
-    <header style={{ position: "sticky", top: 0, zIndex: 100, background: "rgba(13, 16, 23, 0.85)", backdropFilter: "blur(12px)", borderBottom: "1px solid #1E2436" }}>
-      <div className="lp-container" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", height: "72px" }}>
-
-        <div style={{ display: "flex", alignItems: "center", gap: "48px" }}>
-          {/* Logo */}
-          <div style={{ display: "flex", alignItems: "center", cursor: "pointer" }}>
-            <span style={{ fontSize: "1.5rem", fontWeight: 800, color: "#F59E0B", letterSpacing: "-0.02em" }}>
-              SnapToon
-            </span>
-            <span style={{ display: "inline-block", width: 8, height: 8, background: "#7C3AED", borderRadius: "50%", marginLeft: 4, marginBottom: 6 }} />
-          </div>
-
-          {/* Desktop Nav */}
-          <nav style={{ display: "none", alignItems: "center", gap: "8px" }} className="md-flex">
-            {["Esplora", "Crea", "BookShop", "Abbonamenti"].map((item) => (
-              <a key={item} style={{ fontSize: "14px", fontWeight: 500, color: "#94A3B8", padding: "8px 16px", borderRadius: "6px", cursor: "pointer", transition: "color 0.2s" }} onMouseOver={(e) => (e.currentTarget.style.color = "#F1F5F9")} onMouseOut={(e) => (e.currentTarget.style.color = "#94A3B8")}>
-                {item}
-              </a>
-            ))}
-          </nav>
-        </div>
-
-        {/* Actions */}
-        <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-          <a href="/login" className="btn btn-secondary" style={{ padding: "8px 16px" }}>Accedi</a>
-          <a href="/login" className="btn btn-primary" style={{ padding: "8px 16px" }}>Prova SnapToon</a>
-        </div>
-
-      </div>
-      <style>{`
-        @media (min-width: 768px) {
-          .md-flex { display: flex !important; }
-        }
-      `}</style>
-    </header>
+    <SiteShell active="/">
+      <HeroSection />
+      <ProductsSection />
+      <WorkflowSection />
+    </SiteShell>
   );
 }
 
@@ -361,64 +276,3 @@ function WorkflowSection() {
   );
 }
 
-function Footer() {
-  return (
-    <footer style={{ background: "#0A0E17", borderTop: "1px solid #1E2436", paddingTop: "80px", paddingBottom: "40px" }}>
-      <div className="lp-container">
-        <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr 1fr 1fr", gap: "64px", marginBottom: "64px" }}>
-
-          <div>
-            <div style={{ display: "flex", alignItems: "center", marginBottom: "16px" }}>
-              <span style={{ fontSize: "1.5rem", fontWeight: 800, color: "#F59E0B", letterSpacing: "-0.02em" }}>
-                SnapToon
-              </span>
-              <span style={{ display: "inline-block", width: 8, height: 8, background: "#7C3AED", borderRadius: "50%", marginLeft: 4, marginBottom: 6 }} />
-            </div>
-            <p style={{ fontSize: "14px", color: "#64748B", maxWidth: "300px", lineHeight: 1.6 }}>
-              L&apos;AI studio per creatori di fumetti. Trasforma le tue storie in tavole illustrate professionali con il pieno controllo artistico.
-            </p>
-          </div>
-
-          <div>
-            <h4 style={{ fontSize: "14px", fontWeight: 600, color: "#F1F5F9", marginBottom: "20px" }}>Prodotto</h4>
-            <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "flex", flexDirection: "column", gap: "12px" }}>
-              {["Funzionalità", "Modelli AI", "Workflow", "Pricing", "Changelog"].map((link) => (
-                <li key={link}><a href="#" style={{ color: "#94A3B8", fontSize: "14px", textDecoration: "none", transition: "color 0.2s" }} onMouseOver={(e) => (e.currentTarget.style.color = "#F59E0B")} onMouseOut={(e) => (e.currentTarget.style.color = "#94A3B8")}>{link}</a></li>
-              ))}
-            </ul>
-          </div>
-
-          <div>
-            <h4 style={{ fontSize: "14px", fontWeight: 600, color: "#F1F5F9", marginBottom: "20px" }}>Risorse</h4>
-            <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "flex", flexDirection: "column", gap: "12px" }}>
-              {["Documentazione", "Tutorial", "Community", "Stili Pubblici", "Blog"].map((link) => (
-                <li key={link}><a href="#" style={{ color: "#94A3B8", fontSize: "14px", textDecoration: "none", transition: "color 0.2s" }} onMouseOver={(e) => (e.currentTarget.style.color = "#F59E0B")} onMouseOut={(e) => (e.currentTarget.style.color = "#94A3B8")}>{link}</a></li>
-              ))}
-            </ul>
-          </div>
-
-          <div>
-            <h4 style={{ fontSize: "14px", fontWeight: 600, color: "#F1F5F9", marginBottom: "20px" }}>Azienda & Legale</h4>
-            <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "flex", flexDirection: "column", gap: "12px" }}>
-              {["Chi Siamo", "Contatti", "Privacy Policy", "Termini di Servizio"].map((link) => (
-                <li key={link}><a href="#" style={{ color: "#94A3B8", fontSize: "14px", textDecoration: "none", transition: "color 0.2s" }} onMouseOver={(e) => (e.currentTarget.style.color = "#F59E0B")} onMouseOut={(e) => (e.currentTarget.style.color = "#94A3B8")}>{link}</a></li>
-              ))}
-            </ul>
-          </div>
-
-        </div>
-
-        <div style={{ borderTop: "1px solid #1E2436", paddingTop: "32px", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "16px" }}>
-          <div style={{ fontSize: "13px", color: "#64748B" }}>
-            © 2026 SnapToon. Tutti i diritti riservati.
-          </div>
-          <div style={{ display: "flex", gap: "16px" }}>
-            {["Twitter", "Discord", "Instagram"].map((social) => (
-              <a key={social} href="#" style={{ fontSize: "13px", color: "#64748B", textDecoration: "none", transition: "color 0.2s" }} onMouseOver={(e) => (e.currentTarget.style.color = "#F1F5F9")} onMouseOut={(e) => (e.currentTarget.style.color = "#64748B")}>{social}</a>
-            ))}
-          </div>
-        </div>
-      </div>
-    </footer>
-  );
-}
