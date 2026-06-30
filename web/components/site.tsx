@@ -161,12 +161,8 @@ export function SiteFooter() {
         </div>
 
         <div style={{ borderTop: "1px solid #1E2436", paddingTop: "32px", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "16px" }}>
-          <div style={{ fontSize: "13px", color: "#64748B" }}>© 2026 SnapToon. Tutti i diritti riservati.</div>
-          <div style={{ display: "flex", gap: "16px" }}>
-            {["Twitter", "Discord", "Instagram"].map((social) => (
-              <a key={social} href="#" style={{ fontSize: "13px", color: "#64748B", textDecoration: "none", transition: "color 0.2s" }} onMouseOver={(e) => (e.currentTarget.style.color = "#F1F5F9")} onMouseOut={(e) => (e.currentTarget.style.color = "#64748B")}>{social}</a>
-            ))}
-          </div>
+          <div style={{ fontSize: "13px", color: "#64748B" }}>© SnapToon | New Star System SRL © 2026.</div>
+          <div style={{ fontSize: "13px", color: "#64748B" }}>Attitudine umana - Passione italiana.</div>
         </div>
       </div>
     </footer>
