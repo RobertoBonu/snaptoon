@@ -68,6 +68,10 @@ class GeneratePanelIn(BaseModel):
     mood: Optional[str] = None
     aspect_ratio: Optional[str] = Field(default="2_3")
     quality: str = Field(default="medium")
+    # Nomi dei personaggi che DEVONO apparire in questa vignetta. Se None →
+    # tutto il cast (comportamento V2 originale). Se lista vuota → nessun
+    # personaggio (utile per scene ambientali).
+    character_names: Optional[list[str]] = None
 
 
 # ============================================================
@@ -194,9 +198,18 @@ def generate_vignette(
         style_preset_id = project.style_id
         pid = project.id
 
-        cast = []
-        for cs in project.character_sheets:
-            cast.append({"name": cs.name, "description": cs.visual_description, "id": str(cs.id)})
+        # Full cast del progetto
+        full_cast = [
+            {"name": cs.name, "description": cs.visual_description, "id": str(cs.id)}
+            for cs in project.character_sheets
+        ]
+
+    # Filtra il cast se l'utente ha selezionato personaggi specifici
+    if payload.character_names is None:
+        cast = full_cast
+    else:
+        wanted_lower = {n.lower() for n in payload.character_names if n.strip()}
+        cast = [c for c in full_cast if c["name"].lower() in wanted_lower]
 
     # 2. Charge
     cost = cost_for_operation("generate_panel", quality=payload.quality)

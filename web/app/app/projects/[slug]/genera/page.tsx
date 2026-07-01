@@ -1,8 +1,12 @@
 "use client";
 
+import PageLoader from "@/components/PageLoader";
+
 import { use, useEffect, useState } from "react";
 import {
   apiFetch,
+  type Character,
+  type CharacterList,
   type SceneOptions,
   type VignetteStatus,
   type VignettesList,
@@ -16,19 +20,28 @@ export default function GeneraPage({
   const { slug } = use(params);
   const [vignettes, setVignettes] = useState<VignetteStatus[] | null>(null);
   const [opts, setOpts] = useState<SceneOptions | null>(null);
+  const [cast, setCast] = useState<Character[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [generating, setGenerating] = useState<string | null>(null);
   const [refreshTag, setRefreshTag] = useState<number>(Date.now());
 
+  // Cast selezionato per ogni vignetta: mapping "page_panel" → Set nomi
+  // Se non presente in state, si intende "tutto il cast" (default V2)
+  const [selectedCast, setSelectedCast] = useState<
+    Record<string, Set<string>>
+  >({});
+
   async function load() {
     try {
       setError(null);
-      const [vs, sc] = await Promise.all([
+      const [vs, sc, ch] = await Promise.all([
         apiFetch<VignettesList>(`/api/projects/${slug}/vignettes`),
         apiFetch<SceneOptions>("/api/scene-options"),
+        apiFetch<CharacterList>(`/api/projects/${slug}/characters`),
       ]);
       setVignettes(vs.vignettes);
       setOpts(sc);
+      setCast(ch.characters);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     }
@@ -37,6 +50,22 @@ export default function GeneraPage({
   useEffect(() => {
     load();
   }, []);
+
+  function toggleCharForPanel(panelKey: string, name: string) {
+    setSelectedCast((prev) => {
+      const current = prev[panelKey] ?? new Set(cast.map((c) => c.name));
+      const next = new Set(current);
+      if (next.has(name)) next.delete(name);
+      else next.add(name);
+      return { ...prev, [panelKey]: next };
+    });
+  }
+
+  function isCharSelected(panelKey: string, name: string): boolean {
+    const current = selectedCast[panelKey];
+    if (current === undefined) return true; // default: tutti selezionati
+    return current.has(name);
+  }
 
   async function generate(
     v: VignetteStatus,
@@ -52,6 +81,11 @@ export default function GeneraPage({
     setGenerating(key);
     setError(null);
     try {
+      // Cast filtrato per questa vignetta (o null = tutto il cast)
+      const selectedForPanel = selectedCast[key];
+      const characterNames =
+        selectedForPanel === undefined ? null : Array.from(selectedForPanel);
+
       await apiFetch(
         `/api/projects/${slug}/vignettes/${v.page_number}/${v.panel_number}/generate`,
         {
@@ -62,6 +96,7 @@ export default function GeneraPage({
             mood: overrides.mood ?? v.mood ?? null,
             aspect_ratio: overrides.aspect_ratio ?? v.aspect_ratio_key ?? "2_3",
             quality: overrides.quality ?? "medium",
+            character_names: characterNames,
           }),
         }
       );
@@ -75,7 +110,7 @@ export default function GeneraPage({
   }
 
   if (vignettes === null && !error) {
-    return <p className="text-[var(--color-fg-muted)]">Caricamento...</p>;
+    return <PageLoader message="Carico le vignette..." />;
   }
 
   if (vignettes && vignettes.length === 0) {
@@ -124,6 +159,13 @@ export default function GeneraPage({
                   v={v}
                   slug={slug}
                   opts={opts}
+                  cast={cast}
+                  isCharSelected={(name) =>
+                    isCharSelected(`${v.page_number}_${v.panel_number}`, name)
+                  }
+                  onToggleChar={(name) =>
+                    toggleCharForPanel(`${v.page_number}_${v.panel_number}`, name)
+                  }
                   generating={
                     generating === `${v.page_number}_${v.panel_number}`
                   }
@@ -143,6 +185,9 @@ function VignetteEditor({
   v,
   slug,
   opts,
+  cast,
+  isCharSelected,
+  onToggleChar,
   generating,
   onGenerate,
   refreshTag,
@@ -150,6 +195,9 @@ function VignetteEditor({
   v: VignetteStatus;
   slug: string;
   opts: SceneOptions | null;
+  cast: Character[];
+  isCharSelected: (name: string) => boolean;
+  onToggleChar: (name: string) => void;
   generating: boolean;
   onGenerate: (overrides: {
     shot_distance?: string | null;
@@ -257,6 +305,40 @@ function VignetteEditor({
               <option value="high">High</option>
             </select>
           </div>
+
+          {/* Personaggi nella scena — se il progetto ha cast, mostra i checkbox */}
+          {cast.length > 0 && (
+            <div className="mb-3">
+              <div className="text-xs text-[var(--color-fg-muted)] mb-1.5">
+                Chi c'è in questa scena
+              </div>
+              <div className="flex flex-wrap gap-1.5">
+                {cast.map((c) => {
+                  const active = isCharSelected(c.name);
+                  return (
+                    <button
+                      key={c.id}
+                      type="button"
+                      onClick={() => onToggleChar(c.name)}
+                      className={`text-xs px-2.5 py-1 rounded-full border transition-colors ${
+                        active
+                          ? "bg-[var(--color-accent)] border-[var(--color-accent)] text-[var(--color-bg)]"
+                          : "bg-transparent border-[var(--color-border)] text-[var(--color-fg-muted)] hover:border-[var(--color-fg-muted)]"
+                      }`}
+                      title={
+                        active
+                          ? `${c.name} sarà nella vignetta`
+                          : `${c.name} NON sarà nella vignetta`
+                      }
+                    >
+                      {active ? "✓ " : ""}
+                      {c.name}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
 
           <button
             onClick={() =>

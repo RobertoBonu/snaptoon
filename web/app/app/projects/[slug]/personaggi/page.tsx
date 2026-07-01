@@ -1,5 +1,7 @@
 "use client";
 
+import PageLoader from "@/components/PageLoader";
+
 import { use, useEffect, useState } from "react";
 import { apiFetch, type Character, type CharacterList } from "@/lib/api";
 
@@ -16,6 +18,7 @@ export default function PersonaggiPage({
   const [newDesc, setNewDesc] = useState("");
   const [creating, setCreating] = useState(false);
   const [generatingRef, setGeneratingRef] = useState<string | null>(null);
+  const [uploadingRef, setUploadingRef] = useState<string | null>(null);
   const [refreshTag, setRefreshTag] = useState<number>(Date.now());
 
   async function load() {
@@ -83,8 +86,51 @@ export default function PersonaggiPage({
     }
   }
 
+  async function handleUploadRef(charId: string, file: File) {
+    // Validazione lato client (rapida)
+    const okTypes = ["image/png", "image/jpeg", "image/jpg", "image/webp"];
+    if (!okTypes.includes(file.type)) {
+      setError("Formato non supportato. Usa PNG, JPEG o WEBP.");
+      return;
+    }
+    if (file.size > 8 * 1024 * 1024) {
+      setError("Immagine troppo grande (max 8 MB).");
+      return;
+    }
+    setUploadingRef(charId);
+    setError(null);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      const res = await fetch(
+        `/api/projects/${slug}/characters/${charId}/upload-reference`,
+        {
+          method: "POST",
+          body: formData,
+          credentials: "include",
+        }
+      );
+      if (!res.ok) {
+        let detail = `HTTP ${res.status}`;
+        try {
+          const data = await res.json();
+          if (data?.detail) detail = data.detail;
+        } catch {
+          /* ignore */
+        }
+        throw new Error(detail);
+      }
+      setRefreshTag(Date.now());
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setUploadingRef(null);
+    }
+  }
+
   if (characters === null && !error) {
-    return <p className="text-[var(--color-fg-muted)]">Caricamento...</p>;
+    return <PageLoader message="Carico i personaggi..." />;
   }
 
   return (
@@ -183,10 +229,12 @@ export default function PersonaggiPage({
                   <p className="text-xs text-[var(--color-fg-muted)] mb-3 line-clamp-3">
                     {c.visual_description}
                   </p>
-                  <div className="flex flex-wrap gap-2">
+                  <div className="flex flex-wrap gap-2 items-center">
                     <button
                       onClick={() => handleGenerateRef(c.id)}
-                      disabled={generatingRef === c.id}
+                      disabled={
+                        generatingRef === c.id || uploadingRef === c.id
+                      }
                       className="text-xs bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] text-[var(--color-bg)] font-medium px-3 py-1.5 rounded disabled:opacity-50"
                     >
                       {generatingRef === c.id
@@ -195,6 +243,32 @@ export default function PersonaggiPage({
                           ? "🔄 Rigenera ref (1 cr)"
                           : "✨ Genera ref (1 cr)"}
                     </button>
+
+                    {/* Upload foto reference */}
+                    <label
+                      className={`text-xs border border-[var(--color-border)] hover:border-[var(--color-accent)] hover:text-[var(--color-accent)] text-[var(--color-fg-muted)] px-3 py-1.5 rounded cursor-pointer transition-colors ${
+                        uploadingRef === c.id ? "opacity-50" : ""
+                      }`}
+                      title="Carica una foto o un disegno del personaggio"
+                    >
+                      {uploadingRef === c.id ? "..." : "📁 Carica foto"}
+                      <input
+                        type="file"
+                        accept="image/png,image/jpeg,image/jpg,image/webp"
+                        onChange={(e) => {
+                          const f = e.target.files?.[0];
+                          if (f) handleUploadRef(c.id, f);
+                          // Reset input value così l'utente può ricaricare
+                          // lo stesso file dopo un errore
+                          e.target.value = "";
+                        }}
+                        disabled={
+                          generatingRef === c.id || uploadingRef === c.id
+                        }
+                        className="hidden"
+                      />
+                    </label>
+
                     <button
                       onClick={() => handleDelete(c.id, c.name)}
                       className="text-xs text-[var(--color-fg-muted)] hover:text-red-400 px-2 py-1.5"

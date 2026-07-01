@@ -1,5 +1,7 @@
 "use client";
 
+import PageLoader from "@/components/PageLoader";
+
 import { use, useEffect, useMemo, useState } from "react";
 import { apiFetch, type Project, type Style, type StyleList } from "@/lib/api";
 
@@ -72,7 +74,7 @@ export default function StilePage({
   }, [data, query]);
 
   if (data === null && !error) {
-    return <p className="text-[var(--color-fg-muted)]">Caricamento stili...</p>;
+    return <PageLoader message="Carico gli stili..." />;
   }
 
   return (

@@ -5,7 +5,7 @@ import uuid
 from datetime import datetime
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
 from fastapi.responses import Response
 from pydantic import BaseModel, Field
 
@@ -275,3 +275,80 @@ def get_reference_image(
     if not object_exists(rk):
         raise HTTPException(status_code=404, detail="Reference non trovata")
     return Response(content=download_bytes(rk), media_type="image/png")
+
+
+# Formati foto accettati per l'upload della reference
+_ACCEPTED_IMAGE_MIMES = {
+    "image/png",
+    "image/jpeg",
+    "image/jpg",
+    "image/webp",
+}
+_MAX_REF_SIZE_BYTES = 8 * 1024 * 1024  # 8 MB
+
+
+@router.post(
+    "/projects/{slug}/characters/{char_id}/upload-reference",
+    response_model=CharacterOut,
+)
+async def upload_reference_image(
+    slug: str,
+    char_id: str,
+    file: UploadFile = File(...),
+    user: dict = Depends(require_user),
+) -> CharacterOut:
+    """Carica una foto (o disegno) come reference image slot 1 del personaggio.
+
+    Sostituisce quella eventualmente già presente (generata o caricata).
+    Non consuma crediti — è un upload manuale, niente AI.
+
+    Formati accettati: PNG, JPEG, WEBP. Max 8 MB.
+    """
+    user_id = uuid.UUID(user["id"])
+    try:
+        cid = uuid.UUID(char_id)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="ID personaggio invalido")
+
+    if file.content_type not in _ACCEPTED_IMAGE_MIMES:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Formato non supportato ({file.content_type}). Usa PNG, JPEG o WEBP.",
+        )
+
+    data = await file.read()
+    if len(data) > _MAX_REF_SIZE_BYTES:
+        raise HTTPException(
+            status_code=413,
+            detail=f"File troppo grande (max {_MAX_REF_SIZE_BYTES // (1024*1024)} MB).",
+        )
+    if len(data) == 0:
+        raise HTTPException(status_code=400, detail="File vuoto.")
+
+    # Verifica proprietà + esiste personaggio
+    with session_scope() as s:
+        project = projects_repo.get_by_slug(s, user_id, slug)
+        if project is None:
+            raise HTTPException(status_code=404, detail="Progetto non trovato")
+        cs = next((c for c in project.character_sheets if c.id == cid), None)
+        if cs is None:
+            raise HTTPException(status_code=404, detail="Personaggio non trovato")
+        pid = project.id
+        char_name = cs.name
+
+    # Upload su Object Storage (chiave: reference slot 1, formato PNG a
+    # prescindere dall'input — la generazione AI usa PNG per coerenza)
+    rk = reference_key(pid, cid, 1)
+    upload_bytes(rk, data, content_type=file.content_type or "image/png")
+
+    with session_scope() as s:
+        project = projects_repo.get_by_slug(s, user_id, slug)
+        cs = next((c for c in project.character_sheets if c.id == cid), None)
+        if cs is None:
+            raise HTTPException(status_code=404, detail="Personaggio non trovato")
+        characters_repo.upsert_reference(
+            s, cs, slot_number=1, storage_key=rk,
+            mime_type=file.content_type or "image/png",
+            file_size=len(data),
+        )
+        return _to_out(cs, has_ref=True)
