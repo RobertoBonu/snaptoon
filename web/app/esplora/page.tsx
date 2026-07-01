@@ -38,6 +38,81 @@ function SectionHead({ title, subtitle }: { title: string; subtitle: string }) {
   );
 }
 
+function Lightbox({ src, alt, onClose }: { src: string; alt: string; onClose: () => void }) {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    document.addEventListener("keydown", onKey);
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      document.body.style.overflow = prev;
+    };
+  }, [onClose]);
+
+  return (
+    <div
+      onClick={onClose}
+      style={{
+        position: "fixed",
+        inset: 0,
+        zIndex: 1000,
+        background: "rgba(3, 6, 12, 0.9)",
+        backdropFilter: "blur(6px)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: 24,
+        cursor: "zoom-out",
+        animation: "esploraFade 0.15s ease-out",
+      }}
+    >
+      <button
+        onClick={onClose}
+        aria-label="Chiudi"
+        style={{
+          position: "absolute",
+          top: 20,
+          right: 24,
+          width: 44,
+          height: 44,
+          borderRadius: 999,
+          border: "1px solid rgba(255,255,255,0.18)",
+          background: "rgba(15,20,32,0.7)",
+          color: "#F1F5F9",
+          fontSize: 22,
+          lineHeight: 1,
+          cursor: "pointer",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+        }}
+      >
+        ✕
+      </button>
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={src}
+        alt={alt}
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          maxWidth: "min(96vw, 1400px)",
+          maxHeight: "92vh",
+          width: "auto",
+          height: "auto",
+          objectFit: "contain",
+          borderRadius: 14,
+          boxShadow: "0 24px 80px rgba(0,0,0,0.6)",
+          cursor: "default",
+        }}
+      />
+      <style>{`@keyframes esploraFade{from{opacity:0}to{opacity:1}}`}</style>
+    </div>
+  );
+}
+
 function EsploraCard({ item, aspect }: { item: EsploraAsset; aspect: string }) {
   // Larghezza stimata dall'aspect della sezione finché l'immagine non è caricata;
   // poi misurata dalle dimensioni naturali per mantenere l'altezza fissa uniforme.
@@ -45,9 +120,12 @@ function EsploraCard({ item, aspect }: { item: EsploraAsset; aspect: string }) {
   const estWidth = ah ? Math.round(ESPLORA_H * (aw / ah)) : ESPLORA_H;
   const [width, setWidth] = useState<number>(estWidth);
   const [ok, setOk] = useState(true);
+  const [zoom, setZoom] = useState(false);
 
   const hasMeta =
     Boolean(item.asset_type || item.title || item.caption || item.author_name || item.author_role);
+
+  const showImage = Boolean(item.image_url && ok);
 
   return (
     <div
@@ -63,20 +141,45 @@ function EsploraCard({ item, aspect }: { item: EsploraAsset; aspect: string }) {
         flexDirection: "column",
       }}
     >
-      {item.image_url && ok ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
-          src={item.image_url}
-          alt={item.title || ""}
-          onLoad={(e) => {
-            const el = e.currentTarget;
-            if (el.naturalHeight > 0) {
-              setWidth(Math.round(ESPLORA_H * (el.naturalWidth / el.naturalHeight)));
-            }
-          }}
-          onError={() => setOk(false)}
-          style={{ height: ESPLORA_H, width: "100%", display: "block", objectFit: "cover", borderRadius: 12 }}
-        />
+      {showImage ? (
+        <div
+          onClick={() => setZoom(true)}
+          style={{ position: "relative", cursor: "zoom-in", borderRadius: 12, overflow: "hidden" }}
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={item.image_url as string}
+            alt={item.title || ""}
+            onLoad={(e) => {
+              const el = e.currentTarget;
+              if (el.naturalHeight > 0) {
+                setWidth(Math.round(ESPLORA_H * (el.naturalWidth / el.naturalHeight)));
+              }
+            }}
+            onError={() => setOk(false)}
+            style={{ height: ESPLORA_H, width: "100%", display: "block", objectFit: "cover", borderRadius: 12 }}
+          />
+          <span
+            aria-hidden
+            style={{
+              position: "absolute",
+              bottom: 10,
+              right: 10,
+              width: 34,
+              height: 34,
+              borderRadius: 999,
+              background: "rgba(3,6,12,0.6)",
+              border: "1px solid rgba(255,255,255,0.18)",
+              color: "#F1F5F9",
+              fontSize: 15,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            🔍
+          </span>
+        </div>
       ) : (
         <div
           style={{
@@ -124,6 +227,9 @@ function EsploraCard({ item, aspect }: { item: EsploraAsset; aspect: string }) {
             </div>
           )}
         </div>
+      )}
+      {zoom && showImage && (
+        <Lightbox src={item.image_url as string} alt={item.title || ""} onClose={() => setZoom(false)} />
       )}
     </div>
   );

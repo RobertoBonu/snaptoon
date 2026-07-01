@@ -169,6 +169,18 @@ def list_public_assets() -> dict:
         return _grouped(rows)
 
 
+def _detect_media_type(data: bytes) -> str:
+    """Riconosce il formato dai magic bytes: gli asset possono essere WebP
+    (upload ottimizzati) o PNG (generati AI / vecchi upload)."""
+    if len(data) >= 12 and data[0:4] == b"RIFF" and data[8:12] == b"WEBP":
+        return "image/webp"
+    if data[:8] == b"\x89PNG\r\n\x1a\n":
+        return "image/png"
+    if data[:3] == b"\xff\xd8\xff":
+        return "image/jpeg"
+    return "image/png"
+
+
 def _serve_image(key: str | None) -> Response:
     if not key:
         raise HTTPException(status_code=404, detail="Immagine non trovata")
@@ -178,7 +190,7 @@ def _serve_image(key: str | None) -> Response:
         raise HTTPException(status_code=404, detail="Immagine non trovata")
     return Response(
         content=data,
-        media_type="image/png",
+        media_type=_detect_media_type(data),
         headers={"Cache-Control": "public, max-age=300"},
     )
 
@@ -303,23 +315,28 @@ async def upload_asset_image(
     raw = await file.read()
     if not raw:
         raise HTTPException(status_code=400, detail="File vuoto")
-    # Normalizza qualsiasi formato (JPEG/WebP/...) in PNG: lo storage e il serving
-    # usano sempre image/png, così l'immagine resta coerente.
+    # Ottimizzazione: qualsiasi upload (PNG/JPEG/...) viene convertito in WebP,
+    # mantenendo le stesse dimensioni in pixel ma con un file molto più leggero.
     from io import BytesIO
 
     from PIL import Image
 
     try:
-        img = Image.open(BytesIO(raw)).convert("RGBA")
+        img = Image.open(BytesIO(raw))
+        has_alpha = img.mode in ("RGBA", "LA") or (
+            img.mode == "P" and "transparency" in img.info
+        )
+        img = img.convert("RGBA" if has_alpha else "RGB")
         buf = BytesIO()
-        img.save(buf, format="PNG")
+        img.save(buf, format="WEBP", quality=85, method=6)
         data = buf.getvalue()
+        content_type = "image/webp"
     except Exception:
         raise HTTPException(status_code=400, detail="Immagine non valida o corrotta")
     with session_scope() as s:
         a = _get_or_404(s, asset_id)
         key = storage_keys.esplora_asset_key(a.section, a.id)
-        upload_bytes(key, data, content_type="image/png")
+        upload_bytes(key, data, content_type=content_type)
         a.storage_key = key
         a.updated_at = utcnow()  # forza cache-bust anche se la key è invariata
         s.flush()

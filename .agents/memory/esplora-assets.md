@@ -31,6 +31,12 @@ Admin edits all 5 inline (Salva/Annulla); `saveMeta` returns a boolean so the fo
 open on PATCH failure (no lost edits).
 
 ## Conventions
-- Uploads are normalized to PNG (PIL) before storage; serving always uses `image/png`.
+- Uploads are re-encoded to **WebP** (PIL, quality 85, method 6), preserving pixel
+  dimensions — lighter files, same size. AI-generated images stay PNG. So storage holds a
+  **mix of formats**: serving must NOT hardcode a MIME. `_serve_image` sniffs magic bytes
+  (`_detect_media_type`: RIFF/WEBP, PNG, JPEG) and sets Content-Type at runtime. Storage
+  keys still end `.png` (cosmetic; the extension is not used for serving).
+- Public card images are click-to-zoom (Lightbox overlay): ESC / backdrop / ✕ to close,
+  body scroll locked while open.
 - Cache-bust: `image_url` carries `?v={updated_at epoch}`; upload/generate explicitly set
   `updated_at = utcnow()` so the URL changes even when the storage key is unchanged.
