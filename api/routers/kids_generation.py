@@ -769,6 +769,313 @@ def _hash_prompt(prompt: str, *extra: str) -> str:
 
 
 # ============================================================
+# Step-by-step (NUOVO): genera cover / una pagina alla volta
+# così l'utente conferma tra un passo e l'altro.
+# ============================================================
+
+
+class StepResultOut(BaseModel):
+    ok: bool
+    kind: str  # "cover" | "page"
+    detail: str = ""
+    generated_panels: list[dict] = []  # per page: [{page, panel}]
+
+
+@router.post(
+    "/projects/{project_id}/generate-cover", response_model=StepResultOut
+)
+def generate_cover_only(
+    project_id: str, user: dict = Depends(require_user)
+) -> StepResultOut:
+    """Genera SOLO la copertina. Ritorna quando pronta.
+
+    Se già esiste, ritorna subito senza consumare crediti.
+    Idempotente per resume.
+    """
+    from snaptoon_core.generator import OpenAIImageGenerator
+    from snaptoon_core.kids_pipeline import build_cover_prompt
+
+    user_id = uuid.UUID(user["id"])
+    pid = _project_or_404(project_id, user_id)
+
+    # Se la cover esiste già → skip
+    cover_key_ = cover_illustration_key(pid)
+    if object_exists(cover_key_):
+        return StepResultOut(ok=True, kind="cover", detail="Cover già presente")
+
+    # Carica context
+    with session_scope() as s:
+        project = projects_repo.get_by_id(s, pid)
+        if project is None or project.owner_user_id != user_id:
+            raise HTTPException(status_code=404, detail="Progetto non trovato")
+        if project.script is None:
+            raise HTTPException(status_code=400, detail="Storia non ancora generata")
+        style_preset_id = project.style_id
+        if not style_preset_id:
+            raise HTTPException(status_code=400, detail="Stile non impostato")
+        pyd_script = scripts_repo.load_pydantic(project.script)
+        cast = [
+            {
+                "name": cs.name,
+                "description": cs.visual_description,
+                "id": str(cs.id),
+            }
+            for cs in project.character_sheets
+        ]
+        cover_title = pyd_script.logline or project.name
+
+    # Prima assicura le reference dei personaggi (necessarie per cover coerente)
+    generator = OpenAIImageGenerator()
+    for c in cast:
+        ref_key = reference_key(pid, uuid.UUID(c["id"]), 1)
+        if object_exists(ref_key):
+            continue
+        # Genera reference al volo
+        cost_ref = cost_for_operation("generate_reference")
+        try:
+            with session_scope() as s:
+                u = users_repo.get_by_id(s, user_id)
+                credits_repo.charge(
+                    s, u, cost=cost_ref,
+                    operation=CreditOperation.generate_reference,
+                    reason=f"KIDS reference {c['name']} (step-by-step)",
+                    reference_id=str(pid),
+                )
+            from snaptoon_core.kids_pipeline import build_reference_prompt
+
+            prompt_ref = build_reference_prompt(
+                c["name"], c["description"], style_preset_id
+            )
+            img_bytes_ref = generator._generate_bytes(
+                prompt=prompt_ref, size="1024x1024",
+                reference_images=None, quality="medium",
+            )
+            upload_bytes(ref_key, img_bytes_ref, content_type="image/png")
+            with session_scope() as s:
+                project = projects_repo.get_by_id(s, pid)
+                cs = next(
+                    (x for x in project.character_sheets if x.name == c["name"]),
+                    None,
+                )
+                if cs is not None:
+                    from db.repos import characters as characters_repo
+
+                    characters_repo.upsert_reference(
+                        s, cs, slot_number=1, storage_key=ref_key,
+                        mime_type="image/png", file_size=len(img_bytes_ref),
+                    )
+        except Exception as e:
+            with session_scope() as s:
+                u = users_repo.get_by_id(s, user_id)
+                credits_repo.refund(
+                    s, u, amount=cost_ref,
+                    reason=f"Refund ref {c['name']}: {str(e)[:200]}",
+                )
+            raise HTTPException(
+                status_code=502,
+                detail=f"Errore reference {c['name']}: {str(e)[:200]}",
+            )
+
+    # Charge cover
+    cost = cost_for_operation("generate_panel", quality="medium")
+    try:
+        with session_scope() as s:
+            u = users_repo.get_by_id(s, user_id)
+            credits_repo.charge(
+                s, u, cost=cost,
+                operation=CreditOperation.generate_cover,
+                reason="KIDS cover (step-by-step)",
+                reference_id=str(pid),
+            )
+    except InsufficientCreditsError as e:
+        raise HTTPException(
+            status_code=402,
+            detail=f"Crediti insufficienti: servono {e.required}, ne hai {e.available}",
+        )
+
+    # Genera cover
+    tmp_refs = []
+    try:
+        for c in cast:
+            rk = reference_key(pid, uuid.UUID(c["id"]), 1)
+            if object_exists(rk):
+                tmp = tempfile.NamedTemporaryFile(suffix=".png", delete=False)
+                tmp.write(download_bytes(rk))
+                tmp.close()
+                tmp_refs.append(Path(tmp.name))
+
+        cover_prompt = build_cover_prompt(cover_title, cast, style_preset_id)
+        img_bytes = generator._generate_bytes(
+            prompt=cover_prompt,
+            size="1024x1536",
+            reference_images=tmp_refs if tmp_refs else None,
+            quality="medium",
+        )
+        upload_bytes(cover_key_, img_bytes, content_type="image/png")
+
+        with session_scope() as s:
+            project = projects_repo.get_by_id(s, pid)
+            cover_orm = covers_repo.get_or_create(s, project)
+            covers_repo.update_text(
+                s, cover_orm, title=cover_title, author="",
+                description=project.source_text or "",
+            )
+            covers_repo.update_illustration_key(s, cover_orm, cover_key_)
+
+        return StepResultOut(ok=True, kind="cover", detail="Cover generata")
+    except Exception as e:
+        with session_scope() as s:
+            u = users_repo.get_by_id(s, user_id)
+            credits_repo.refund(
+                s, u, amount=cost,
+                reason=f"Refund cover: {str(e)[:200]}",
+            )
+        raise HTTPException(status_code=502, detail=f"Errore cover: {str(e)[:200]}")
+    finally:
+        for p in tmp_refs:
+            try:
+                p.unlink()
+            except OSError:
+                pass
+
+
+@router.post(
+    "/projects/{project_id}/generate-page/{page_num}",
+    response_model=StepResultOut,
+)
+def generate_single_page(
+    project_id: str, page_num: int, user: dict = Depends(require_user)
+) -> StepResultOut:
+    """Genera tutte le vignette di UNA pagina in un colpo solo.
+
+    Skippa le vignette già generate (idempotente).
+    Ritorna la lista di vignette effettivamente generate in questa call.
+    """
+    from snaptoon_core.generator import OpenAIImageGenerator
+    from snaptoon_core.kids_pipeline import build_panel_prompt, panel_size_for
+
+    user_id = uuid.UUID(user["id"])
+    pid = _project_or_404(project_id, user_id)
+
+    with session_scope() as s:
+        project = projects_repo.get_by_id(s, pid)
+        if project is None or project.owner_user_id != user_id:
+            raise HTTPException(status_code=404, detail="Progetto non trovato")
+        if project.script is None:
+            raise HTTPException(status_code=400, detail="Storia non ancora generata")
+        style_preset_id = project.style_id
+        if not style_preset_id:
+            raise HTTPException(status_code=400, detail="Stile non impostato")
+
+        pyd_script = scripts_repo.load_pydantic(project.script)
+        target_page = next(
+            (p for p in pyd_script.pages if p.number == page_num), None
+        )
+        if target_page is None:
+            raise HTTPException(status_code=404, detail=f"Pagina {page_num} non trovata")
+
+        page_layouts = {pl.page_number: pl.grid_id for pl in project.page_layouts}
+        grid_id = page_layouts.get(page_num, "2x2")
+
+        cast = [
+            {"name": cs.name, "description": cs.visual_description, "id": str(cs.id)}
+            for cs in project.character_sheets
+        ]
+
+        existing_vigs = {
+            (v.page_number, v.panel_number)
+            for v in vignettes_repo.list_for_project(s, project)
+        }
+
+    generator = OpenAIImageGenerator()
+    generated: list[dict] = []
+
+    # Reference temp files (una volta per tutte le vignette di questa pagina)
+    tmp_refs = []
+    for c in cast:
+        rk = reference_key(pid, uuid.UUID(c["id"]), 1)
+        if object_exists(rk):
+            tmp = tempfile.NamedTemporaryFile(suffix=".png", delete=False)
+            tmp.write(download_bytes(rk))
+            tmp.close()
+            tmp_refs.append(Path(tmp.name))
+
+    try:
+        for panel in target_page.panels:
+            key_tup = (page_num, panel.number)
+            if key_tup in existing_vigs:
+                continue  # già generata, skip
+
+            cost = cost_for_operation("generate_panel", quality="medium")
+            try:
+                with session_scope() as s:
+                    u = users_repo.get_by_id(s, user_id)
+                    credits_repo.charge(
+                        s, u, cost=cost,
+                        operation=CreditOperation.generate_panel,
+                        reason=f"KIDS p{page_num}v{panel.number} (step-by-step)",
+                        reference_id=str(pid),
+                    )
+            except InsufficientCreditsError as e:
+                raise HTTPException(
+                    status_code=402,
+                    detail=f"Crediti insufficienti a p{page_num}v{panel.number}",
+                )
+
+            try:
+                size_str, aspect_key, fmt_label = panel_size_for(
+                    grid_id, panel.number
+                )
+                prompt = build_panel_prompt(
+                    panel, cast, style_preset_id, {}, panel_format=fmt_label,
+                )
+                img_bytes = generator._generate_bytes(
+                    prompt=prompt, size=size_str,
+                    reference_images=tmp_refs if tmp_refs else None,
+                    quality="medium",
+                )
+                vk = vignette_key(pid, page_num, panel.number)
+                upload_bytes(vk, img_bytes, content_type="image/png")
+
+                with session_scope() as s:
+                    project = projects_repo.get_by_id(s, pid)
+                    vignettes_repo.upsert(
+                        s, project=project,
+                        page_number=page_num, panel_number=panel.number,
+                        storage_key=vk,
+                        prompt_hash=_hash_prompt(prompt),
+                        quality="medium",
+                        aspect_ratio_key=aspect_key,
+                        provider="openai",
+                        model="gpt-image-2",
+                    )
+                generated.append({"page": page_num, "panel": panel.number})
+            except Exception as e:
+                with session_scope() as s:
+                    u = users_repo.get_by_id(s, user_id)
+                    credits_repo.refund(
+                        s, u, amount=cost,
+                        reason=f"Refund p{page_num}v{panel.number}: {str(e)[:200]}",
+                    )
+                # continua con la prossima vignetta invece di fallire tutto
+                logger.warning(
+                    "Panel p%dv%d failed: %s", page_num, panel.number, str(e)[:200]
+                )
+
+        return StepResultOut(
+            ok=True, kind="page",
+            detail=f"Pagina {page_num}: {len(generated)} vignette generate",
+            generated_panels=generated,
+        )
+    finally:
+        for p in tmp_refs:
+            try:
+                p.unlink()
+            except OSError:
+                pass
+
+
+# ============================================================
 # Step 5: Export PDF (regressione chiusa: mancava in V2)
 # ============================================================
 

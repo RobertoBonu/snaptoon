@@ -1,37 +1,36 @@
 "use client";
 
 import Link from "next/link";
-import { use, useEffect, useRef, useState } from "react";
+import { use, useEffect, useState } from "react";
 import { apiFetch, type KidsProjectDetails } from "@/lib/api";
 
-interface SSEEvent {
-  type: "start" | "step" | "image_ready" | "error" | "done";
-  total_steps?: number;
-  kind?: "reference" | "cover" | "panel";
-  label?: string;
-  current?: number;
-  total?: number;
-  name?: string;
-  page?: number;
-  panel?: number;
-  message?: string;
+/**
+ * Generazione KIDS step-by-step:
+ *   1. Genera la COPERTINA. Attesa 30-45s.
+ *   2. Cover pronta → utente decide se continuare.
+ *   3. Genera pagina 1. Attesa 30-90s (dipende da quante vignette).
+ *   4. Pagina 1 pronta → utente decide se continuare.
+ *   5. E così via fino all'ultima pagina.
+ *
+ * Vantaggi rispetto alla pipeline SSE precedente:
+ *   - L'utente vede risultati subito dopo il primo passo (cover in 30s)
+ *   - Può fermarsi in qualsiasi momento e riprendere più tardi
+ *   - Se un passo fallisce, non blocca gli altri
+ *   - Ogni passo è una POST atomica: se l'utente esce e rientra, non
+ *     c'è "app incartata" (fix del bug segnalato)
+ */
+
+interface StepResult {
+  ok: boolean;
+  kind: string;
+  detail?: string;
+  generated_panels?: Array<{ page: number; panel: number }>;
 }
 
-interface CompletedImage {
-  kind: "reference" | "cover" | "panel";
-  label: string;
-  src: string;
-}
-
-// Timeline degli step attesi — mostrata da subito così l'utente sa
-// cosa deve succedere e cosa manca. Ogni voce può essere "done" o in
-// attesa. La UI si aggiorna in tempo reale al ricevere gli eventi SSE.
-interface Step {
-  kind: "reference" | "cover" | "panel";
-  label: string;
-  key: string; // univoco per identificare lo step
-  done: boolean;
-  active: boolean;
+interface PageInfo {
+  number: number;
+  n_panels: number;
+  all_generated: boolean;
 }
 
 export default function KidsGeneratePage({
@@ -41,323 +40,282 @@ export default function KidsGeneratePage({
 }) {
   const { id } = use(params);
 
-  const [status, setStatus] = useState<string>("Mi connetto al server...");
-  const [emoji, setEmoji] = useState<string>("📦");
-  const [current, setCurrent] = useState(0);
-  const [total, setTotal] = useState(0);
-  const [completed, setCompleted] = useState<CompletedImage[]>([]);
-  const [errors, setErrors] = useState<string[]>([]);
-  const [done, setDone] = useState(false);
-  const [steps, setSteps] = useState<Step[]>([]);
-  // Heartbeat: quanti secondi dall'ultimo evento SSE. Se sale sopra 15s
-  // l'utente vede un messaggio esplicito che è normale (l'AI sta
-  // generando le immagini, ci mette 5-15s per ognuna).
-  const [secondsSinceUpdate, setSecondsSinceUpdate] = useState(0);
-  const [connected, setConnected] = useState(false);
+  const [details, setDetails] = useState<KidsProjectDetails | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [working, setWorking] = useState<string | null>(null); // "cover" | "page-N"
+  const [refreshTag, setRefreshTag] = useState<number>(Date.now());
+  const [progressMsg, setProgressMsg] = useState<string | null>(null);
 
-  const startedRef = useRef(false);
-  const lastUpdateRef = useRef<number>(Date.now());
-
-  // Timer del heartbeat: aggiorna secondi trascorsi dall'ultimo evento
-  useEffect(() => {
-    const iv = setInterval(() => {
-      const sec = Math.floor((Date.now() - lastUpdateRef.current) / 1000);
-      setSecondsSinceUpdate(sec);
-    }, 500);
-    return () => clearInterval(iv);
-  }, []);
-
-  // Bump del timer alla ricezione di un evento
-  function touch() {
-    lastUpdateRef.current = Date.now();
-    setSecondsSinceUpdate(0);
-  }
-
-  // Fetch iniziale dei details per costruire la timeline attesa
-  async function fetchInitialTimeline() {
+  async function load() {
     try {
       const d = await apiFetch<KidsProjectDetails>(
         `/api/kids/projects/${id}/details`
       );
-      const timelineSteps: Step[] = [];
-
-      // Cover attesa
-      timelineSteps.push({
-        kind: "cover",
-        label: "📕 Copertina",
-        key: "cover",
-        done: d.has_cover,
-        active: false,
-      });
-
-      // Vignette attese (dalla story, se già generata)
-      if (d.story) {
-        const vigDone = new Set(
-          d.vignettes.map((v) => `${v.page_number}_${v.panel_number}`)
-        );
-        for (const p of d.story.pages) {
-          for (const pn of p.panels) {
-            const key = `p${p.number}_v${pn.number}`;
-            timelineSteps.push({
-              kind: "panel",
-              label: `Pagina ${p.number} · Vignetta ${pn.number}`,
-              key,
-              done: vigDone.has(`${p.number}_${pn.number}`),
-              active: false,
-            });
-          }
-        }
-      }
-      setSteps(timelineSteps);
-    } catch {
-      // Non è un errore bloccante, la SSE popola comunque
+      setDetails(d);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
     }
   }
 
   useEffect(() => {
-    fetchInitialTimeline();
-  }, [id]);
+    load();
+  }, []);
 
-  useEffect(() => {
-    if (startedRef.current) return;
-    startedRef.current = true;
+  async function generateCover() {
+    setWorking("cover");
+    setError(null);
+    setProgressMsg("Sto disegnando la copertina... può richiedere 30-45 secondi");
+    try {
+      const res = await apiFetch<StepResult>(
+        `/api/kids/projects/${id}/generate-cover`,
+        { method: "POST" }
+      );
+      setProgressMsg(null);
+      setRefreshTag(Date.now());
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+      setProgressMsg(null);
+    } finally {
+      setWorking(null);
+    }
+  }
 
-    const source = new EventSource(
-      `/api/kids/projects/${id}/generate-stream`,
-      { withCredentials: true }
+  async function generatePage(pageNum: number) {
+    setWorking(`page-${pageNum}`);
+    setError(null);
+    setProgressMsg(
+      `Sto disegnando la pagina ${pageNum}... può richiedere 30-90 secondi`
     );
+    try {
+      await apiFetch<StepResult>(
+        `/api/kids/projects/${id}/generate-page/${pageNum}`,
+        { method: "POST" }
+      );
+      setProgressMsg(null);
+      setRefreshTag(Date.now());
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+      setProgressMsg(null);
+    } finally {
+      setWorking(null);
+    }
+  }
 
-    source.onopen = () => {
-      setConnected(true);
-      setStatus("Sto preparando la scatola magica...");
-      touch();
+  if (!details) {
+    return (
+      <div className="p-8 max-w-3xl mx-auto">
+        <p className="text-[var(--color-fg-muted)]">Caricamento...</p>
+      </div>
+    );
+  }
+
+  // Info di stato: cover generata? pagine con vignette generate?
+  const vigDone = new Set(
+    details.vignettes.map((v) => `${v.page_number}_${v.panel_number}`)
+  );
+
+  const pagesInfo: PageInfo[] = (details.story?.pages ?? []).map((p) => {
+    const allGen = p.panels.every((pn) =>
+      vigDone.has(`${p.number}_${pn.number}`)
+    );
+    return {
+      number: p.number,
+      n_panels: p.panels.length,
+      all_generated: allGen,
     };
+  });
 
-    source.onmessage = (e) => {
-      touch();
-      try {
-        const data: SSEEvent = JSON.parse(e.data);
-        if (data.type === "start") {
-          setTotal(data.total_steps ?? 0);
-          setStatus("La pipeline è partita — ora genero un pezzo alla volta");
-        } else if (data.type === "step") {
-          if (data.kind === "reference") setEmoji("👤");
-          else if (data.kind === "cover") setEmoji("📕");
-          else setEmoji("🎨");
-          setStatus(data.label ?? "...");
-          setCurrent(data.current ?? 0);
-          // Aggiorna "active" nella timeline
-          setSteps((prev) => {
-            const marker = describeStepKey(data);
-            return prev.map((s) => ({
-              ...s,
-              active: s.key === marker,
-            }));
-          });
-        } else if (data.type === "image_ready") {
-          const ts = Date.now();
-          let src = "";
-          let label = "";
-          let stepKey: string | null = null;
-          if (data.kind === "cover") {
-            src = `/api/kids/projects/${id}/images/cover?t=${ts}`;
-            label = "📕 Copertina";
-            stepKey = "cover";
-          } else if (data.kind === "panel" && data.page && data.panel) {
-            src = `/api/kids/projects/${id}/images/panel/${data.page}/${data.panel}?t=${ts}`;
-            label = `P${data.page}V${data.panel}`;
-            stepKey = `p${data.page}_v${data.panel}`;
-          } else if (data.kind === "reference") {
-            label = `👋 ${data.name ?? "?"}`;
-          }
-          if (label) {
-            setCompleted((prev) => [
-              ...prev,
-              { kind: data.kind!, label, src },
-            ]);
-          }
-          if (stepKey) {
-            setSteps((prev) =>
-              prev.map((s) =>
-                s.key === stepKey ? { ...s, done: true, active: false } : s
-              )
-            );
-          }
-        } else if (data.type === "error") {
-          setErrors((prev) => [...prev, data.message ?? "Errore"]);
-        } else if (data.type === "done") {
-          setDone(true);
-          setStatus("🎉 Il tuo libretto è pronto!");
-          setEmoji("🎉");
-          source.close();
-          setTimeout(() => {
-            window.location.href = `/app/kids/${id}`;
-          }, 2500);
-        }
-      } catch (err) {
-        console.error("SSE parse error", err);
-      }
-    };
-
-    source.onerror = () => {
-      setConnected(false);
-      // EventSource auto-reconnect. Non chiudo, lascio riprovare.
-    };
-
-    return () => {
-      source.close();
-    };
-  }, [id]);
-
-  const progress = total > 0 ? (current / total) * 100 : 0;
-
-  // Se sono passati più di 12s dall'ultimo evento e non siamo done →
-  // mostro un messaggio esplicito che è normale (l'AI ci mette).
-  const showLongWaitMessage = secondsSinceUpdate > 12 && !done;
+  // Trova il prossimo passo da fare
+  const coverDone = details.has_cover;
+  const nextPageIdx = pagesInfo.findIndex((p) => !p.all_generated);
+  const nextPage = nextPageIdx >= 0 ? pagesInfo[nextPageIdx] : null;
+  const allDone = coverDone && nextPage === null;
 
   return (
-    <div className="p-8 max-w-5xl mx-auto">
+    <div className="p-8 max-w-3xl mx-auto">
       <header className="mb-6">
-        <h1 className="text-3xl font-bold mb-1">🎁 Sto creando il tuo libretto</h1>
-        <p className="text-sm text-[var(--color-fg-muted)]">
-          La generazione può richiedere 5-15 minuti. Resta qui — le vignette
-          appaiono man mano che sono pronte. Puoi anche{" "}
-          <Link href={`/app/kids/${id}`} className="text-[var(--color-accent)] underline">
-            uscire e tornare più tardi
+        <div className="mb-4">
+          <Link
+            href={`/app/kids/${id}`}
+            className="text-sm text-[var(--color-fg-muted)] hover:text-[var(--color-fg)]"
+          >
+            ← Torna al libretto
           </Link>
-          : la pipeline continua in background.
+        </div>
+        <h1 className="text-3xl font-bold mb-1">🎁 Creiamo il tuo libretto</h1>
+        <p className="text-sm text-[var(--color-fg-muted)]">
+          Un passo alla volta: prima la copertina, poi ogni pagina. Puoi uscire
+          e tornare in qualsiasi momento — non perdi progressi.
         </p>
       </header>
 
-      {/* Status box con heartbeat visivo */}
-      <div className="bg-gradient-to-br from-[var(--color-accent)]/20 to-[var(--color-bg-elev)] border-2 border-[var(--color-accent)] rounded-2xl p-8 text-center mb-6 relative">
-        {/* Spinner ambra pulsante — heartbeat visivo che l'app è viva */}
-        {!done && (
-          <div className="absolute top-4 right-4">
-            <div className="w-4 h-4 rounded-full bg-[var(--color-accent)] animate-pulse" />
-          </div>
-        )}
-        <div className="text-6xl mb-3">{emoji}</div>
-        <p className="text-xl font-medium mb-4">{status}</p>
-        {total > 0 && !done && (
-          <>
-            <div className="h-2 bg-[var(--color-border)] rounded-full overflow-hidden mb-2">
-              <div
-                className="h-full bg-[var(--color-accent)] transition-all duration-500"
-                style={{ width: `${progress}%` }}
-              />
-            </div>
-            <p className="text-xs text-[var(--color-fg-muted)]">
-              {current} / {total} passi completati
-            </p>
-          </>
-        )}
-        {/* Heartbeat testuale */}
-        {!done && (
-          <p className="text-[10px] text-[var(--color-fg-muted)] mt-3 uppercase tracking-widest">
-            {connected ? "connesso" : "riconnessione..."} · ultimo aggiornamento{" "}
-            {secondsSinceUpdate}s fa
-          </p>
-        )}
-        {/* Messaggio esplicito per attese lunghe */}
-        {showLongWaitMessage && (
-          <p className="text-xs text-[var(--color-accent)] mt-2 max-w-md mx-auto">
-            💡 È normale — l'AI sta disegnando un'immagine, ci mette 5-15
-            secondi per ognuna. Vedrai il prossimo aggiornamento tra poco.
-          </p>
-        )}
-      </div>
+      {error && (
+        <p className="text-red-400 text-sm bg-red-950/30 border border-red-900/50 rounded px-3 py-2 mb-4">
+          {error}
+        </p>
+      )}
 
-      {/* Timeline degli step attesi — sempre visibile */}
-      {steps.length > 0 && (
-        <div className="bg-[var(--color-bg-elev)] border border-[var(--color-border)] rounded-xl p-5 mb-6">
-          <h2 className="text-sm font-semibold mb-3 text-[var(--color-fg-muted)] uppercase tracking-widest">
-            Cosa verrà generato
-          </h2>
-          <ul className="space-y-1 text-sm max-h-64 overflow-y-auto">
-            {steps.map((s) => (
-              <li
-                key={s.key}
-                className={`flex items-center gap-2 py-1 ${
-                  s.done
-                    ? "text-[var(--color-fg-muted)] line-through"
-                    : s.active
-                      ? "text-[var(--color-accent)] font-medium"
-                      : "text-[var(--color-fg)]"
+      {progressMsg && (
+        <div className="mb-4 bg-[var(--color-accent)]/10 border border-[var(--color-accent)]/40 rounded-lg px-4 py-3 flex items-center gap-3">
+          <div className="w-4 h-4 rounded-full bg-[var(--color-accent)] animate-pulse flex-shrink-0" />
+          <p className="text-sm">{progressMsg}</p>
+        </div>
+      )}
+
+      {/* STEP 1: COPERTINA */}
+      <section className="mb-6 bg-[var(--color-bg-elev)] border border-[var(--color-border)] rounded-xl overflow-hidden">
+        <div className="p-5">
+          <div className="flex items-center gap-2 mb-3">
+            <span
+              className={`inline-flex items-center justify-center w-6 h-6 rounded-full text-xs font-bold ${
+                coverDone
+                  ? "bg-green-500/20 text-green-400"
+                  : "bg-[var(--color-accent)] text-[var(--color-bg)]"
+              }`}
+            >
+              {coverDone ? "✓" : "1"}
+            </span>
+            <h2 className="text-lg font-semibold">📕 La copertina</h2>
+          </div>
+
+          {coverDone ? (
+            <>
+              <img
+                src={`/api/kids/projects/${id}/images/cover?t=${refreshTag}`}
+                alt="Copertina"
+                className="w-full max-w-xs rounded-lg border border-[var(--color-border)] mb-3"
+              />
+              <p className="text-sm text-green-400">
+                ✓ Copertina pronta!
+              </p>
+            </>
+          ) : (
+            <div className="text-center py-6">
+              <div className="text-5xl mb-3">📕</div>
+              <p className="text-sm text-[var(--color-fg-muted)] mb-4">
+                Iniziamo dalla copertina.
+              </p>
+              <button
+                onClick={generateCover}
+                disabled={working !== null}
+                className="bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] text-[var(--color-bg)] font-semibold px-6 py-2.5 rounded-lg disabled:opacity-50"
+              >
+                {working === "cover"
+                  ? "Sto disegnando..."
+                  : "✨ Genera copertina"}
+              </button>
+            </div>
+          )}
+        </div>
+      </section>
+
+      {/* STEP 2+: PAGINE una alla volta */}
+      {coverDone && pagesInfo.length > 0 && (
+        <div className="space-y-3">
+          {pagesInfo.map((p, i) => {
+            const isNext =
+              !p.all_generated &&
+              (i === 0 || pagesInfo.slice(0, i).every((pp) => pp.all_generated));
+            const isBlocked = !p.all_generated && !isNext;
+            const workingThis = working === `page-${p.number}`;
+            return (
+              <section
+                key={p.number}
+                className={`bg-[var(--color-bg-elev)] border rounded-xl overflow-hidden ${
+                  isBlocked
+                    ? "border-[var(--color-border)] opacity-40"
+                    : p.all_generated
+                      ? "border-green-500/30"
+                      : "border-[var(--color-accent)]/60"
                 }`}
               >
-                <span className="inline-block w-4 text-center">
-                  {s.done ? "✓" : s.active ? "▶" : "·"}
-                </span>
-                <span>{s.label}</span>
-                {s.active && (
-                  <span className="text-xs text-[var(--color-accent)] ml-auto">
-                    in corso...
-                  </span>
-                )}
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
+                <div className="p-5">
+                  <div className="flex items-center justify-between gap-2 mb-3">
+                    <div className="flex items-center gap-2">
+                      <span
+                        className={`inline-flex items-center justify-center w-6 h-6 rounded-full text-xs font-bold ${
+                          p.all_generated
+                            ? "bg-green-500/20 text-green-400"
+                            : isNext
+                              ? "bg-[var(--color-accent)] text-[var(--color-bg)]"
+                              : "bg-[var(--color-border)] text-[var(--color-fg-muted)]"
+                        }`}
+                      >
+                        {p.all_generated ? "✓" : i + 2}
+                      </span>
+                      <h3 className="font-semibold">
+                        Pagina {p.number}{" "}
+                        <span className="text-xs text-[var(--color-fg-muted)] font-normal">
+                          ({p.n_panels} vignette)
+                        </span>
+                      </h3>
+                    </div>
+                    {p.all_generated ? (
+                      <span className="text-green-400 text-xs">
+                        ✓ Completa
+                      </span>
+                    ) : isNext ? (
+                      <button
+                        onClick={() => generatePage(p.number)}
+                        disabled={working !== null}
+                        className="bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] text-[var(--color-bg)] font-semibold text-sm px-4 py-1.5 rounded disabled:opacity-50"
+                      >
+                        {workingThis
+                          ? "Sto disegnando..."
+                          : `✨ Genera pagina ${p.number}`}
+                      </button>
+                    ) : (
+                      <span className="text-xs text-[var(--color-fg-muted)]">
+                        Attendi il tuo turno
+                      </span>
+                    )}
+                  </div>
 
-      {/* Errori */}
-      {errors.length > 0 && (
-        <div className="bg-red-950/30 border border-red-900/50 rounded-lg px-4 py-3 mb-6 text-sm">
-          <p className="font-semibold mb-1 text-red-400">
-            Alcuni pezzi hanno dato errore (i crediti sono stati rimborsati):
-          </p>
-          <ul className="space-y-0.5 text-red-300">
-            {errors.map((e, i) => (
-              <li key={i}>• {e}</li>
-            ))}
-          </ul>
-        </div>
-      )}
-
-      {/* Galleria */}
-      {completed.length > 0 && (
-        <>
-          <h2 className="text-lg font-semibold mb-3">
-            ✨ Pronti ({completed.length})
-          </h2>
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
-            {completed.map((item, i) => (
-              <div
-                key={i}
-                className="bg-[var(--color-bg-elev)] border border-[var(--color-border)] rounded-lg overflow-hidden"
-              >
-                {item.src && (
-                  <img
-                    src={item.src}
-                    alt={item.label}
-                    className="w-full aspect-square object-cover"
-                  />
-                )}
-                <div className="px-2 py-1.5 text-xs text-center text-[var(--color-fg-muted)]">
-                  {item.label}
+                  {p.all_generated && (
+                    <div className="grid grid-cols-3 md:grid-cols-4 gap-2 mt-3">
+                      {details.story?.pages
+                        .find((pp) => pp.number === p.number)
+                        ?.panels.map((pn) => (
+                          <div
+                            key={pn.number}
+                            className="rounded overflow-hidden bg-[var(--color-bg)] border border-[var(--color-border)]"
+                          >
+                            <img
+                              src={`/api/kids/projects/${id}/images/panel/${p.number}/${pn.number}?t=${refreshTag}`}
+                              alt={`P${p.number}V${pn.number}`}
+                              className="w-full aspect-square object-cover"
+                            />
+                          </div>
+                        ))}
+                    </div>
+                  )}
                 </div>
-              </div>
-            ))}
-          </div>
-        </>
+              </section>
+            );
+          })}
+        </div>
       )}
 
-      {done && (
-        <div className="mt-8 text-center">
-          <p className="text-[var(--color-fg-muted)] text-sm">
-            Sto aprendo il libretto...
+      {/* Chiusura */}
+      {allDone && (
+        <div className="mt-6 bg-green-500/10 border border-green-500/30 rounded-xl p-6 text-center">
+          <div className="text-4xl mb-2">🎉</div>
+          <h2 className="text-xl font-semibold mb-2">
+            Il libretto è pronto!
+          </h2>
+          <p className="text-sm text-[var(--color-fg-muted)] mb-4">
+            Copertina + {pagesInfo.length} pagine generate.
           </p>
+          <Link
+            href={`/app/kids/${id}`}
+            className="inline-block bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] text-[var(--color-bg)] font-semibold px-6 py-2.5 rounded-lg"
+          >
+            📖 Vai al libretto
+          </Link>
         </div>
       )}
     </div>
   );
-}
-
-function describeStepKey(e: SSEEvent): string {
-  if (e.kind === "cover") return "cover";
-  if (e.kind === "panel" && e.page && e.panel) {
-    return `p${e.page}_v${e.panel}`;
-  }
-  return "";
 }
