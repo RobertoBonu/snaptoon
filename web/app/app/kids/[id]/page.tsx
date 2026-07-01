@@ -142,21 +142,34 @@ export default function KidsPreviewPage({
             </p>
           )}
         </div>
-        {/* Download PDF — abilitato solo se c'è almeno una vignetta o la cover */}
-        <button
-          onClick={downloadPdf}
-          disabled={
-            downloadingPdf || (!details.has_cover && details.vignettes.length === 0)
-          }
-          className="bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] text-[var(--color-bg)] font-semibold px-5 py-2.5 rounded-lg disabled:opacity-40 disabled:cursor-not-allowed whitespace-nowrap"
-          title={
-            !details.has_cover && details.vignettes.length === 0
-              ? "Genera almeno la cover o una vignetta"
-              : "Scarica il libretto in PDF"
-          }
-        >
-          {downloadingPdf ? "Genero PDF..." : "📥 Scarica PDF"}
-        </button>
+        <div className="flex gap-2 flex-wrap">
+          <Link
+            href={`/app/kids/${id}/personaggi`}
+            className="border border-[var(--color-border)] hover:border-[var(--color-accent)]/50 text-[var(--color-fg-muted)] hover:text-[var(--color-fg)] px-4 py-2.5 rounded-lg transition-colors"
+          >
+            👥 Personaggi
+          </Link>
+          <Link
+            href={`/app/kids/${id}/story`}
+            className="border border-[var(--color-border)] hover:border-[var(--color-accent)]/50 text-[var(--color-fg-muted)] hover:text-[var(--color-fg)] px-4 py-2.5 rounded-lg transition-colors"
+          >
+            📖 Storia
+          </Link>
+          <button
+            onClick={downloadPdf}
+            disabled={
+              downloadingPdf || (!details.has_cover && details.vignettes.length === 0)
+            }
+            className="bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] text-[var(--color-bg)] font-semibold px-5 py-2.5 rounded-lg disabled:opacity-40 disabled:cursor-not-allowed whitespace-nowrap"
+            title={
+              !details.has_cover && details.vignettes.length === 0
+                ? "Genera almeno la cover o una vignetta"
+                : "Scarica il libretto in PDF"
+            }
+          >
+            {downloadingPdf ? "Genero PDF..." : "📥 Scarica PDF"}
+          </button>
+        </div>
       </header>
 
       {!allGenerated && (
