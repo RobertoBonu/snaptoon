@@ -97,7 +97,7 @@ export default function KidsGeneratePage({
         );
         for (const p of d.story.pages) {
           for (const pn of p.panels) {
-            const key = `p${p.page_number}_v${pn.number}`;
+            const key = `p${p.number}_v${pn.number}`;
             timelineSteps.push({
               kind: "panel",
               label: `Pagina ${p.number} · Vignetta ${pn.number}`,
