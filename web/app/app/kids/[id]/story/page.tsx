@@ -4,6 +4,38 @@ import Link from "next/link";
 import { use, useEffect, useState } from "react";
 import { apiFetch, type KidsProjectDetails, type KidsStory } from "@/lib/api";
 
+interface EditablePanel {
+  number: number;
+  description: string;
+  dialogue_speaker: string;
+  dialogue_text: string;
+}
+
+interface EditablePage {
+  number: number;
+  panels: EditablePanel[];
+}
+
+interface EditableStory {
+  logline: string;
+  pages: EditablePage[];
+}
+
+function toEditable(s: KidsStory): EditableStory {
+  return {
+    logline: s.logline,
+    pages: s.pages.map((p) => ({
+      number: p.number,
+      panels: p.panels.map((pn) => ({
+        number: pn.number,
+        description: pn.description,
+        dialogue_speaker: pn.dialogue_speaker ?? "",
+        dialogue_text: pn.dialogue_text ?? "",
+      })),
+    })),
+  };
+}
+
 export default function KidsStoryPage({
   params,
 }: {
@@ -12,7 +44,10 @@ export default function KidsStoryPage({
   const { id } = use(params);
   const [details, setDetails] = useState<KidsProjectDetails | null>(null);
   const [story, setStory] = useState<KidsStory | null>(null);
+  const [edit, setEdit] = useState<EditableStory | null>(null);
+  const [dirty, setDirty] = useState(false);
   const [generating, setGenerating] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showFeedback, setShowFeedback] = useState(false);
   const [feedback, setFeedback] = useState("");
@@ -25,6 +60,8 @@ export default function KidsStoryPage({
       setDetails(d);
       if (d.has_story && d.story) {
         setStory(d.story);
+        setEdit(toEditable(d.story));
+        setDirty(false);
       } else {
         // Storia non ancora generata → genera al primo accesso
         await generate("");
@@ -43,6 +80,8 @@ export default function KidsStoryPage({
         body: JSON.stringify({ feedback: fb }),
       });
       setStory(s);
+      setEdit(toEditable(s));
+      setDirty(false);
       setShowFeedback(false);
       setFeedback("");
     } catch (e) {
@@ -52,9 +91,58 @@ export default function KidsStoryPage({
     }
   }
 
+  async function saveEdits() {
+    if (!edit) return;
+    setSaving(true);
+    setError(null);
+    try {
+      const s = await apiFetch<KidsStory>(`/api/kids/projects/${id}/story`, {
+        method: "PATCH",
+        body: JSON.stringify({
+          logline: edit.logline,
+          pages: edit.pages.map((p) => ({
+            number: p.number,
+            panels: p.panels.map((pn) => ({
+              number: pn.number,
+              description: pn.description,
+              dialogue_speaker: pn.dialogue_speaker || null,
+              dialogue_text: pn.dialogue_text || null,
+            })),
+          })),
+        }),
+      });
+      setStory(s);
+      setEdit(toEditable(s));
+      setDirty(false);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setSaving(false);
+    }
+  }
+
   useEffect(() => {
     loadDetails();
   }, []);
+
+  function updateLogline(v: string) {
+    if (!edit) return;
+    setEdit({ ...edit, logline: v });
+    setDirty(true);
+  }
+  function updatePanel(
+    pageIdx: number,
+    panelIdx: number,
+    patch: Partial<EditablePanel>
+  ) {
+    if (!edit) return;
+    const pages = edit.pages.slice();
+    const panels = pages[pageIdx].panels.slice();
+    panels[panelIdx] = { ...panels[panelIdx], ...patch };
+    pages[pageIdx] = { ...pages[pageIdx], panels };
+    setEdit({ ...edit, pages });
+    setDirty(true);
+  }
 
   if (generating && !story) {
     return (
@@ -92,25 +180,39 @@ export default function KidsStoryPage({
         </p>
       )}
 
-      {story && (
+      {edit && (
         <>
-          {/* Logline card */}
+          {/* Logline editabile */}
           <div className="bg-gradient-to-br from-purple-950/30 to-[var(--color-bg-elev)] border-2 border-[var(--color-accent)] rounded-xl p-6 mb-6">
             <div className="text-xs text-[var(--color-accent)] uppercase tracking-widest mb-2 font-semibold">
               ✨ La tua storia
             </div>
-            <p className="text-xl italic font-medium leading-relaxed">
-              "{story.logline}"
-            </p>
+            <textarea
+              value={edit.logline}
+              onChange={(e) => updateLogline(e.target.value)}
+              rows={2}
+              className="w-full text-xl italic font-medium leading-relaxed bg-transparent border border-transparent hover:border-[var(--color-accent)]/30 focus:border-[var(--color-accent)] focus:outline-none rounded p-2 transition-colors"
+            />
           </div>
 
-          {/* Pagine */}
-          <h3 className="text-lg font-semibold mb-3">📚 Come si svolge</h3>
+          <div className="flex items-center justify-between mb-3 gap-2">
+            <h3 className="text-lg font-semibold">📚 Come si svolge</h3>
+            <button
+              onClick={saveEdits}
+              disabled={!dirty || saving}
+              className="bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] text-[var(--color-bg)] text-sm font-semibold px-4 py-1.5 rounded transition-colors disabled:opacity-30"
+            >
+              {saving ? "Salvo..." : dirty ? "💾 Salva modifiche" : "✓ Salvato"}
+            </button>
+          </div>
+
+          {/* Pagine editabili */}
           <div className="space-y-2 mb-8">
-            {story.pages.map((p) => (
+            {edit.pages.map((p, pi) => (
               <details
                 key={p.number}
                 className="bg-[var(--color-bg-elev)] border border-[var(--color-border)] rounded-lg overflow-hidden"
+                open
               >
                 <summary className="px-4 py-3 cursor-pointer hover:bg-[var(--color-border)]/30 transition-colors text-sm font-medium">
                   📖 Pagina {p.number}{" "}
@@ -119,23 +221,47 @@ export default function KidsStoryPage({
                   </span>
                 </summary>
                 <div className="px-4 pb-4 space-y-3 border-t border-[var(--color-border)] pt-3">
-                  {p.panels.map((pn) => (
-                    <div key={pn.number} className="text-sm">
-                      <div className="font-medium mb-1">
+                  {p.panels.map((pn, pni) => (
+                    <div
+                      key={pn.number}
+                      className="border border-[var(--color-border)] rounded p-3 space-y-2"
+                    >
+                      <div className="text-sm font-medium">
                         🎬 Vignetta {pn.number}
                       </div>
-                      <div className="text-[var(--color-fg-muted)] mb-1 pl-4">
-                        {pn.description}
+                      <textarea
+                        value={pn.description}
+                        onChange={(e) =>
+                          updatePanel(pi, pni, { description: e.target.value })
+                        }
+                        rows={2}
+                        placeholder="Descrizione scena"
+                        className="w-full px-2 py-1 bg-[var(--color-bg)] border border-[var(--color-border)] focus:border-[var(--color-accent)] focus:outline-none rounded text-sm text-[var(--color-fg-muted)]"
+                      />
+                      <div className="flex gap-2 items-start">
+                        <input
+                          type="text"
+                          value={pn.dialogue_speaker}
+                          onChange={(e) =>
+                            updatePanel(pi, pni, {
+                              dialogue_speaker: e.target.value,
+                            })
+                          }
+                          placeholder="Chi parla"
+                          className="w-28 px-2 py-1 bg-[var(--color-bg)] border border-[var(--color-border)] focus:border-[var(--color-accent)] focus:outline-none rounded text-xs"
+                        />
+                        <input
+                          type="text"
+                          value={pn.dialogue_text}
+                          onChange={(e) =>
+                            updatePanel(pi, pni, {
+                              dialogue_text: e.target.value,
+                            })
+                          }
+                          placeholder="Battuta MAIUSCOLA breve"
+                          className="flex-1 px-2 py-1 bg-[var(--color-bg)] border border-[var(--color-border)] focus:border-[var(--color-accent)] focus:outline-none rounded text-xs italic text-[var(--color-accent)]"
+                        />
                       </div>
-                      {pn.dialogue_text && (
-                        <div className="pl-4 text-[var(--color-accent)] italic">
-                          💬{" "}
-                          {pn.dialogue_speaker && (
-                            <strong>{pn.dialogue_speaker}: </strong>
-                          )}
-                          "{pn.dialogue_text}"
-                        </div>
-                      )}
                     </div>
                   ))}
                 </div>
@@ -143,13 +269,27 @@ export default function KidsStoryPage({
             ))}
           </div>
 
+          {/* Barra salvataggio fissa quando dirty */}
+          {dirty && (
+            <div className="sticky bottom-4 mb-6 bg-[var(--color-accent)]/10 border border-[var(--color-accent)] rounded-lg px-4 py-2.5 flex items-center justify-between backdrop-blur">
+              <span className="text-sm">Hai modifiche non salvate.</span>
+              <button
+                onClick={saveEdits}
+                disabled={saving}
+                className="bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] text-[var(--color-bg)] font-semibold px-4 py-1.5 rounded text-sm"
+              >
+                {saving ? "Salvo..." : "💾 Salva ora"}
+              </button>
+            </div>
+          )}
+
           {/* Actions */}
           <div className="flex flex-wrap gap-3">
             <button
               onClick={() => setShowFeedback(!showFeedback)}
               className="border border-[var(--color-border)] hover:border-[var(--color-accent)]/50 px-5 py-2.5 rounded-lg transition-colors"
             >
-              🔄 Rigenera storia
+              🔄 Rigenera con Claude
             </button>
             <Link
               href={`/app/kids/${id}/generate`}
@@ -164,6 +304,8 @@ export default function KidsStoryPage({
               <h3 className="font-semibold mb-2">🔄 Rigenera con feedback</h3>
               <p className="text-sm text-[var(--color-fg-muted)] mb-3">
                 Cosa vuoi cambiare? Scrivilo e Claude riscriverà tenendone conto.
+                Se hai già modificato la storia manualmente, la rigenerazione
+                sovrascriverà le tue modifiche.
               </p>
               <textarea
                 value={feedback}

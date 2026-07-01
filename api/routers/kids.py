@@ -9,7 +9,8 @@ import uuid
 from datetime import datetime
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
+from fastapi.responses import Response
 from pydantic import BaseModel, Field
 
 from api.routers.auth import require_user
@@ -252,3 +253,150 @@ def delete_kids_project(project_id: str, user: dict = Depends(require_user)) -> 
         if project is None or project.owner_user_id != user_id:
             raise HTTPException(status_code=404, detail="Progetto non trovato")
         projects_repo.soft_delete(s, project)
+
+
+# ============================================================
+# Personaggi KIDS — upload/genera reference image
+#
+# Riusa la logica di api/routers/characters.py (flusso Pro) ma indicizza
+# via project UUID invece di slug, per coerenza con il resto dell'API kids.
+# ============================================================
+
+from storage.client import download_bytes, object_exists, upload_bytes
+from storage.keys import reference_key
+from db.repos import characters as characters_repo
+
+
+class KidsCharacterOut(BaseModel):
+    id: str
+    name: str
+    visual_description: str
+    has_reference: bool
+
+
+class KidsCharactersListOut(BaseModel):
+    characters: list[KidsCharacterOut]
+
+
+_ACCEPTED_IMAGE_MIMES = {"image/png", "image/jpeg", "image/jpg", "image/webp"}
+_MAX_REF_SIZE_BYTES = 8 * 1024 * 1024  # 8 MB
+
+
+def _kids_project_or_404(project_id: str, user_id: uuid.UUID):
+    try:
+        pid = uuid.UUID(project_id)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="ID progetto invalido")
+    return pid
+
+
+@router.get(
+    "/projects/{project_id}/characters", response_model=KidsCharactersListOut
+)
+def list_kids_characters(
+    project_id: str, user: dict = Depends(require_user)
+) -> KidsCharactersListOut:
+    user_id = uuid.UUID(user["id"])
+    pid = _kids_project_or_404(project_id, user_id)
+    with session_scope() as s:
+        project = projects_repo.get_by_id(s, pid)
+        if project is None or project.owner_user_id != user_id:
+            raise HTTPException(status_code=404, detail="Progetto non trovato")
+        out = []
+        for cs in project.character_sheets:
+            rk = reference_key(pid, cs.id, 1)
+            out.append(
+                KidsCharacterOut(
+                    id=str(cs.id),
+                    name=cs.name,
+                    visual_description=cs.visual_description,
+                    has_reference=object_exists(rk),
+                )
+            )
+        return KidsCharactersListOut(characters=out)
+
+
+@router.get("/projects/{project_id}/characters/{char_id}/reference")
+def get_kids_character_reference(
+    project_id: str, char_id: str, user: dict = Depends(require_user)
+) -> Response:
+    user_id = uuid.UUID(user["id"])
+    pid = _kids_project_or_404(project_id, user_id)
+    try:
+        cid = uuid.UUID(char_id)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="ID personaggio invalido")
+    with session_scope() as s:
+        project = projects_repo.get_by_id(s, pid)
+        if project is None or project.owner_user_id != user_id:
+            raise HTTPException(status_code=404, detail="Progetto non trovato")
+    rk = reference_key(pid, cid, 1)
+    if not object_exists(rk):
+        raise HTTPException(status_code=404, detail="Reference non trovata")
+    return Response(content=download_bytes(rk), media_type="image/png")
+
+
+@router.post(
+    "/projects/{project_id}/characters/{char_id}/upload-reference",
+    response_model=KidsCharacterOut,
+)
+async def upload_kids_character_reference(
+    project_id: str,
+    char_id: str,
+    file: UploadFile = File(...),
+    user: dict = Depends(require_user),
+) -> KidsCharacterOut:
+    """Carica una foto come reference image slot 1 del personaggio KIDS.
+
+    Sostituisce quella eventualmente già presente (generata o caricata).
+    Zero crediti — è un upload manuale, no AI.
+    """
+    user_id = uuid.UUID(user["id"])
+    pid = _kids_project_or_404(project_id, user_id)
+    try:
+        cid = uuid.UUID(char_id)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="ID personaggio invalido")
+
+    if file.content_type not in _ACCEPTED_IMAGE_MIMES:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Formato non supportato ({file.content_type}). Usa PNG, JPEG o WEBP.",
+        )
+
+    data = await file.read()
+    if len(data) > _MAX_REF_SIZE_BYTES:
+        raise HTTPException(
+            status_code=413,
+            detail=f"File troppo grande (max {_MAX_REF_SIZE_BYTES // (1024*1024)} MB).",
+        )
+    if len(data) == 0:
+        raise HTTPException(status_code=400, detail="File vuoto.")
+
+    with session_scope() as s:
+        project = projects_repo.get_by_id(s, pid)
+        if project is None or project.owner_user_id != user_id:
+            raise HTTPException(status_code=404, detail="Progetto non trovato")
+        cs = next((c for c in project.character_sheets if c.id == cid), None)
+        if cs is None:
+            raise HTTPException(status_code=404, detail="Personaggio non trovato")
+
+    rk = reference_key(pid, cid, 1)
+    upload_bytes(rk, data, content_type=file.content_type or "image/png")
+
+    with session_scope() as s:
+        project = projects_repo.get_by_id(s, pid)
+        cs = next((c for c in project.character_sheets if c.id == cid), None)
+        if cs is None:
+            raise HTTPException(status_code=404, detail="Personaggio non trovato")
+        characters_repo.upsert_reference(
+            s, cs, slot_number=1, storage_key=rk,
+            mime_type=file.content_type or "image/png",
+            file_size=len(data),
+        )
+        return KidsCharacterOut(
+            id=str(cs.id),
+            name=cs.name,
+            visual_description=cs.visual_description,
+            has_reference=True,
+        )

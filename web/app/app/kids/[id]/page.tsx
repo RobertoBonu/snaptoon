@@ -17,6 +17,7 @@ export default function KidsPreviewPage({
   const [error, setError] = useState<string | null>(null);
   // Refresh-tag per forzare ricarica immagini dopo rigenerazione
   const [refreshTag, setRefreshTag] = useState<number>(Date.now());
+  const [downloadingPdf, setDownloadingPdf] = useState(false);
 
   async function load() {
     try {
@@ -33,6 +34,34 @@ export default function KidsPreviewPage({
   useEffect(() => {
     load();
   }, []);
+
+  async function downloadPdf() {
+    setDownloadingPdf(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/kids/projects/${id}/pdf`, {
+        credentials: "include",
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.detail || `Errore PDF (HTTP ${res.status})`);
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      const safeName = (details?.name || "libretto")
+        .replace(/[^a-z0-9]+/gi, "-")
+        .toLowerCase();
+      a.download = `snaptoon-kids-${safeName}.pdf`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setDownloadingPdf(false);
+    }
+  }
 
   if (details === null && !error) {
     return (
@@ -104,13 +133,43 @@ export default function KidsPreviewPage({
         </Link>
       </div>
 
-      <header className="mb-8">
-        <h1 className="text-3xl font-bold mb-1">📖 {details.name}</h1>
-        {details.story && (
-          <p className="text-[var(--color-fg-muted)] italic">
-            "{details.story.logline}"
-          </p>
-        )}
+      <header className="mb-8 flex items-start justify-between gap-4 flex-wrap">
+        <div>
+          <h1 className="text-3xl font-bold mb-1">📖 {details.name}</h1>
+          {details.story && (
+            <p className="text-[var(--color-fg-muted)] italic">
+              "{details.story.logline}"
+            </p>
+          )}
+        </div>
+        <div className="flex gap-2 flex-wrap">
+          <Link
+            href={`/app/kids/${id}/personaggi`}
+            className="border border-[var(--color-border)] hover:border-[var(--color-accent)]/50 text-[var(--color-fg-muted)] hover:text-[var(--color-fg)] px-4 py-2.5 rounded-lg transition-colors"
+          >
+            👥 Personaggi
+          </Link>
+          <Link
+            href={`/app/kids/${id}/story`}
+            className="border border-[var(--color-border)] hover:border-[var(--color-accent)]/50 text-[var(--color-fg-muted)] hover:text-[var(--color-fg)] px-4 py-2.5 rounded-lg transition-colors"
+          >
+            📖 Storia
+          </Link>
+          <button
+            onClick={downloadPdf}
+            disabled={
+              downloadingPdf || (!details.has_cover && details.vignettes.length === 0)
+            }
+            className="bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] text-[var(--color-bg)] font-semibold px-5 py-2.5 rounded-lg disabled:opacity-40 disabled:cursor-not-allowed whitespace-nowrap"
+            title={
+              !details.has_cover && details.vignettes.length === 0
+                ? "Genera almeno la cover o una vignetta"
+                : "Scarica il libretto in PDF"
+            }
+          >
+            {downloadingPdf ? "Genero PDF..." : "📥 Scarica PDF"}
+          </button>
+        </div>
       </header>
 
       {!allGenerated && (
@@ -195,11 +254,18 @@ export default function KidsPreviewPage({
         </div>
       </section>
 
-      {/* Future: bottoni rigenera cover/panel + PDF download */}
-      <div className="mt-10 text-center text-sm text-[var(--color-fg-muted)]">
-        Rigenerazione singole vignette + export PDF: nel prossimo
-        aggiornamento.
-      </div>
+      {/* Footer con secondo bottone download PDF (utile per libretti lunghi) */}
+      {(details.has_cover || details.vignettes.length > 0) && (
+        <div className="mt-10 flex justify-center">
+          <button
+            onClick={downloadPdf}
+            disabled={downloadingPdf}
+            className="bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] text-[var(--color-bg)] font-semibold px-6 py-3 rounded-lg disabled:opacity-50"
+          >
+            {downloadingPdf ? "Genero PDF..." : "📥 Scarica il libretto in PDF"}
+          </button>
+        </div>
+      )}
     </div>
   );
 }
