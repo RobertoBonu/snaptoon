@@ -43,6 +43,13 @@ open on PATCH failure (no lost edits).
   it steals hover, toggles the transform in a rapid mouseenter/leave loop → continuous flicker.
 - Cache-bust: `image_url` carries `?v={updated_at epoch}`; upload/generate explicitly set
   `updated_at = utcnow()` so the URL changes even when the storage key is unchanged.
+- `MediaFrame` (`web/components/site.tsx`) must carry `key={src}` on its `<img>`. Its `onError`
+  hides the img **imperatively** (`style.display="none"`), which React does NOT reset when the
+  `src` prop later changes. So when a slot first renders the (often missing → 404) static default
+  then swaps to the uploaded override URL, the img loads 200 but stays hidden. `key={src}` forces
+  a fresh element per src. **Why:** race is timing-dependent — invisible in dev (fast local API
+  wins), reproducible in prod (default 404 fires first). Symptom looked like "uploads not showing"
+  even though logs showed the override image served 200.
 - CREA page images (`/crea`) reuse this exact pattern but as **fixed slots**, not a dynamic
   list: model `CreaImage` (unique `slot`), router `api/routers/crea.py` with a `SLOTS` config
   (6 keys: dashboard, step-testo, step-stile, step-personaggi, step-genera, step-impagina),

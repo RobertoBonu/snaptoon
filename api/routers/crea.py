@@ -139,7 +139,11 @@ def _get_storage_key(slot: str) -> str | None:
 
 
 @public_router.get("/images")
-def list_public_images() -> dict:
+def list_public_images(response: Response) -> dict:
+    # No-store: la lista deve riflettere subito gli upload admin. Senza questo,
+    # un browser/proxy può servire un JSON vecchio (image_url null) e mostrare
+    # i default statici invece delle immagini appena caricate.
+    response.headers["Cache-Control"] = "no-store"
     return _list()
 
 

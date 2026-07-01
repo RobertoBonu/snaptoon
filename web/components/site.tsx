@@ -208,7 +208,12 @@ export function MediaFrame({
         {label && <span style={{ fontSize: 12, color: "#64748B", lineHeight: 1.4, maxWidth: 220 }}>{label}</span>}
       </div>
       {src ? (
+        // key={src}: rimonta un <img> pulito ad ogni cambio di src. Senza questo,
+        // il fallback statico (404) imposta display:none imperativo che PERSISTE
+        // anche quando src passa all'URL immagine reale — l'immagine caricava (200)
+        // ma restava invisibile. Race visibile solo in produzione (rete più lenta).
         <img
+          key={src}
           src={src}
           alt={alt || ""}
           style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }}

@@ -53,7 +53,7 @@ export default function CreaPage() {
   const [overrides, setOverrides] = useState<Record<string, string>>({});
 
   useEffect(() => {
-    apiFetch<CreaImagesOut>("/api/crea/images")
+    apiFetch<CreaImagesOut>("/api/crea/images", { cache: "no-store" })
       .then((d) => {
         const map: Record<string, string> = {};
         for (const it of d.images) {
