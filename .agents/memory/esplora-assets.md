@@ -22,6 +22,14 @@ publicly even if the direct UUID URL is known.
 previews of hidden assets use a separate admin-gated image endpoint
 (`/api/admin/esplora/assets/{id}/image`), so `_to_out(admin=True)` points image_url there.
 
+## Card metadata fields
+Each asset carries 5 display fields shown on the public card: `asset_type` (gray uppercase
+label e.g. KIDSTOONS), `title` (bold), `caption` (didascalia), `author_name`, `author_role`
+(rendered as a purple pill, e.g. "Editore"). All default to empty string (non-null) at DB +
+API level; frontend conditionally renders each block so empty fields simply disappear.
+Admin edits all 5 inline (Salva/Annulla); `saveMeta` returns a boolean so the form stays
+open on PATCH failure (no lost edits).
+
 ## Conventions
 - Uploads are normalized to PNG (PIL) before storage; serving always uses `image/png`.
 - Cache-bust: `image_url` carries `?v={updated_at epoch}`; upload/generate explicitly set

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { SiteShell } from "@/components/site";
-import { apiFetch, type EsploraSectionsOut, type EsploraSection } from "@/lib/api";
+import { apiFetch, type EsploraSectionsOut, type EsploraSection, type EsploraAsset } from "@/lib/api";
 
 // Altezza fissa per tutte le immagini di Esplora: la base si sviluppa in
 // proporzione (verticali strette, orizzontali larghe), immagine sempre 100%.
@@ -38,70 +38,103 @@ function SectionHead({ title, subtitle }: { title: string; subtitle: string }) {
   );
 }
 
-function UniformImage({ src, label, aspect }: { src: string; label?: string; aspect: string }) {
-  const [ok, setOk] = useState(true);
-  // Larghezza del segnaposto derivata dall'aspect della sezione (w / h).
+function EsploraCard({ item, aspect }: { item: EsploraAsset; aspect: string }) {
+  // Larghezza stimata dall'aspect della sezione finché l'immagine non è caricata;
+  // poi misurata dalle dimensioni naturali per mantenere l'altezza fissa uniforme.
   const [aw, ah] = aspect.split("/").map((s) => parseFloat(s.trim()));
-  const phWidth = ah ? Math.round(ESPLORA_H * (aw / ah)) : ESPLORA_H;
+  const estWidth = ah ? Math.round(ESPLORA_H * (aw / ah)) : ESPLORA_H;
+  const [width, setWidth] = useState<number>(estWidth);
+  const [ok, setOk] = useState(true);
 
-  if (src && ok) {
-    return (
-      <img
-        src={src}
-        alt={label || ""}
-        style={{
-          height: ESPLORA_H,
-          width: "auto",
-          maxWidth: "100%",
-          display: "block",
-          objectFit: "contain",
-          borderRadius: 14,
-          border: "1px solid #1E2436",
-          background: "linear-gradient(135deg, #161B26 0%, #0D1017 100%)",
-        }}
-        onError={() => setOk(false)}
-      />
-    );
-  }
+  const hasMeta =
+    Boolean(item.asset_type || item.title || item.caption || item.author_name || item.author_role);
 
   return (
     <div
+      className="lift"
       style={{
-        height: ESPLORA_H,
-        width: phWidth,
+        width,
         maxWidth: "100%",
-        borderRadius: 14,
+        background: "#0F1420",
         border: "1px solid #1E2436",
-        background: "linear-gradient(135deg, #161B26 0%, #0D1017 100%)",
+        borderRadius: 20,
+        padding: 12,
         display: "flex",
         flexDirection: "column",
-        alignItems: "center",
-        justifyContent: "center",
-        gap: 10,
-        padding: 16,
-        textAlign: "center",
       }}
     >
-      <div style={{ width: 44, height: 44, borderRadius: 12, background: "rgba(245,158,11,0.10)", border: "1px solid #F59E0B40", display: "flex", alignItems: "center", justifyContent: "center", color: "#F59E0B", fontSize: 20 }}>▦</div>
-      {label && <span style={{ fontSize: 12, color: "#64748B", lineHeight: 1.4, maxWidth: 220 }}>{label}</span>}
+      {item.image_url && ok ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={item.image_url}
+          alt={item.title || ""}
+          onLoad={(e) => {
+            const el = e.currentTarget;
+            if (el.naturalHeight > 0) {
+              setWidth(Math.round(ESPLORA_H * (el.naturalWidth / el.naturalHeight)));
+            }
+          }}
+          onError={() => setOk(false)}
+          style={{ height: ESPLORA_H, width: "100%", display: "block", objectFit: "cover", borderRadius: 12 }}
+        />
+      ) : (
+        <div
+          style={{
+            height: ESPLORA_H,
+            width: "100%",
+            borderRadius: 12,
+            background: "linear-gradient(135deg, #161B26 0%, #0D1017 100%)",
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: 10,
+            padding: 16,
+            textAlign: "center",
+          }}
+        >
+          <div style={{ width: 44, height: 44, borderRadius: 12, background: "rgba(245,158,11,0.10)", border: "1px solid #F59E0B40", display: "flex", alignItems: "center", justifyContent: "center", color: "#F59E0B", fontSize: 20 }}>▦</div>
+          {item.title && <span style={{ fontSize: 12, color: "#64748B", lineHeight: 1.4, maxWidth: 220 }}>{item.title}</span>}
+        </div>
+      )}
+
+      {hasMeta && (
+        <div style={{ padding: "14px 6px 6px" }}>
+          {item.asset_type && (
+            <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", color: "#64748B", marginBottom: 8 }}>
+              {item.asset_type}
+            </div>
+          )}
+          {item.title && (
+            <div style={{ fontSize: 17, fontWeight: 700, color: "#F1F5F9", lineHeight: 1.25, overflowWrap: "break-word" }}>
+              {item.title}
+            </div>
+          )}
+          {item.caption && (
+            <p style={{ fontSize: 13, color: "#94A3B8", marginTop: 6, lineHeight: 1.5 }}>{item.caption}</p>
+          )}
+          {(item.author_name || item.author_role) && (
+            <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: 10, marginTop: 12 }}>
+              {item.author_name && <span style={{ fontSize: 14, color: "#94A3B8" }}>{item.author_name}</span>}
+              {item.author_role && (
+                <span style={{ fontSize: 12, fontWeight: 600, color: "#A78BFA", border: "1px solid rgba(139,92,246,0.5)", borderRadius: 999, padding: "2px 10px" }}>
+                  {item.author_role}
+                </span>
+              )}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
 
-function UniformGallery({ sec, showTitle = false }: { sec: EsploraSection; showTitle?: boolean }) {
+function UniformGallery({ sec }: { sec: EsploraSection }) {
   const meta = SECTION_META[sec.key] ?? SECTION_META.copertine;
   return (
     <div style={{ display: "flex", flexWrap: "wrap", alignItems: "flex-start", gap: meta.gap }}>
       {sec.items.map((c) => (
-        <div key={c.id} style={{ display: "flex", flexDirection: "column", maxWidth: "100%" }}>
-          <div className="lift" style={{ width: "fit-content", maxWidth: "100%" }}>
-            <UniformImage src={c.image_url || ""} label={c.title} aspect={sec.aspect} />
-          </div>
-          {showTitle && <div style={{ fontSize: "15px", fontWeight: 700, color: "#F1F5F9", marginTop: "10px" }}>{c.title}</div>}
-          {c.caption && (
-            <p style={{ fontSize: "13px", color: "#94A3B8", marginTop: showTitle ? "4px" : "10px", maxWidth: 320 }}>{c.caption}</p>
-          )}
-        </div>
+        <EsploraCard key={c.id} item={c} aspect={sec.aspect} />
       ))}
     </div>
   );
@@ -160,7 +193,7 @@ export default function EsploraPage() {
           <SectionHead title={SECTION_META.personaggi.heading} subtitle={SECTION_META.personaggi.subtitle} />
           {(() => {
             const sec = bySection("personaggi");
-            return sec ? <UniformGallery sec={sec} showTitle /> : null;
+            return sec ? <UniformGallery sec={sec} /> : null;
           })()}
         </div>
       </section>

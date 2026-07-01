@@ -520,8 +520,12 @@ class EsploraAsset(UUIDPrimaryKeyMixin, TimestampMixin, UpdatedAtMixin, Base):
 
     section: Mapped[str] = mapped_column(String(32), nullable=False, index=True)
     # ^ copertine | tavole | personaggi
+    asset_type: Mapped[str] = mapped_column(String(120), nullable=False, default="")
+    # ^ "Tipo" mostrato in alto nella card (es. KIDSTOONS)
     title: Mapped[str] = mapped_column(String(255), nullable=False, default="")
     caption: Mapped[str] = mapped_column(String(500), nullable=False, default="")
+    author_name: Mapped[str] = mapped_column(String(160), nullable=False, default="")
+    author_role: Mapped[str] = mapped_column(String(80), nullable=False, default="")
     position: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     storage_key: Mapped[str | None] = mapped_column(String(512), nullable=True)
     prompt: Mapped[str] = mapped_column(Text, nullable=False, default="")

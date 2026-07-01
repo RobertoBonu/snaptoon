@@ -55,8 +55,11 @@ SECTIONS: dict[str, dict] = {
 class EsploraAssetOut(BaseModel):
     id: str
     section: str
+    asset_type: str
     title: str
     caption: str
+    author_name: str
+    author_role: str
     position: int
     has_image: bool
     image_url: Optional[str] = None
@@ -66,14 +69,20 @@ class EsploraAssetOut(BaseModel):
 
 class CreateAssetIn(BaseModel):
     section: str
+    asset_type: str = Field(default="", max_length=120)
     title: str = Field(default="", max_length=255)
     caption: str = Field(default="", max_length=500)
+    author_name: str = Field(default="", max_length=160)
+    author_role: str = Field(default="", max_length=80)
     position: Optional[int] = None
 
 
 class UpdateAssetIn(BaseModel):
+    asset_type: Optional[str] = Field(default=None, max_length=120)
     title: Optional[str] = Field(default=None, max_length=255)
     caption: Optional[str] = Field(default=None, max_length=500)
+    author_name: Optional[str] = Field(default=None, max_length=160)
+    author_role: Optional[str] = Field(default=None, max_length=80)
     position: Optional[int] = None
     is_active: Optional[bool] = None
 
@@ -98,8 +107,11 @@ def _to_out(a: EsploraAsset, *, admin: bool = False) -> EsploraAssetOut:
     return EsploraAssetOut(
         id=str(a.id),
         section=a.section,
+        asset_type=a.asset_type,
         title=a.title,
         caption=a.caption,
+        author_name=a.author_name,
+        author_role=a.author_role,
         position=a.position,
         has_image=has_image,
         image_url=image_url,
@@ -232,8 +244,11 @@ def create_asset(
             pos = payload.position
         a = EsploraAsset(
             section=payload.section,
+            asset_type=payload.asset_type,
             title=payload.title,
             caption=payload.caption,
+            author_name=payload.author_name,
+            author_role=payload.author_role,
             position=pos,
         )
         s.add(a)
@@ -247,10 +262,16 @@ def update_asset(
 ) -> EsploraAssetOut:
     with session_scope() as s:
         a = _get_or_404(s, asset_id)
+        if payload.asset_type is not None:
+            a.asset_type = payload.asset_type
         if payload.title is not None:
             a.title = payload.title
         if payload.caption is not None:
             a.caption = payload.caption
+        if payload.author_name is not None:
+            a.author_name = payload.author_name
+        if payload.author_role is not None:
+            a.author_role = payload.author_role
         if payload.position is not None:
             a.position = payload.position
         if payload.is_active is not None:

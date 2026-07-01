@@ -283,8 +283,11 @@ export interface AdminRoleInfo {
 export interface EsploraAsset {
   id: string;
   section: string;
+  asset_type: string;
   title: string;
   caption: string;
+  author_name: string;
+  author_role: string;
   position: number;
   has_image: boolean;
   image_url?: string | null;
