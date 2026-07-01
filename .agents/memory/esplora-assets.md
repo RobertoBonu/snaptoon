@@ -37,6 +37,9 @@ open on PATCH failure (no lost edits).
   (`_detect_media_type`: RIFF/WEBP, PNG, JPEG) and sets Content-Type at runtime. Storage
   keys still end `.png` (cosmetic; the extension is not used for serving).
 - Public card images are click-to-zoom (Lightbox overlay): ESC / backdrop / ✕ to close,
-  body scroll locked while open.
+  body scroll locked while open. The Lightbox MUST render via `createPortal(..., document.body)`:
+  the card uses `.lift:hover { transform: translateY(-4px) }`, and a `transform` on an
+  ancestor re-bases `position: fixed` to that ancestor — the overlay then jumps and, because
+  it steals hover, toggles the transform in a rapid mouseenter/leave loop → continuous flicker.
 - Cache-bust: `image_url` carries `?v={updated_at epoch}`; upload/generate explicitly set
   `updated_at = utcnow()` so the URL changes even when the storage key is unchanged.

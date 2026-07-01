@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { SiteShell } from "@/components/site";
 import { apiFetch, type EsploraSectionsOut, type EsploraSection, type EsploraAsset } from "@/lib/api";
 
@@ -39,7 +40,10 @@ function SectionHead({ title, subtitle }: { title: string; subtitle: string }) {
 }
 
 function Lightbox({ src, alt, onClose }: { src: string; alt: string; onClose: () => void }) {
+  const [mounted, setMounted] = useState(false);
+
   useEffect(() => {
+    setMounted(true);
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") onClose();
     };
@@ -52,7 +56,11 @@ function Lightbox({ src, alt, onClose }: { src: string; alt: string; onClose: ()
     };
   }, [onClose]);
 
-  return (
+  if (!mounted) return null;
+
+  // Reso via portal su <body>: un antenato con `transform` (es. .lift:hover)
+  // trasformerebbe il contesto di un position:fixed, causando flicker.
+  return createPortal(
     <div
       onClick={onClose}
       style={{
@@ -109,7 +117,8 @@ function Lightbox({ src, alt, onClose }: { src: string; alt: string; onClose: ()
         }}
       />
       <style>{`@keyframes esploraFade{from{opacity:0}to{opacity:1}}`}</style>
-    </div>
+    </div>,
+    document.body
   );
 }
 
