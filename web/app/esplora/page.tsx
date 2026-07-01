@@ -1,8 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { SiteShell, MediaFrame } from "@/components/site";
+import { SiteShell } from "@/components/site";
 import { apiFetch, type EsploraSectionsOut, type EsploraSection } from "@/lib/api";
+
+// Altezza fissa per tutte le immagini di Esplora: la base si sviluppa in
+// proporzione (verticali strette, orizzontali larghe), immagine sempre 100%.
+const ESPLORA_H = 360;
 
 const SECTION_META: Record<string, { heading: string; subtitle: string; minCol: string; gap: string }> = {
   copertine: {
@@ -34,33 +38,69 @@ function SectionHead({ title, subtitle }: { title: string; subtitle: string }) {
   );
 }
 
-function PersonaggiGrid({ sec }: { sec: EsploraSection }) {
-  const meta = SECTION_META.personaggi;
+function UniformImage({ src, label, aspect }: { src: string; label?: string; aspect: string }) {
+  const [ok, setOk] = useState(true);
+  // Larghezza del segnaposto derivata dall'aspect della sezione (w / h).
+  const [aw, ah] = aspect.split("/").map((s) => parseFloat(s.trim()));
+  const phWidth = ah ? Math.round(ESPLORA_H * (aw / ah)) : ESPLORA_H;
+
+  if (src && ok) {
+    return (
+      <img
+        src={src}
+        alt={label || ""}
+        style={{
+          height: ESPLORA_H,
+          width: "auto",
+          maxWidth: "100%",
+          display: "block",
+          objectFit: "contain",
+          borderRadius: 14,
+          border: "1px solid #1E2436",
+          background: "linear-gradient(135deg, #161B26 0%, #0D1017 100%)",
+        }}
+        onError={() => setOk(false)}
+      />
+    );
+  }
+
   return (
-    <div style={{ display: "grid", gridTemplateColumns: `repeat(auto-fill, minmax(${meta.minCol}, 1fr))`, gap: meta.gap }}>
-      {sec.items.map((p) => (
-        <div key={p.id} className="product-card">
-          <MediaFrame src={p.image_url || ""} label={p.title} aspect={sec.aspect} rounded={0} />
-          <div style={{ padding: "16px" }}>
-            <div style={{ fontSize: "15px", fontWeight: 700, color: "#F1F5F9" }}>{p.title}</div>
-            <div style={{ fontSize: "13px", color: "#94A3B8", marginTop: "4px" }}>{p.caption}</div>
-          </div>
-        </div>
-      ))}
+    <div
+      style={{
+        height: ESPLORA_H,
+        width: phWidth,
+        maxWidth: "100%",
+        borderRadius: 14,
+        border: "1px solid #1E2436",
+        background: "linear-gradient(135deg, #161B26 0%, #0D1017 100%)",
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "center",
+        gap: 10,
+        padding: 16,
+        textAlign: "center",
+      }}
+    >
+      <div style={{ width: 44, height: 44, borderRadius: 12, background: "rgba(245,158,11,0.10)", border: "1px solid #F59E0B40", display: "flex", alignItems: "center", justifyContent: "center", color: "#F59E0B", fontSize: 20 }}>▦</div>
+      {label && <span style={{ fontSize: 12, color: "#64748B", lineHeight: 1.4, maxWidth: 220 }}>{label}</span>}
     </div>
   );
 }
 
-function CardGrid({ sec }: { sec: EsploraSection }) {
+function UniformGallery({ sec, showTitle = false }: { sec: EsploraSection; showTitle?: boolean }) {
   const meta = SECTION_META[sec.key] ?? SECTION_META.copertine;
   return (
-    <div style={{ display: "grid", gridTemplateColumns: `repeat(auto-fill, minmax(${meta.minCol}, 1fr))`, gap: meta.gap }}>
+    <div style={{ display: "flex", flexWrap: "wrap", alignItems: "flex-start", gap: meta.gap }}>
       {sec.items.map((c) => (
-        <div key={c.id}>
-          <div className="lift" style={{ borderRadius: 14, overflow: "hidden", border: "1px solid #1E2436" }}>
-            <MediaFrame src={c.image_url || ""} label={c.title} aspect={sec.aspect} rounded={0} />
+        <div key={c.id} style={{ display: "flex", flexDirection: "column", maxWidth: "100%" }}>
+          <div className="lift" style={{ width: "fit-content", maxWidth: "100%" }}>
+            <UniformImage src={c.image_url || ""} label={c.title} aspect={sec.aspect} />
           </div>
-          <p style={{ fontSize: "13px", color: "#94A3B8", marginTop: "10px" }}>{c.caption}</p>
+          {showTitle && <div style={{ fontSize: "15px", fontWeight: 700, color: "#F1F5F9", marginTop: "10px" }}>{c.title}</div>}
+          {c.caption && (
+            <p style={{ fontSize: "13px", color: "#94A3B8", marginTop: showTitle ? "4px" : "10px", maxWidth: 320 }}>{c.caption}</p>
+          )}
         </div>
       ))}
     </div>
@@ -98,7 +138,7 @@ export default function EsploraPage() {
           <SectionHead title={SECTION_META.copertine.heading} subtitle={SECTION_META.copertine.subtitle} />
           {(() => {
             const sec = bySection("copertine");
-            return sec ? <CardGrid sec={sec} /> : null;
+            return sec ? <UniformGallery sec={sec} /> : null;
           })()}
         </div>
       </section>
@@ -109,7 +149,7 @@ export default function EsploraPage() {
           <SectionHead title={SECTION_META.tavole.heading} subtitle={SECTION_META.tavole.subtitle} />
           {(() => {
             const sec = bySection("tavole");
-            return sec ? <CardGrid sec={sec} /> : null;
+            return sec ? <UniformGallery sec={sec} /> : null;
           })()}
         </div>
       </section>
@@ -120,7 +160,7 @@ export default function EsploraPage() {
           <SectionHead title={SECTION_META.personaggi.heading} subtitle={SECTION_META.personaggi.subtitle} />
           {(() => {
             const sec = bySection("personaggi");
-            return sec ? <PersonaggiGrid sec={sec} /> : null;
+            return sec ? <UniformGallery sec={sec} showTitle /> : null;
           })()}
         </div>
       </section>
