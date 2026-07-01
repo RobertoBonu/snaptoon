@@ -20,6 +20,7 @@ from api.routers import account as account_router
 from api.routers import admin as admin_router
 from api.routers import auth as auth_router
 from api.routers import characters as characters_router
+from api.routers import crea as crea_router
 from api.routers import esplora as esplora_router
 from api.routers import kids as kids_router
 from api.routers import kids_generation as kids_gen_router
@@ -62,6 +63,10 @@ app.include_router(admin_router.router, prefix="/api/admin", tags=["admin"])
 app.include_router(esplora_router.public_router, prefix="/api/esplora", tags=["esplora"])
 app.include_router(
     esplora_router.admin_router, prefix="/api/admin/esplora", tags=["esplora-admin"]
+)
+app.include_router(crea_router.public_router, prefix="/api/crea", tags=["crea"])
+app.include_router(
+    crea_router.admin_router, prefix="/api/admin/crea", tags=["crea-admin"]
 )
 
 

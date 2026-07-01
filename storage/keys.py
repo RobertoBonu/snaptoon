@@ -49,6 +49,11 @@ def esplora_asset_key(section: str, asset_id: uuid.UUID | str) -> str:
     return f"esplora/{section}/{_stringify(asset_id)}.png"
 
 
+def crea_image_key(slot: str) -> str:
+    """Storage key per un'immagine (slot fisso) della pagina pubblica /crea."""
+    return f"crea/{slot}.png"
+
+
 def pdf_export_key(project_id: uuid.UUID | str, ts: datetime | None = None) -> str:
     if ts is None:
         ts = datetime.now(timezone.utc)

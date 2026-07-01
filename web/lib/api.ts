@@ -338,6 +338,55 @@ export async function uploadEsploraImage(
   return res.json();
 }
 
+// ============================================================
+// CREA — immagini della pagina pubblica /crea (slot fissi)
+// ============================================================
+
+export interface CreaImage {
+  slot: string;
+  label: string;
+  aspect: string;
+  default_src: string;
+  has_image: boolean;
+  image_url?: string | null;
+}
+
+export interface CreaImagesOut {
+  images: CreaImage[];
+}
+
+/**
+ * Upload di un'immagine per uno slot CREA (multipart/form-data).
+ * Non usa apiFetch perché quello forza Content-Type application/json.
+ */
+export async function uploadCreaImage(
+  slot: string,
+  file: File
+): Promise<CreaImage> {
+  const fd = new FormData();
+  fd.append("file", file);
+  const res = await fetch(`/api/admin/crea/images/${slot}/upload`, {
+    method: "POST",
+    credentials: "include",
+    body: fd,
+  });
+  if (res.status === 401) {
+    if (typeof window !== "undefined") window.location.href = "/login";
+    throw new Error("Sessione scaduta");
+  }
+  if (!res.ok) {
+    let detail = `HTTP ${res.status}`;
+    try {
+      const data = await res.json();
+      if (data?.detail) detail = data.detail;
+    } catch {
+      /* ignore */
+    }
+    throw new Error(detail);
+  }
+  return res.json();
+}
+
 /**
  * Fetch dell'API con gestione standardizzata di errori.
  * - credentials: 'include' invia il cookie auth

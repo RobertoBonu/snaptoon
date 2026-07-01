@@ -1,9 +1,12 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { SiteShell, MediaFrame } from "@/components/site";
+import { apiFetch, type CreaImagesOut } from "@/lib/api";
 
 const STEPS = [
   {
+    slot: "step-testo",
     heading: "1. 📝 Testo — Scrivi la scintilla",
     body: "Incolla un soggetto, un racconto breve o anche solo un'idea di poche righe. Claude la trasforma in sceneggiatura strutturata: logline, personaggi, pagine, vignette, dialoghi. Tu approvi o rigeneri con un suggerimento.",
     highlight: "Costa 5 crediti per generazione + rigenerazioni con feedback",
@@ -11,6 +14,7 @@ const STEPS = [
     label: "Pagina /testo · script generato",
   },
   {
+    slot: "step-stile",
     heading: "2. 🎨 Stile — Scegli il look",
     body: "98 stili visivi pronti: dal flat illustrato per bambini al noir cinematografico, dal manga giapponese al fumetto franco-belga. Filtra per categoria, scegli e procedi.",
     highlight: "Lo stile è applicato automaticamente a tutte le vignette del progetto",
@@ -18,6 +22,7 @@ const STEPS = [
     label: "Griglia stili",
   },
   {
+    slot: "step-personaggi",
     heading: "3. 👥 Personaggi — Il tuo cast",
     body: "Crea i personaggi della storia con nome e descrizione visiva. SnapToon genera una reference image AI per ognuno e la riutilizza in ogni vignetta successiva. Il volto di Mia rimane Mia, sempre.",
     highlight: "1 credito per reference. Rigenera quanto vuoi finché non sei soddisfatto",
@@ -25,6 +30,7 @@ const STEPS = [
     label: "Card personaggio · reference image",
   },
   {
+    slot: "step-genera",
     heading: "4. 🖼 Genera — Componi le vignette",
     body: "Per ogni vignetta decidi inquadratura (dal close-up al campo lungo), angolo (dal cinematic basso al volo d'uccello), mood (dall'azione drammatica al lirico) e formato (quadrato, verticale o panoramico). I balloon sono disegnati direttamente nell'immagine dall'AI, leggibili e coerenti con lo stile.",
     highlight: "1 credito a vignetta (qualità Medium). Quality High disponibile su Premium",
@@ -32,6 +38,7 @@ const STEPS = [
     label: "Pagina /genera · scene selector",
   },
   {
+    slot: "step-impagina",
     heading: "5. 📐 Impagina — La pagina finita",
     body: "Scegli la griglia per ogni pagina: splash, 2x2, 1+2, fila singola. Le vignette si dispongono automaticamente. Esporta in PDF stampabile.",
     highlight: "Esportazione PDF inclusa in tutti i piani",
@@ -41,6 +48,26 @@ const STEPS = [
 ];
 
 export default function CreaPage() {
+  // Override immagini gestite dall'admin: slot → URL. Se assente si usa il
+  // default statico definito qui sotto (SSR-safe: parte dai default).
+  const [overrides, setOverrides] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    apiFetch<CreaImagesOut>("/api/crea/images")
+      .then((d) => {
+        const map: Record<string, string> = {};
+        for (const it of d.images) {
+          if (it.image_url) map[it.slot] = it.image_url;
+        }
+        setOverrides(map);
+      })
+      .catch(() => {
+        /* fallback ai default statici */
+      });
+  }, []);
+
+  const srcFor = (slot: string, fallback: string) => overrides[slot] || fallback;
+
   return (
     <SiteShell active="/crea">
       {/* Hero */}
@@ -56,7 +83,7 @@ export default function CreaPage() {
             </p>
             <a href="/login" className="btn btn-primary" style={{ padding: "14px 28px", fontSize: "15px" }}>Inizia gratis →</a>
           </div>
-          <MediaFrame src="/images/crea/dashboard.png" label="Dashboard · I miei progetti" aspect="4 / 3" rounded={16} />
+          <MediaFrame src={srcFor("dashboard", "/images/crea/dashboard.png")} label="Dashboard · I miei progetti" aspect="4 / 3" rounded={16} />
         </div>
       </section>
 
@@ -75,7 +102,7 @@ export default function CreaPage() {
                   </div>
                 </div>
                 <div style={{ order: reverse ? 1 : 2 }}>
-                  <MediaFrame src={step.img} label={step.label} aspect="4 / 3" rounded={14} />
+                  <MediaFrame src={srcFor(step.slot, step.img)} label={step.label} aspect="4 / 3" rounded={14} />
                 </div>
               </div>
             );

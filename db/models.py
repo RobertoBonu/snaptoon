@@ -549,3 +549,19 @@ class AdminAudit(UUIDPrimaryKeyMixin, Base):
     occurred_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=utcnow, nullable=False, index=True
     )
+
+
+class CreaImage(UUIDPrimaryKeyMixin, TimestampMixin, UpdatedAtMixin, Base):
+    """Immagini della pagina pubblica /crea, sovrascrivibili dall'admin.
+
+    Slot fissi (6): dashboard, step-testo, step-stile, step-personaggi,
+    step-genera, step-impagina. Ogni slot ha al più una riga. Se non esiste
+    riga (o storage_key è None), il frontend usa il default statico in
+    web/public/images/crea/. L'upload converte in WebP (come Esplora).
+    """
+
+    __tablename__ = "crea_images"
+
+    slot: Mapped[str] = mapped_column(String(64), nullable=False, unique=True, index=True)
+    # ^ dashboard | step-testo | step-stile | step-personaggi | step-genera | step-impagina
+    storage_key: Mapped[str | None] = mapped_column(String(512), nullable=True)

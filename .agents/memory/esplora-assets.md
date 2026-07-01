@@ -43,3 +43,10 @@ open on PATCH failure (no lost edits).
   it steals hover, toggles the transform in a rapid mouseenter/leave loop → continuous flicker.
 - Cache-bust: `image_url` carries `?v={updated_at epoch}`; upload/generate explicitly set
   `updated_at = utcnow()` so the URL changes even when the storage key is unchanged.
+- CREA page images (`/crea`) reuse this exact pattern but as **fixed slots**, not a dynamic
+  list: model `CreaImage` (unique `slot`), router `api/routers/crea.py` with a `SLOTS` config
+  (6 keys: dashboard, step-testo, step-stile, step-personaggi, step-genera, step-impagina),
+  reusing esplora's `_serve_image`/`_detect_media_type` + PNG→WebP. Admin uploads override the
+  static default in `web/public/images/crea/`; the public page (`web/app/crea/page.tsx`) starts
+  from static defaults then swaps to uploaded URLs via `GET /api/crea/images`. Delete reverts to
+  default (clears storage_key). Admin UI: `web/app/app/admin/crea/page.tsx`.
