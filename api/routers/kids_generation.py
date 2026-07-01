@@ -23,7 +23,7 @@ from pathlib import Path
 from typing import AsyncIterator, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from fastapi.responses import Response, StreamingResponse
+from fastapi.responses import Response
 from pydantic import BaseModel, Field
 from sse_starlette.sse import EventSourceResponse
 
@@ -661,3 +661,116 @@ def _hash_prompt(prompt: str, *extra: str) -> str:
         h.update(b"|")
         h.update(e.encode("utf-8"))
     return h.hexdigest()
+
+
+# ============================================================
+# Step 5: Export PDF (regressione chiusa: mancava in V2)
+# ============================================================
+
+
+@router.get("/projects/{project_id}/pdf")
+def export_kids_pdf(
+    project_id: str, user: dict = Depends(require_user)
+) -> Response:
+    """Genera il PDF del libretto KIDS con COVER come pagina 1 + tavole.
+
+    Riusa snaptoon_core.layout.render_page + export_pdf come per Pro,
+    ma antepone la cover come prima pagina "splash" del PDF.
+    """
+    from snaptoon_core.layout import GRIDS, export_pdf, render_page
+
+    user_id = uuid.UUID(user["id"])
+    pid = _project_or_404(project_id, user_id)
+
+    with session_scope() as s:
+        project = projects_repo.get_by_id(s, pid)
+        if project is None or project.owner_user_id != user_id:
+            raise HTTPException(status_code=404, detail="Progetto non trovato")
+        if project.script is None:
+            raise HTTPException(status_code=400, detail="Storia non ancora generata")
+
+        pyd_script = scripts_repo.load_pydantic(project.script)
+        layouts = {pl.page_number: pl for pl in project.page_layouts}
+        project_slug = project.slug
+        project_name = project.name
+
+    temp_files: list[Path] = []
+    page_temp_paths: list[Path] = []
+    try:
+        # === Pagina 1: la COVER del libretto ===
+        cover_key = cover_illustration_key(pid)
+        if object_exists(cover_key):
+            cover_bytes = download_bytes(cover_key)
+            cover_tmp = tempfile.NamedTemporaryFile(suffix=".png", delete=False)
+            cover_tmp.write(cover_bytes)
+            cover_tmp.close()
+            cover_path = Path(cover_tmp.name)
+            temp_files.append(cover_path)
+            page_temp_paths.append(cover_path)
+        # se non c'è cover, non blocchiamo — il PDF parte dalle pagine interne
+
+        # === Pagine interne ===
+        for page in pyd_script.pages:
+            pl = layouts.get(page.number)
+            grid_id = pl.grid_id if pl else "2x2"
+            grid = GRIDS.get(grid_id)
+            if grid is None:
+                continue
+
+            panel_paths: list[tuple] = []
+            for panel in page.panels:
+                vk = vignette_key(pid, page.number, panel.number)
+                if object_exists(vk):
+                    data = download_bytes(vk)
+                    tmp = tempfile.NamedTemporaryFile(suffix=".png", delete=False)
+                    tmp.write(data)
+                    tmp.close()
+                    p = Path(tmp.name)
+                    temp_files.append(p)
+                    panel_paths.append((panel, p))
+                else:
+                    panel_paths.append((panel, None))
+
+            out_tmp = tempfile.NamedTemporaryFile(suffix=".png", delete=False)
+            out_tmp.close()
+            out_path = Path(out_tmp.name)
+            temp_files.append(out_path)
+
+            # I balloon sono già dentro le vignette generate (AI-bake), quindi
+            # niente overlay PIL: show_balloons=False.
+            render_page(
+                panels_with_images=panel_paths,
+                grid=grid,
+                out_path=out_path,
+                show_balloons=False,
+            )
+            page_temp_paths.append(out_path)
+
+        if not page_temp_paths:
+            raise HTTPException(
+                status_code=400,
+                detail="Nessuna pagina da esportare (né cover né vignette generate).",
+            )
+
+        pdf_tmp = tempfile.NamedTemporaryFile(suffix=".pdf", delete=False)
+        pdf_tmp.close()
+        pdf_path = Path(pdf_tmp.name)
+        temp_files.append(pdf_path)
+        export_pdf(page_temp_paths, pdf_path)
+
+        pdf_bytes = pdf_path.read_bytes()
+    finally:
+        for tp in temp_files:
+            try:
+                tp.unlink()
+            except OSError:
+                pass
+
+    filename = f"snaptoon_kids_{project_slug}.pdf"
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition": f'attachment; filename="{filename}"',
+        },
+    )
