@@ -149,6 +149,19 @@ which is just stopped workflows.)
   so "lazy on expand" needs explicit gating; the realistic win is cheap presence checks +
   cached downloads, which the validation code review enforces.
 
+# Auth session cookie must be Secure in PRODUCTION only
+The `snaptoon_token` JWT session cookie (set in `api/routers/auth.py` login/logout) must be
+`Secure` in the deployed app (HTTPS) but NOT in local dev (HTTP on localhost, where a Secure
+cookie would never be sent → local login breaks). Gate it on `REPLIT_DEPLOYMENT` (present ONLY
+in deployments); do NOT gate on `REPL_ID` — that is ALSO set in the dev workspace, so it can't
+distinguish prod from dev. `COOKIE_SECURE = bool(os.getenv("REPLIT_DEPLOYMENT"))`.
+**Why:** a non-Secure `SameSite=Lax` cookie over HTTPS is refused/not-persisted by stricter
+browsers (Safari/iOS especially) → `POST /api/auth/login` returns 200 but the session cookie
+never sticks, so the user "can't log in" even though the backend accepted the credentials.
+**Verify (dev):** `curl -i localhost:5000/api/auth/login` Set-Cookie must NOT contain `Secure`
+(dev is HTTP). The Next.js proxy DOES correctly forward the single Set-Cookie header, so the
+proxy is not the culprit for cookie issues. Takes effect only after a REDEPLOY.
+
 # Other env facts
 - Runtime is Python 3.11 (NOT 3.13). Install deps via the package-management skill
   (`installLanguagePackages`, uv-backed); raw `pip install` times out (exit -1).

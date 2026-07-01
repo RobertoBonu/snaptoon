@@ -55,6 +55,15 @@ JWT_ALGO = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24 * 7  # 7 giorni
 COOKIE_NAME = "snaptoon_token"
 
+# In produzione (deployment Replit su HTTPS) il cookie DEVE essere Secure:
+# altrimenti browser come Safari/iOS possono rifiutare di persisterlo, con il
+# risultato che il login viene accettato dal server (200) ma la sessione non
+# viene salvata nel browser → "il login non funziona". In dev locale (HTTP) deve
+# restare False, altrimenti il cookie non verrebbe mai inviato su http://localhost.
+# REPLIT_DEPLOYMENT è presente SOLO nei deployment, non nel workspace di sviluppo
+# (REPL_ID invece è presente anche in dev, quindi non è utilizzabile qui).
+COOKIE_SECURE = bool(os.getenv("REPLIT_DEPLOYMENT"))
+
 
 class LoginRequest(BaseModel):
     email: EmailStr
@@ -133,7 +142,7 @@ def login_endpoint(req: LoginRequest, response: Response) -> UserOut:
         COOKIE_NAME,
         token,
         httponly=True,
-        secure=False,  # TODO: True in produzione HTTPS
+        secure=COOKIE_SECURE,
         samesite="lax",
         max_age=ACCESS_TOKEN_EXPIRE_MINUTES * 60,
         path="/",
@@ -143,7 +152,13 @@ def login_endpoint(req: LoginRequest, response: Response) -> UserOut:
 
 @router.post("/logout")
 def logout_endpoint(response: Response) -> dict:
-    response.delete_cookie(COOKIE_NAME, path="/")
+    response.delete_cookie(
+        COOKIE_NAME,
+        path="/",
+        httponly=True,
+        secure=COOKIE_SECURE,
+        samesite="lax",
+    )
     return {"ok": True}
 
 
