@@ -1,5 +1,7 @@
 "use client";
 
+import PageLoader from "@/components/PageLoader";
+
 import { use, useEffect, useState } from "react";
 import {
   apiFetch,
@@ -250,7 +252,7 @@ export default function TestoPage({
   }
 
   if (data === null && !error) {
-    return <p className="text-[var(--color-fg-muted)]">Caricamento...</p>;
+    return <PageLoader message="Carico la sceneggiatura..." />;
   }
 
   return (

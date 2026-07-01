@@ -1,5 +1,7 @@
 "use client";
 
+import PageLoader from "@/components/PageLoader";
+
 import { use, useEffect, useState } from "react";
 import {
   apiFetch,
@@ -75,7 +77,7 @@ export default function GeneraPage({
   }
 
   if (vignettes === null && !error) {
-    return <p className="text-[var(--color-fg-muted)]">Caricamento...</p>;
+    return <PageLoader message="Carico le vignette..." />;
   }
 
   if (vignettes && vignettes.length === 0) {

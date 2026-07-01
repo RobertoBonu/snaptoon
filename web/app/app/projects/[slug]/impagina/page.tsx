@@ -1,5 +1,7 @@
 "use client";
 
+import PageLoader from "@/components/PageLoader";
+
 import { use, useEffect, useState } from "react";
 import { apiFetch, type PageInfo, type PagesList } from "@/lib/api";
 
@@ -97,7 +99,7 @@ export default function ImpaginaPage({
   }
 
   if (pages === null && !error) {
-    return <p className="text-[var(--color-fg-muted)]">Caricamento...</p>;
+    return <PageLoader message="Carico le pagine..." />;
   }
 
   if (pages && pages.length === 0) {

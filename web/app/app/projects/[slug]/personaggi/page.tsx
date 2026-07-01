@@ -1,5 +1,7 @@
 "use client";
 
+import PageLoader from "@/components/PageLoader";
+
 import { use, useEffect, useState } from "react";
 import { apiFetch, type Character, type CharacterList } from "@/lib/api";
 
@@ -128,7 +130,7 @@ export default function PersonaggiPage({
   }
 
   if (characters === null && !error) {
-    return <p className="text-[var(--color-fg-muted)]">Caricamento...</p>;
+    return <PageLoader message="Carico i personaggi..." />;
   }
 
   return (
