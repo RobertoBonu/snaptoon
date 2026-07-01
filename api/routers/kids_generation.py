@@ -69,6 +69,23 @@ class GenerateStoryIn(BaseModel):
     feedback: str = Field(default="", max_length=2000)
 
 
+class KidsPanelEditIn(BaseModel):
+    number: int
+    description: str
+    dialogue_speaker: Optional[str] = None
+    dialogue_text: Optional[str] = None
+
+
+class KidsPageEditIn(BaseModel):
+    number: int
+    panels: list[KidsPanelEditIn]
+
+
+class KidsStoryEditIn(BaseModel):
+    logline: str
+    pages: list[KidsPageEditIn]
+
+
 class PanelOut(BaseModel):
     number: int
     description: str
@@ -246,6 +263,94 @@ def generate_story(
 # ============================================================
 # Step 2: Details (storia + status vignette)
 # ============================================================
+
+
+@router.patch("/projects/{project_id}/story", response_model=StoryOut)
+def update_story(
+    project_id: str, payload: KidsStoryEditIn, user: dict = Depends(require_user)
+) -> StoryOut:
+    """Salva modifiche manuali alla storia KIDS.
+
+    L'utente può correggere logline, description e dialoghi vignetta
+    per vignetta. Non chiama Claude, non consuma crediti.
+
+    NB: non modifica la struttura (numero pagine/vignette) — quella è
+    fissata dal template. Solo il testo dentro le vignette.
+    """
+    from snaptoon_core.models import Dialogue, Page, Panel
+    from snaptoon_core.models import Script as PydScript
+
+    user_id = uuid.UUID(user["id"])
+    pid = _project_or_404(project_id, user_id)
+
+    with session_scope() as s:
+        project = projects_repo.get_by_id(s, pid)
+        if project is None or project.owner_user_id != user_id:
+            raise HTTPException(status_code=404, detail="Progetto non trovato")
+
+        # Preserva i personaggi già presenti
+        existing_characters = []
+        if project.script is not None:
+            try:
+                existing_pyd = scripts_repo.load_pydantic(project.script)
+                existing_characters = existing_pyd.characters
+            except Exception:
+                pass
+
+        pyd_script = PydScript(
+            logline=payload.logline,
+            characters=existing_characters,
+            pages=[
+                Page(
+                    number=p.number,
+                    panels=[
+                        Panel(
+                            number=pn.number,
+                            description=pn.description,
+                            dialogues=(
+                                [
+                                    Dialogue(
+                                        kind="FUMETTO",
+                                        speaker=pn.dialogue_speaker,
+                                        text=pn.dialogue_text,
+                                    )
+                                ]
+                                if pn.dialogue_text and pn.dialogue_text.strip()
+                                else []
+                            ),
+                        )
+                        for pn in p.panels
+                    ],
+                )
+                for p in payload.pages
+            ],
+        )
+
+        orm_script = scripts_repo.get_or_create(s, project)
+        scripts_repo.save_pydantic(s, orm_script, pyd_script)
+
+    return StoryOut(
+        logline=pyd_script.logline,
+        pages=[
+            PageOut(
+                number=p.number,
+                panels=[
+                    PanelOut(
+                        number=pn.number,
+                        description=pn.description,
+                        dialogue_speaker=(
+                            pn.dialogues[0].speaker if pn.dialogues else None
+                        ),
+                        dialogue_text=(
+                            pn.dialogues[0].text if pn.dialogues else None
+                        ),
+                    )
+                    for pn in p.panels
+                ],
+            )
+            for p in pyd_script.pages
+        ],
+    )
 
 
 @router.get("/projects/{project_id}/details", response_model=KidsProjectDetailsOut)
