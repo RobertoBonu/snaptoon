@@ -15,10 +15,13 @@ API_PORT="${API_PORT:-8000}"
 WEB_PORT="${PORT:-5000}"
 
 echo "[start_v2] Starting FastAPI on :${API_PORT}..."
+# --workers 2: mentre uno genera un'immagine (OpenAI blocca il loop 5-15s)
+# l'altro serve API normali → niente più "Caricamento..." infinito
+# quando l'utente esce dalla pagina generate e naviga altrove.
 python -m uvicorn api.main:app \
     --port "${API_PORT}" \
     --host 0.0.0.0 \
-    --workers 1 &
+    --workers 2 &
 UVICORN_PID=$!
 
 # Graceful shutdown
