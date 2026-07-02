@@ -132,6 +132,7 @@ export interface KidsProjectDetails {
   story?: KidsStory | null;
   has_cover: boolean;
   vignettes: KidsVignetteStatus[];
+  grid_variant_label?: string | null;
 }
 
 // === Sceneggiatura (flusso Pro) ===

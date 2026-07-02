@@ -134,6 +134,9 @@ class KidsProjectDetailsOut(BaseModel):
     story: Optional[StoryOut] = None
     has_cover: bool
     vignettes: list[VignetteStatusOut]
+    # Ritmo di impaginazione scelto casualmente alla creazione
+    # (label leggibile per il tag "Ritmo: X" nella dashboard)
+    grid_variant_label: Optional[str] = None
 
 
 # ============================================================
@@ -185,14 +188,19 @@ def generate_story(
         if project.style_id not in KIDS_STYLE_PRESET_IDS:
             raise HTTPException(status_code=400, detail="Progetto non Kids")
 
-        # Recupera template dalla grid_distribution salvata o ricalcola
-        # Usiamo page_layouts già salvati se ci sono, altrimenti default 2x2
+        # Recupera grid_distribution dai PageLayout salvati alla creazione.
+        # Retrocompatibilità: se il progetto è stato creato prima
+        # dell'introduzione dei ritmi (kids_grid_variants), non ha
+        # page_layouts. In quel caso uso il ritmo Classico Breve come default.
         page_layouts = sorted(project.page_layouts, key=lambda p: p.page_number)
         if page_layouts:
             grid_distribution = [pl.grid_id for pl in page_layouts]
         else:
-            # Fallback breve standard se manca
-            grid_distribution = ["splash", "1+2", "2x2", "1+2", "splash"]
+            from snaptoon_core.kids_grid_variants import BREVE_VARIANTS
+
+            grid_distribution = list(
+                BREVE_VARIANTS["classico"]["grid_distribution"]
+            )
 
         scintilla = project.source_text or ""
         if not scintilla:
@@ -497,6 +505,10 @@ def get_project_details(
             for v in vigs
         ]
 
+        # Ritmo di impaginazione dal Project.appearance
+        appearance_ = project.appearance or {}
+        grid_variant_label = appearance_.get("kids_grid_variant_label")
+
         return KidsProjectDetailsOut(
             id=str(project.id),
             slug=project.slug,
@@ -507,6 +519,7 @@ def get_project_details(
             story=story,
             has_cover=has_cover,
             vignettes=vig_status,
+            grid_variant_label=grid_variant_label,
         )
 
 

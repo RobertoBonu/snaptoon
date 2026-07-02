@@ -235,6 +235,24 @@ def create_kids_project(
         # Salvo la scintilla come source_text
         projects_repo.set_source_text(s, project, payload.scintilla)
 
+        # Ritmo (grid variant): pesca casuale tra 6 varianti per lunghezza.
+        # Salvo:
+        #   1. lo slug in Project.appearance (per il tag informativo nella UI)
+        #   2. la grid_distribution nelle PageLayout (usata da Claude
+        #      e dal renderer PDF)
+        from snaptoon_core.kids_grid_variants import pick_random_variant
+        from db.repos import page_layouts as page_layouts_repo
+
+        variant = pick_random_variant(length_str)
+        current_appearance = project.appearance or {}
+        current_appearance["kids_grid_variant"] = variant["slug"]
+        current_appearance["kids_grid_variant_label"] = variant["label"]
+        project.appearance = current_appearance
+
+        for page_idx, grid_id in enumerate(variant["grid_distribution"], start=1):
+            pl = page_layouts_repo.get_or_create(s, project, page_idx)
+            page_layouts_repo.set_grid(s, pl, grid_id)
+
         # Copyright text sul Project (per la quarta di copertina)
         if hasattr(project, "copyright_text"):
             project.copyright_text = payload.copyright_text.strip()

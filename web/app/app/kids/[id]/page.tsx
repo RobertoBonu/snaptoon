@@ -194,7 +194,15 @@ export default function KidsPreviewPage({
           <h1 className="text-3xl font-bold mb-1">📖 {details.name}</h1>
           {details.story && (
             <p className="text-[var(--color-fg-muted)] italic">
-              "{details.story.logline}"
+              &quot;{details.story.logline}&quot;
+            </p>
+          )}
+          {details.grid_variant_label && (
+            <p
+              className="mt-2 inline-block text-xs bg-[var(--color-bg-elev)] border border-[var(--color-border)] rounded-full px-2.5 py-0.5 text-[var(--color-fg-muted)]"
+              title="Ritmo di impaginazione scelto casualmente alla creazione"
+            >
+              🎞 Ritmo: {details.grid_variant_label}
             </p>
           )}
         </div>
