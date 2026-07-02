@@ -123,8 +123,10 @@ export default function NewKidsPage() {
           copyright_text: copyrightText.trim(),
         }),
       });
-      // Va all'anteprima del libretto (Sett. 4 = step generazione)
-      window.location.href = `/app/kids/${proj.id}`;
+      // Vai a "Personaggi": step obbligatorio per generare/caricare i
+      // reference visivi prima della generazione delle tavole. Da lì
+      // l'utente può cliccare "Genera" per procedere.
+      window.location.href = `/app/kids/${proj.id}/personaggi`;
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
       setCreating(false);
