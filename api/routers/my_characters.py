@@ -254,6 +254,8 @@ def create_my_character(
     user_id = uuid.UUID(user["id"])
 
     # 1. Crea entry (senza reference)
+    from sqlalchemy.exc import IntegrityError
+
     with session_scope() as s:
         u = users_repo.get_by_id(s, user_id)
         if u is None:
@@ -265,6 +267,16 @@ def create_my_character(
             )
         except ValueError as e:
             raise HTTPException(status_code=400, detail=str(e))
+        except IntegrityError:
+            # Doppione reale (vincolo unique parziale, solo su righe vive):
+            # esiste già un personaggio con lo stesso nome per questo utente.
+            raise HTTPException(
+                status_code=409,
+                detail=(
+                    f"Hai già un personaggio chiamato '{payload.name}'. "
+                    "Usa un nome diverso o elimina prima quello esistente."
+                ),
+            )
         entry_id = entry.id
 
     # 2. Charge crediti
@@ -362,6 +374,8 @@ async def create_my_character_from_photo(
     user_id = uuid.UUID(user["id"])
 
     # 1. Crea entry
+    from sqlalchemy.exc import IntegrityError
+
     with session_scope() as s:
         u = users_repo.get_by_id(s, user_id)
         if u is None:
@@ -373,6 +387,15 @@ async def create_my_character_from_photo(
             )
         except ValueError as e:
             raise HTTPException(status_code=400, detail=str(e))
+        except IntegrityError:
+            # Doppione reale — vedi commento in create_my_character
+            raise HTTPException(
+                status_code=409,
+                detail=(
+                    f"Hai già un personaggio chiamato '{name}'. "
+                    "Usa un nome diverso o elimina prima quello esistente."
+                ),
+            )
         entry_id = entry.id
 
     # 2. Charge

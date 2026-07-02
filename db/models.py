@@ -473,9 +473,13 @@ class CastArchiveEntry(UUIDPrimaryKeyMixin, TimestampMixin, UpdatedAtMixin, Base
     """
 
     __tablename__ = "cast_archive_entries"
-    __table_args__ = (
-        UniqueConstraint("user_id", "name", name="uq_cast_archive_user_name"),
-    )
+    # Nota: il constraint UniqueConstraint (user_id, name) originale è stato
+    # sostituito da un indice unico PARZIALE (dove deleted_at IS NULL) nella
+    # migrazione f2a3b4c5d6e7. Il motivo: un unique "duro" contava anche i
+    # personaggi soft-deleted, quindi dopo aver cancellato "Bea" non era più
+    # possibile creare un nuovo "Bea". L'indice parziale ignora i soft-delete.
+    # Non specifichiamo nulla in __table_args__ per NAME: la migrazione gestisce
+    # l'indice unico postgresql-specifico.
 
     user_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
