@@ -107,21 +107,39 @@ def _build_neutral_reference_prompt(name: str, visual_description: str) -> str:
     (KIDS pixar, chibi, superhero; Pro graphic novel, ecc.). Uno stile
     "portrait clean" permette a gpt-image-2 di adattare lo stile grafico
     al momento dell'uso nel progetto, mantenendo l'aspetto del soggetto.
+
+    Formato output: 1024x1536 verticale (2:3). Vincoli forti sul framing
+    per garantire che la testa sia SEMPRE completamente in cornice (evitare
+    il problema classico dei generatori che tagliano il volto in alto).
     """
     return (
         "=== RENDER MODE ===\n"
-        "Full-body character reference sheet. Neutral clean art style, "
-        "soft natural lighting, plain off-white background. Character stands "
-        "facing forward, arms slightly relaxed, calm neutral expression. "
-        "The face and body must be clearly visible with all details readable. "
-        "No panel border, no frame, no watermark, no accessories that hide "
-        "the face.\n\n"
+        "Full-body vertical character reference sheet, 2:3 portrait format. "
+        "Neutral clean illustration style, soft natural lighting, plain "
+        "off-white background. The character stands facing the camera in a "
+        "T-pose or relaxed neutral pose.\n\n"
+        "=== CRITICAL FRAMING CONSTRAINTS ===\n"
+        "The ENTIRE character must be FULLY VISIBLE inside the frame:\n"
+        " - HEAD: the top of the hair/hat/crown must have at least 10% "
+        "padding above it. The face is fully in frame, not cropped.\n"
+        " - FEET: the bottom of the shoes/paws must have at least 5% "
+        "padding below.\n"
+        " - LEFT/RIGHT: 15% empty space on each side of the widest point "
+        "(arms, wings, tail, etc).\n"
+        "The camera is medium-wide, pulled back enough to fit the whole "
+        "figure comfortably. NO close-up. NO cropping of the head, face, "
+        "hands, or feet.\n\n"
         f"=== SUBJECT — {name} ===\n"
         f"{visual_description}\n\n"
+        "=== EXPRESSION AND POSE ===\n"
+        "Calm neutral expression, mouth slightly closed, eyes open looking "
+        "forward. Arms slightly away from body (not covering torso), palms "
+        "visible. No dramatic action, no motion.\n\n"
         "=== AVOID ===\n"
-        "cinematic dramatic lighting, blurry motion, action pose, "
-        "background scenery, other characters, extreme camera angle, "
-        "watermark, text, logo, signature."
+        "cropped head, head cut off at top, face cut off, chin only visible, "
+        "close-up portrait, extreme angle, cinematic drama, background "
+        "scenery, other characters, watermark, text, logo, signature, "
+        "props hiding the body."
     )
 
 
@@ -139,16 +157,24 @@ def _build_photo_to_reference_prompt(
         extra = f"\n\nAdditional description hints: {visual_description}"
     return (
         "=== RENDER MODE ===\n"
-        "Convert this reference photo into a full-body illustrated character "
-        "reference sheet. Preserve the subject's facial features, hair color, "
-        "body proportions and identifying characteristics from the photo. "
-        "Render in a clean neutral illustration style with soft natural "
-        "lighting, plain off-white background. Character stands facing "
-        "forward, calm neutral expression. Full body visible if possible.\n\n"
+        "Convert this reference photo into a full-body vertical illustrated "
+        "character reference sheet, 2:3 portrait format. Preserve the "
+        "subject's facial features, hair color, body proportions and "
+        "identifying characteristics from the photo. Render in a clean "
+        "neutral illustration style with soft natural lighting, plain "
+        "off-white background.\n\n"
+        "=== CRITICAL FRAMING CONSTRAINTS ===\n"
+        "The ENTIRE character must be FULLY VISIBLE inside the frame:\n"
+        " - HEAD: 10% padding above the top of the hair. Face fully visible.\n"
+        " - FEET: 5% padding below feet.\n"
+        " - Character stands facing the camera, arms relaxed, calm "
+        "expression. Medium-wide framing.\n"
+        "NO cropping of head, face, hands, or feet. NO close-up portrait.\n\n"
         f"=== CHARACTER NAME ===\n{name}{extra}\n\n"
         "=== AVOID ===\n"
-        "photorealistic skin, exact photo reproduction, cinematic drama, "
-        "action pose, other people, background scenery, watermark, text."
+        "photorealistic skin, exact photo reproduction, cropped head, "
+        "face cut off, close-up, cinematic drama, action pose, other "
+        "people, background scenery, watermark, text."
     )
 
 
@@ -181,7 +207,9 @@ def _generate_and_save_reference(
     try:
         img_bytes = generator._generate_bytes(
             prompt=prompt,
-            size="1024x1024",
+            # 2:3 portrait — massimo spazio verticale per contenere la testa
+            # e i piedi senza dover ricorrere a crop stretti.
+            size="1024x1536",
             reference_images=ref_list,
             quality="medium",
         )
