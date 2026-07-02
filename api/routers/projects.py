@@ -302,14 +302,12 @@ def generate_pro_cover(
     import tempfile
     from pathlib import Path
 
-    from billing.credits import (
-        CreditOperation,
-        InsufficientCreditsError,
-        cost_for_operation,
-    )
+    from billing.plans import cost_for_operation
+    from db.models import CreditOperation
     from db.repos import characters as characters_repo
     from db.repos import covers as covers_repo
     from db.repos import credits as credits_repo
+    from db.repos.credits import InsufficientCreditsError
     from snaptoon_core.generator import OpenAIImageGenerator
     from storage.client import download_bytes, object_exists, upload_bytes
     from storage.keys import cover_illustration_key, reference_key
