@@ -30,6 +30,8 @@ KIDS_STYLE_MAP = {
     "flat": ("Flat", "bold_toddler_graphic"),
     "3d": ("3D", "illumination_cartoon_style"),
     "manga": ("Manga", "japanese_preschool_anime"),
+    "chibi": ("Chibi", "chibi_kawaii_emotions"),
+    "supereroi": ("Supereroi", "cartoon_superhero_kids"),
 }
 KIDS_STYLE_PRESET_IDS = {pid for _, pid in KIDS_STYLE_MAP.values()}
 

@@ -4,11 +4,13 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { apiFetch, type KidsProject } from "@/lib/api";
 
-// Mapping style → colore badge (stesso schema delle card Streamlit attuali)
+// Mapping style → colore badge (uno per ogni stile KIDS)
 const STYLE_BADGE: Record<string, { emoji: string; color: string; label: string }> = {
   bold_toddler_graphic: { emoji: "🎨", color: "#F59E0B", label: "Flat" },
   illumination_cartoon_style: { emoji: "🎭", color: "#8B5CF6", label: "3D" },
   japanese_preschool_anime: { emoji: "🌸", color: "#EC4899", label: "Manga" },
+  chibi_kawaii_emotions: { emoji: "🥰", color: "#F472B6", label: "Chibi" },
+  cartoon_superhero_kids: { emoji: "🦸", color: "#3B82F6", label: "Supereroi" },
 };
 
 export default function KidsDashboardPage() {
