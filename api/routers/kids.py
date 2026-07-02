@@ -33,6 +33,13 @@ KIDS_STYLE_MAP = {
     "chibi": ("Chibi", "chibi_kawaii_emotions"),
     "supereroi": ("Supereroi", "cartoon_superhero_kids"),
     "fiaba": ("Fiaba", "enchanted_fairytale_princess"),
+    "plush": ("Storybook Plush", "storybook_plush"),
+    "avventura": ("Adventure Cartoon", "adventure_cartoon"),
+    "graphic": ("Graphic Novel Junior", "graphic_novel_junior"),
+    "acquerello": ("Magical Watercolor", "magical_watercolor"),
+    "scribble": ("Funny Scribble", "funny_scribble"),
+    "dreamworks": ("DreamWorks Junior", "dreamworks_junior"),
+    "heroes": ("Tiny Heroes", "tiny_heroes"),
 }
 KIDS_STYLE_PRESET_IDS = {pid for _, pid in KIDS_STYLE_MAP.values()}
 
