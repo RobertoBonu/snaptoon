@@ -213,20 +213,33 @@ export default function KidsPersonaggiPage({
         ))}
       </div>
 
-      <div className="flex gap-3">
+      {/* Il prossimo step dipende da se la storia è già stata creata:
+          - NO storia → "Genera la storia" (primario) va a /story
+          - SÌ storia → "Genera le immagini" (primario) va a /generate,
+                       con anche "Rivedi la storia" (secondario) verso /story */}
+      {details?.has_story ? (
+        <div className="flex gap-3">
+          <Link
+            href={`/app/kids/${id}/story`}
+            className="flex-1 text-center border border-[var(--color-border)] hover:border-[var(--color-accent)]/50 px-5 py-2.5 rounded-lg transition-colors"
+          >
+            📖 Rivedi la storia
+          </Link>
+          <Link
+            href={`/app/kids/${id}/generate`}
+            className="flex-1 text-center bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] text-[var(--color-bg)] font-semibold px-5 py-2.5 rounded-lg transition-colors"
+          >
+            ✨ Genera le immagini →
+          </Link>
+        </div>
+      ) : (
         <Link
           href={`/app/kids/${id}/story`}
-          className="flex-1 text-center border border-[var(--color-border)] hover:border-[var(--color-accent)]/50 px-5 py-2.5 rounded-lg transition-colors"
+          className="block w-full text-center bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] text-[var(--color-bg)] font-semibold px-5 py-2.5 rounded-lg transition-colors"
         >
-          📖 Vai alla storia
+          📖 Genera la storia →
         </Link>
-        <Link
-          href={`/app/kids/${id}/generate`}
-          className="flex-1 text-center bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] text-[var(--color-bg)] font-semibold px-5 py-2.5 rounded-lg transition-colors"
-        >
-          ✨ Genera le immagini →
-        </Link>
-      </div>
+      )}
     </div>
   );
 }
