@@ -25,6 +25,12 @@ const ITEMS: Item[] = [
     isActive: (p) => p.startsWith("/app/kids"),
   },
   {
+    href: "/app/my-characters",
+    icon: "personaggi",
+    label: "I MIEI PERSONAGGI",
+    isActive: (p) => p.startsWith("/app/my-characters"),
+  },
+  {
     href: "/app/account",
     icon: "account",
     label: "Account",

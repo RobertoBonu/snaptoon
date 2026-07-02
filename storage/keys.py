@@ -54,6 +54,13 @@ def crea_image_key(slot: str) -> str:
     return f"crea/{slot}.png"
 
 
+def my_character_reference_key(
+    user_id: uuid.UUID | str, entry_id: uuid.UUID | str
+) -> str:
+    """Reference PNG di un personaggio nella libreria personale dell'utente."""
+    return f"my-characters/{_stringify(user_id)}/{_stringify(entry_id)}.png"
+
+
 def pdf_export_key(project_id: uuid.UUID | str, ts: datetime | None = None) -> str:
     if ts is None:
         ts = datetime.now(timezone.utc)

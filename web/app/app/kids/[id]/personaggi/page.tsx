@@ -33,6 +33,39 @@ export default function KidsPersonaggiPage({
   const [uploading, setUploading] = useState<string | null>(null);
   const [generating, setGenerating] = useState<string | null>(null);
   const [refreshTag, setRefreshTag] = useState<number>(Date.now());
+  // Picker "I miei personaggi": memorizza il char_id del progetto per cui
+  // stiamo scegliendo. null = picker chiuso.
+  const [pickerFor, setPickerFor] = useState<string | null>(null);
+  const [myChars, setMyChars] = useState<
+    Array<{ id: string; name: string; visual_description: string; has_reference: boolean }>
+  >([]);
+  const [importing, setImporting] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (pickerFor === null) return;
+    apiFetch<{ characters: typeof myChars }>("/api/my-characters")
+      .then((d) => setMyChars(d.characters))
+      .catch((e) => setError(e instanceof Error ? e.message : String(e)));
+  }, [pickerFor]);
+
+  async function handleImportFromMy(myCharId: string) {
+    if (!pickerFor) return;
+    setImporting(myCharId);
+    setError(null);
+    try {
+      await apiFetch(
+        `/api/kids/projects/${id}/characters/${pickerFor}/import-from-my/${myCharId}`,
+        { method: "POST" },
+      );
+      setPickerFor(null);
+      setRefreshTag(Date.now());
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setImporting(null);
+    }
+  }
 
   async function load() {
     try {
@@ -206,6 +239,14 @@ export default function KidsPersonaggiPage({
                       className="hidden"
                     />
                   </label>
+                  <button
+                    type="button"
+                    onClick={() => setPickerFor(c.id)}
+                    className="text-sm border border-[var(--color-border)] hover:border-[var(--color-accent)] hover:text-[var(--color-accent)] text-[var(--color-fg-muted)] px-4 py-1.5 rounded transition-colors"
+                    title="Scegli dai personaggi salvati nel tuo archivio"
+                  >
+                    📚 Scegli dai miei
+                  </button>
                 </div>
               </div>
             </div>
@@ -239,6 +280,88 @@ export default function KidsPersonaggiPage({
         >
           📖 Genera la storia →
         </Link>
+      )}
+
+      {/* Modale picker "I miei personaggi" */}
+      {pickerFor && (
+        <div
+          className="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-50"
+          onClick={() => setPickerFor(null)}
+        >
+          <div
+            className="bg-[var(--color-bg-elev)] border border-[var(--color-border)] rounded-xl p-6 max-w-4xl w-full max-h-[80vh] overflow-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex justify-between items-start mb-4">
+              <div>
+                <h2 className="text-lg font-semibold">
+                  📚 I miei personaggi
+                </h2>
+                <p className="text-sm text-[var(--color-fg-muted)]">
+                  Scegli un personaggio dal tuo archivio da importare in
+                  questo slot. Nessun credito consumato — è una copia.
+                </p>
+              </div>
+              <button
+                onClick={() => setPickerFor(null)}
+                className="text-[var(--color-fg-muted)] hover:text-[var(--color-fg)] text-2xl leading-none"
+              >
+                ×
+              </button>
+            </div>
+
+            {myChars.length === 0 ? (
+              <div className="text-center py-12">
+                <p className="text-[var(--color-fg-muted)] mb-3">
+                  Il tuo archivio è vuoto.
+                </p>
+                <Link
+                  href="/app/my-characters"
+                  className="text-[var(--color-accent)] hover:text-[var(--color-accent-hover)] text-sm font-medium"
+                >
+                  Vai a &quot;I miei personaggi&quot; per crearne uno →
+                </Link>
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+                {myChars
+                  .filter((mc) => mc.has_reference)
+                  .map((mc) => {
+                    const isImporting = importing === mc.id;
+                    return (
+                      <button
+                        key={mc.id}
+                        onClick={() => handleImportFromMy(mc.id)}
+                        disabled={isImporting}
+                        className={`bg-[var(--color-bg)] border border-[var(--color-border)] rounded-lg overflow-hidden text-left hover:border-[var(--color-accent)] transition-colors disabled:opacity-50`}
+                      >
+                        <div className="relative">
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img
+                            src={`/api/my-characters/${mc.id}/image?t=${refreshTag}`}
+                            alt={mc.name}
+                            className="w-full aspect-square object-cover"
+                          />
+                          {isImporting && (
+                            <div className="absolute inset-0 flex items-center justify-center bg-black/60">
+                              <p className="text-xs bg-[var(--color-bg)] px-2 py-1 rounded">
+                                Importo...
+                              </p>
+                            </div>
+                          )}
+                        </div>
+                        <div className="p-2">
+                          <h3 className="font-semibold text-sm truncate">
+                            {mc.name}
+                          </h3>
+                        </div>
+                      </button>
+                    );
+                  })}
+              </div>
+            )}
+          </div>
+        </div>
       )}
     </div>
   );

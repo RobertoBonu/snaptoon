@@ -457,13 +457,19 @@ class KidsTemplate(UUIDPrimaryKeyMixin, TimestampMixin, UpdatedAtMixin, Base):
     notes: Mapped[str] = mapped_column(Text, default="", nullable=False)
 
 
-class CastArchiveEntry(UUIDPrimaryKeyMixin, TimestampMixin, Base):
-    """Archivio personale dei character sheet riusabili tra progetti.
+class CastArchiveEntry(UUIDPrimaryKeyMixin, TimestampMixin, UpdatedAtMixin, Base):
+    """Archivio personale dei personaggi riusabili tra progetti ("I miei personaggi").
 
-    L'utente può salvare un personaggio dal cast di un progetto nell'archivio
-    e poi importarlo in altri progetti. NB: la reference image NON viene
-    archiviata (è specifica del progetto+stile). V1.1 aggiungerà anche
-    quella.
+    L'utente può creare personaggi da descrizione testuale o da foto reale
+    (foto immediatamente cancellata dopo la generazione della reference AI),
+    e importarli in qualsiasi progetto (KIDS o Pro).
+
+    reference_storage_key è la PNG del ritratto in stile neutro / portrait
+    realistico, salvata in object storage in "my-characters/{user_id}/{id}.png".
+    Se None, il personaggio non ha ancora una reference generata.
+
+    Soft-delete via deleted_at (per non perdere lo storico se importato in
+    progetti esistenti; le reference importate rimangono nei progetti).
     """
 
     __tablename__ = "cast_archive_entries"
@@ -478,6 +484,10 @@ class CastArchiveEntry(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     visual_description: Mapped[str] = mapped_column(Text, default="", nullable=False)
     color_palette: Mapped[str] = mapped_column(Text, default="", nullable=False)
     notes: Mapped[str] = mapped_column(Text, default="", nullable=False)
+    reference_storage_key: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    deleted_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
 
 
 class AdminStyle(UUIDPrimaryKeyMixin, TimestampMixin, UpdatedAtMixin, Base):

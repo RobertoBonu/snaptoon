@@ -459,6 +459,82 @@ def generate_kids_character_reference(
 
 
 @router.post(
+    "/projects/{project_id}/characters/{char_id}/import-from-my/{my_char_id}",
+    response_model=KidsCharacterOut,
+)
+def import_kids_character_from_my(
+    project_id: str,
+    char_id: str,
+    my_char_id: str,
+    user: dict = Depends(require_user),
+) -> KidsCharacterOut:
+    """Importa un personaggio da 'I miei personaggi' nello slot indicato.
+
+    Aggiorna nome + descrizione del character_sheet del progetto e copia
+    la reference PNG dallo storage user-scoped a quello del progetto.
+    Zero crediti (è solo una copia).
+    """
+    from db.repos import cast_archive as cast_archive_repo
+    from storage.keys import my_character_reference_key
+
+    user_id = uuid.UUID(user["id"])
+    pid = _kids_project_or_404(project_id, user_id)
+    try:
+        cid = uuid.UUID(char_id)
+        mid = uuid.UUID(my_char_id)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="ID invalido")
+
+    # 1. Verifica esistenza personaggio archiviato + reference
+    with session_scope() as s:
+        u = users_repo.get_by_id(s, user_id)
+        entry = cast_archive_repo.get_by_id(s, u, mid) if u else None
+        if entry is None:
+            raise HTTPException(
+                status_code=404, detail="Personaggio archiviato non trovato"
+            )
+        if not entry.reference_storage_key:
+            raise HTTPException(
+                status_code=400,
+                detail="Il personaggio archiviato non ha ancora una reference generata",
+            )
+        my_key = entry.reference_storage_key
+        my_name = entry.name
+        my_desc = entry.visual_description
+
+    if not object_exists(my_key):
+        raise HTTPException(
+            status_code=404, detail="File reference archiviato non trovato in storage"
+        )
+
+    # 2. Copia bytes nel path del progetto
+    data = download_bytes(my_key)
+    rk = reference_key(pid, cid, 1)
+    upload_bytes(rk, data, content_type="image/png")
+
+    # 3. Aggiorna character_sheet del progetto
+    with session_scope() as s:
+        project = projects_repo.get_by_id(s, pid)
+        if project is None or project.owner_user_id != user_id:
+            raise HTTPException(status_code=404, detail="Progetto non trovato")
+        cs = next((c for c in project.character_sheets if c.id == cid), None)
+        if cs is None:
+            raise HTTPException(status_code=404, detail="Slot personaggio non trovato")
+        cs.name = my_name
+        cs.visual_description = my_desc
+        characters_repo.upsert_reference(
+            s, cs, slot_number=1, storage_key=rk,
+            mime_type="image/png", file_size=len(data),
+        )
+        return KidsCharacterOut(
+            id=str(cs.id),
+            name=cs.name,
+            visual_description=cs.visual_description,
+            has_reference=True,
+        )
+
+
+@router.post(
     "/projects/{project_id}/characters/{char_id}/upload-reference",
     response_model=KidsCharacterOut,
 )
