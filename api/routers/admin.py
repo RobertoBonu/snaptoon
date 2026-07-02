@@ -290,10 +290,47 @@ _ACCEPTED_LOGO_MIMES = {"image/png", "image/jpeg", "image/jpg", "image/webp"}
 _MAX_LOGO_SIZE = 4 * 1024 * 1024  # 4 MB
 
 
+class LogoParamsOut(BaseModel):
+    logo_show: bool
+    cover_size_px: int
+    cover_x: int
+    cover_y: int
+    back_size_px: int
+    back_x: int
+    back_y: int
+
+
+class LogoParamsIn(BaseModel):
+    logo_show: Optional[bool] = None
+    cover_size_px: Optional[int] = Field(default=None, ge=20, le=2000)
+    cover_x: Optional[int] = Field(default=None, ge=-500, le=2000)
+    cover_y: Optional[int] = Field(default=None, ge=-500, le=2500)
+    back_size_px: Optional[int] = Field(default=None, ge=20, le=2000)
+    back_x: Optional[int] = Field(default=None, ge=-500, le=2000)
+    back_y: Optional[int] = Field(default=None, ge=-500, le=2500)
+
+
 class SystemSettingsOut(BaseModel):
     has_logo: bool
     default_copyright_text: str
     back_cover_template: str
+    logo_params: LogoParamsOut
+
+
+def _load_logo_params() -> LogoParamsOut:
+    """Carica i parametri logo dal JSON in object storage (o default)."""
+    from storage.client import download_bytes, object_exists
+    from storage.keys import ADMIN_LOGO_PARAMS_KEY
+    from snaptoon_core.logo_composite import parse_logo_params
+
+    raw = None
+    if object_exists(ADMIN_LOGO_PARAMS_KEY):
+        try:
+            raw = download_bytes(ADMIN_LOGO_PARAMS_KEY)
+        except Exception:
+            pass
+    params = parse_logo_params(raw)
+    return LogoParamsOut(**params)
 
 
 @router.get("/system-settings", response_model=SystemSettingsOut)
@@ -327,6 +364,7 @@ def get_system_settings(admin: dict = Depends(require_admin)) -> SystemSettingsO
         has_logo=object_exists(ADMIN_LOGO_KEY),
         default_copyright_text=default_copyright,
         back_cover_template=template,
+        logo_params=_load_logo_params(),
     )
 
 
@@ -366,6 +404,33 @@ def update_system_settings(
             content_type="text/plain",
         )
 
+    return get_system_settings(admin)
+
+
+@router.patch("/logo-params", response_model=SystemSettingsOut)
+def update_logo_params(
+    payload: LogoParamsIn, admin: dict = Depends(require_admin)
+) -> SystemSettingsOut:
+    """Aggiorna dimensione (px) e posizione (X, Y) del logo su copertina e quarta.
+
+    Il file JSON viene salvato in object storage. Ogni PATCH fa un merge coi
+    valori esistenti — puoi mandare solo i campi cambiati.
+    """
+    import json as _json
+    from storage.client import upload_bytes
+
+    from storage.keys import ADMIN_LOGO_PARAMS_KEY
+
+    current = _load_logo_params().model_dump()
+    for field, value in payload.model_dump(exclude_unset=True).items():
+        if value is not None:
+            current[field] = value
+
+    upload_bytes(
+        ADMIN_LOGO_PARAMS_KEY,
+        _json.dumps(current).encode("utf-8"),
+        content_type="application/json",
+    )
     return get_system_settings(admin)
 
 

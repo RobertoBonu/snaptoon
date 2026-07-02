@@ -59,3 +59,9 @@ def pdf_export_key(project_id: uuid.UUID | str, ts: datetime | None = None) -> s
         ts = datetime.now(timezone.utc)
     stamp = ts.strftime("%Y%m%d_%H%M%S")
     return f"exports/{_stringify(project_id)}/comic_{stamp}.pdf"
+
+
+ADMIN_LOGO_KEY = "admin/system_logo.png"
+ADMIN_DEFAULT_COPYRIGHT_KEY = "admin/default_copyright.txt"
+ADMIN_BACK_COVER_TEMPLATE_KEY = "admin/back_cover_template.txt"
+ADMIN_LOGO_PARAMS_KEY = "admin/logo_params.json"

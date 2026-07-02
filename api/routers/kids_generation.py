@@ -1184,9 +1184,11 @@ def export_kids_pdf(
     """
     from snaptoon_core.kids_back_cover import render_back_cover
     from snaptoon_core.layout import GRIDS, export_pdf, render_page
+    from snaptoon_core.logo_composite import composite_logo, parse_logo_params
     from storage.keys import (
         ADMIN_BACK_COVER_TEMPLATE_KEY,
         ADMIN_LOGO_KEY,
+        ADMIN_LOGO_PARAMS_KEY,
     )
 
     user_id = uuid.UUID(user["id"])
@@ -1221,21 +1223,37 @@ def export_kids_pdf(
         except Exception:
             pass
 
-    # Logo di sistema (opzionale)
+    # Logo di sistema (opzionale) + parametri (px + posizione X,Y)
     logo_bytes = None
     if object_exists(ADMIN_LOGO_KEY):
         try:
             logo_bytes = download_bytes(ADMIN_LOGO_KEY)
         except Exception:
             pass
+    logo_params_raw = None
+    if object_exists(ADMIN_LOGO_PARAMS_KEY):
+        try:
+            logo_params_raw = download_bytes(ADMIN_LOGO_PARAMS_KEY)
+        except Exception:
+            pass
+    logo_params = parse_logo_params(logo_params_raw)
+    logo_active = bool(logo_bytes) and logo_params.get("logo_show", False)
 
     temp_files: list[Path] = []
     page_temp_paths: list[Path] = []
     try:
-        # === Pagina 1: la COVER del libretto ===
+        # === Pagina 1: la COVER del libretto (con logo compositato se attivo) ===
         cover_key = cover_illustration_key(pid)
         if object_exists(cover_key):
             cover_bytes = download_bytes(cover_key)
+            if logo_active:
+                cover_bytes = composite_logo(
+                    base_bytes=cover_bytes,
+                    logo_bytes=logo_bytes,
+                    size_px=logo_params["cover_size_px"],
+                    x=logo_params["cover_x"],
+                    y=logo_params["cover_y"],
+                )
             cover_tmp = tempfile.NamedTemporaryFile(suffix=".png", delete=False)
             cover_tmp.write(cover_bytes)
             cover_tmp.close()
@@ -1287,7 +1305,7 @@ def export_kids_pdf(
                 detail="Nessuna pagina da esportare (né cover né vignette generate).",
             )
 
-        # === ULTIMA PAGINA: la quarta di copertina ===
+        # === ULTIMA PAGINA: la quarta di copertina (con logo compositato se attivo) ===
         back_cover_tmp = tempfile.NamedTemporaryFile(suffix=".png", delete=False)
         back_cover_tmp.close()
         back_cover_path = Path(back_cover_tmp.name)
@@ -1299,9 +1317,18 @@ def export_kids_pdf(
                 subtitle=bc_subtitle,
                 copyright_text=bc_copyright,
                 back_cover_template=bc_template,
-                logo_bytes=logo_bytes,
                 out_path=back_cover_path,
             )
+            if logo_active:
+                bc_bytes = back_cover_path.read_bytes()
+                bc_bytes = composite_logo(
+                    base_bytes=bc_bytes,
+                    logo_bytes=logo_bytes,
+                    size_px=logo_params["back_size_px"],
+                    x=logo_params["back_x"],
+                    y=logo_params["back_y"],
+                )
+                back_cover_path.write_bytes(bc_bytes)
             page_temp_paths.append(back_cover_path)
         except Exception as e:
             logger.warning("Back cover generation failed, skipping: %s", str(e))

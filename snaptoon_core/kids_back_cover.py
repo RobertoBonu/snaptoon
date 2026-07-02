@@ -2,21 +2,22 @@
 
 Composta programmaticamente con PIL:
   - Sfondo pastello (gradiente ambra→crema o palette coerente)
-  - Logo di sistema in alto (se presente)
+  - Bordo decorativo
   - Titolo del libretto centrato
   - Sottotitolo (opzionale)
   - Autore
   - Testo editoriale dal template admin (opzionale)
   - Testo copyright del libretto in basso
 
+Il LOGO è compositato separatamente da logo_composite.composite_logo() con
+dimensione e posizione controllate dall'admin (px + coordinate X,Y).
+
 Ritorna un file PNG nella dimensione della cover (1024x1536, 2:3 verticale)
 pronto per essere inserito come ULTIMA pagina del PDF.
 """
 from __future__ import annotations
 
-import io
 from pathlib import Path
-from typing import Optional
 
 from PIL import Image, ImageDraw, ImageFont
 
@@ -112,10 +113,12 @@ def render_back_cover(
     subtitle: str = "",
     copyright_text: str = "",
     back_cover_template: str = "",
-    logo_bytes: Optional[bytes] = None,
     out_path: Path,
 ) -> Path:
-    """Genera la quarta di copertina del libretto come immagine PNG.
+    """Genera la quarta di copertina del libretto come immagine PNG (SENZA logo).
+
+    Il logo viene compositato separatamente da composite_logo() a valle,
+    con dimensione e posizione controllate dall'admin.
 
     Args:
         title: Titolo del libretto (obbligatorio)
@@ -123,7 +126,6 @@ def render_back_cover(
         subtitle: Sottotitolo (opzionale)
         copyright_text: Testo copyright per la quarta (dal libretto specifico)
         back_cover_template: Testo editoriale sistema-wide (dall'admin)
-        logo_bytes: Bytes del logo di sistema (PNG/JPEG/WEBP) o None
         out_path: dove salvare il PNG risultante
 
     Returns:
@@ -148,29 +150,16 @@ def render_back_cover(
         width=4,
     )
 
-    y = margin + 40
-
-    # === Logo (se presente) ===
-    if logo_bytes:
-        try:
-            logo_img = Image.open(io.BytesIO(logo_bytes)).convert("RGBA")
-            # Ridimensiona logo a max 200px lato lungo, mantenendo aspect
-            max_logo_size = 200
-            logo_img.thumbnail((max_logo_size, max_logo_size))
-            logo_w, logo_h = logo_img.size
-            logo_x = (BACK_COVER_W - logo_w) // 2
-            # Paste con alpha channel per trasparenza
-            canvas.paste(logo_img, (logo_x, y), logo_img)
-            y += logo_h + 30
-        except Exception:
-            # Logo malformato: skip senza bloccare
-            pass
+    # Il testo parte da un offset in alto sufficiente a lasciare spazio
+    # a un eventuale logo compositato in alto. Se admin sceglie di piazzarlo
+    # altrove (basso, destra, ecc.) questa area rimane libera.
+    y = margin + 220
 
     # === Titolo grande ===
     title_font = _find_font(72)
     title_lines = _wrap_text(title.upper(), title_font, BACK_COVER_W - 200)
     y = _draw_multiline_centered(
-        draw, title_lines, title_font, y + 20, BACK_COVER_W, TEXT_DARK,
+        draw, title_lines, title_font, y, BACK_COVER_W, TEXT_DARK,
         line_height_mul=1.15,
     )
     y += 20

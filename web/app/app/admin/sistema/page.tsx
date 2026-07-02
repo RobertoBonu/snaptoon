@@ -4,20 +4,36 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { apiFetch } from "@/lib/api";
 
+interface LogoParams {
+  logo_show: boolean;
+  cover_size_px: number;
+  cover_x: number;
+  cover_y: number;
+  back_size_px: number;
+  back_x: number;
+  back_y: number;
+}
+
 interface SystemSettings {
   has_logo: boolean;
   default_copyright_text: string;
   back_cover_template: string;
+  logo_params: LogoParams;
 }
+
+const CANVAS_W = 1024;
+const CANVAS_H = 1536;
 
 export default function AdminSistemaPage() {
   const [settings, setSettings] = useState<SystemSettings | null>(null);
   const [defaultCopyright, setDefaultCopyright] = useState("");
   const [backCoverTemplate, setBackCoverTemplate] = useState("");
+  const [logoParams, setLogoParams] = useState<LogoParams | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [savingLogo, setSavingLogo] = useState(false);
   const [refreshTag, setRefreshTag] = useState<number>(Date.now());
 
   async function load() {
@@ -27,6 +43,7 @@ export default function AdminSistemaPage() {
       setSettings(s);
       setDefaultCopyright(s.default_copyright_text);
       setBackCoverTemplate(s.back_cover_template);
+      setLogoParams(s.logo_params);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     }
@@ -107,7 +124,35 @@ export default function AdminSistemaPage() {
     }
   }
 
-  if (!settings) {
+  async function handleSaveLogoParams() {
+    if (!logoParams) return;
+    setSavingLogo(true);
+    setError(null);
+    setSuccess(null);
+    try {
+      await apiFetch("/api/admin/logo-params", {
+        method: "PATCH",
+        body: JSON.stringify(logoParams),
+      });
+      setSuccess("Parametri logo salvati.");
+      setRefreshTag(Date.now());
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setSavingLogo(false);
+    }
+  }
+
+  function updateLogoParam<K extends keyof LogoParams>(
+    key: K,
+    value: LogoParams[K],
+  ) {
+    if (!logoParams) return;
+    setLogoParams({ ...logoParams, [key]: value });
+  }
+
+  if (!settings || !logoParams) {
     return (
       <div className="p-8">
         <p className="text-[var(--color-fg-muted)]">Caricamento...</p>
@@ -129,7 +174,7 @@ export default function AdminSistemaPage() {
       <h1 className="text-3xl font-bold mb-2">⚙️ Sistema</h1>
       <p className="text-sm text-[var(--color-fg-muted)] mb-8">
         Logo di sistema + testi default per copertine e quarta di copertina
-        dei libretti. L'utente finale non può modificarli.
+        dei libretti. L&apos;utente finale non può modificarli.
       </p>
 
       {error && (
@@ -143,18 +188,21 @@ export default function AdminSistemaPage() {
         </p>
       )}
 
-      {/* Sezione Logo */}
+      {/* Sezione Logo: upload + preview */}
       <section className="bg-[var(--color-bg-elev)] border border-[var(--color-border)] rounded-xl p-6 mb-6">
-        <h2 className="text-lg font-semibold mb-2">🖼 Logo di sistema</h2>
+        <h2 className="text-lg font-semibold mb-2">🏷 Logo di sistema</h2>
         <p className="text-sm text-[var(--color-fg-muted)] mb-4">
-          Sarà stampato sulla copertina e sulla quarta di copertina di ogni
-          libretto. Formato: PNG, JPEG o WEBP (max 4 MB). Sfondo trasparente
-          consigliato.
+          Il logo viene compositato in PIL sulla{" "}
+          <strong>copertina</strong> del libretto e sulla{" "}
+          <strong>quarta di copertina</strong>, con dimensione (px) e
+          posizione (X, Y) controllabili qui sotto. PNG con trasparenza
+          consigliato. Vale per tutti i libretti KIDS.
         </p>
 
         <div className="flex gap-6 items-start flex-wrap">
           <div className="w-40 h-40 bg-[var(--color-bg)] border border-[var(--color-border)] rounded overflow-hidden flex items-center justify-center">
             {settings.has_logo ? (
+              // eslint-disable-next-line @next/next/no-img-element
               <img
                 src={`/api/admin/logo?t=${refreshTag}`}
                 alt="Logo di sistema"
@@ -202,6 +250,104 @@ export default function AdminSistemaPage() {
         </div>
       </section>
 
+      {/* Sezione parametri logo: toggle + dimensione px + posizione X,Y */}
+      {settings.has_logo && (
+        <section className="bg-[var(--color-bg-elev)] border border-[var(--color-border)] rounded-xl p-6 mb-6">
+          <div className="flex items-center gap-3 mb-4">
+            <label className="relative inline-flex items-center cursor-pointer">
+              <input
+                type="checkbox"
+                checked={logoParams.logo_show}
+                onChange={(e) =>
+                  updateLogoParam("logo_show", e.target.checked)
+                }
+                className="sr-only peer"
+              />
+              <div className="w-11 h-6 bg-[var(--color-border)] peer-checked:bg-[var(--color-accent)] rounded-full peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all"></div>
+            </label>
+            <span className="font-semibold">
+              Mostra logo su copertina e quarta di copertina
+            </span>
+          </div>
+
+          <p className="text-xs text-[var(--color-fg-muted)] mb-6">
+            Canvas di riferimento (identico per copertina e quarta):{" "}
+            <strong>
+              {CANVAS_W} × {CANVAS_H} px
+            </strong>{" "}
+            (larghezza × altezza). Coordinate (X, Y) = angolo alto-sinistra del
+            logo. Il logo viene ridimensionato con lato lungo = dimensione
+            impostata, mantenendo il rapporto d&apos;aspetto originale.
+          </p>
+
+          {/* Copertina */}
+          <div className="mb-8">
+            <h3 className="text-base font-semibold mb-3">📕 Copertina</h3>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <NumberField
+                label="Dimensione (px lato lungo)"
+                value={logoParams.cover_size_px}
+                min={20}
+                max={2000}
+                onChange={(v) => updateLogoParam("cover_size_px", v)}
+              />
+              <NumberField
+                label={`X (0 = sinistra, max ${CANVAS_W})`}
+                value={logoParams.cover_x}
+                min={-500}
+                max={2000}
+                onChange={(v) => updateLogoParam("cover_x", v)}
+              />
+              <NumberField
+                label={`Y (0 = alto, max ${CANVAS_H})`}
+                value={logoParams.cover_y}
+                min={-500}
+                max={2500}
+                onChange={(v) => updateLogoParam("cover_y", v)}
+              />
+            </div>
+          </div>
+
+          {/* Quarta di copertina */}
+          <div className="mb-6">
+            <h3 className="text-base font-semibold mb-3">
+              🏷 Quarta di copertina
+            </h3>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <NumberField
+                label="Dimensione (px lato lungo)"
+                value={logoParams.back_size_px}
+                min={20}
+                max={2000}
+                onChange={(v) => updateLogoParam("back_size_px", v)}
+              />
+              <NumberField
+                label={`X (0 = sinistra, max ${CANVAS_W})`}
+                value={logoParams.back_x}
+                min={-500}
+                max={2000}
+                onChange={(v) => updateLogoParam("back_x", v)}
+              />
+              <NumberField
+                label={`Y (0 = alto, max ${CANVAS_H})`}
+                value={logoParams.back_y}
+                min={-500}
+                max={2500}
+                onChange={(v) => updateLogoParam("back_y", v)}
+              />
+            </div>
+          </div>
+
+          <button
+            onClick={handleSaveLogoParams}
+            disabled={savingLogo}
+            className="bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] text-[var(--color-bg)] font-semibold px-6 py-2.5 rounded disabled:opacity-50"
+          >
+            {savingLogo ? "Salvo..." : "💾 Salva parametri logo"}
+          </button>
+        </section>
+      )}
+
       {/* Sezione Testi */}
       <section className="bg-[var(--color-bg-elev)] border border-[var(--color-border)] rounded-xl p-6 mb-6">
         <h2 className="text-lg font-semibold mb-4">📝 Testi default</h2>
@@ -212,16 +358,16 @@ export default function AdminSistemaPage() {
               Copyright suggerito per nuovi libretti
             </label>
             <p className="text-xs text-[var(--color-fg-muted)] mb-2">
-              Verrà proposto come placeholder nel campo "Testo per la quarta
-              di copertina" quando l'utente crea un libretto. L'utente potrà
-              sovrascriverlo.
+              Verrà proposto come placeholder nel campo &quot;Testo per la
+              quarta di copertina&quot; quando l&apos;utente crea un libretto.
+              L&apos;utente potrà sovrascriverlo.
             </p>
             <textarea
               value={defaultCopyright}
               onChange={(e) => setDefaultCopyright(e.target.value)}
               rows={2}
               maxLength={1000}
-              placeholder="Es. © 2026 SnapToon. Tutti i diritti riservati."
+              placeholder="Es. 2026 SnapToon. Tutti i diritti riservati."
               className="w-full px-3 py-2 bg-[var(--color-bg)] border border-[var(--color-border)] rounded text-sm focus:outline-none focus:border-[var(--color-accent)]"
             />
             <p className="text-xs text-[var(--color-fg-muted)] mt-1">
@@ -260,6 +406,39 @@ export default function AdminSistemaPage() {
           </button>
         </div>
       </section>
+    </div>
+  );
+}
+
+function NumberField({
+  label,
+  value,
+  min,
+  max,
+  onChange,
+}: {
+  label: string;
+  value: number;
+  min: number;
+  max: number;
+  onChange: (v: number) => void;
+}) {
+  return (
+    <div>
+      <label className="block text-xs font-semibold mb-1 text-[var(--color-fg-muted)]">
+        {label}
+      </label>
+      <input
+        type="number"
+        value={value}
+        min={min}
+        max={max}
+        onChange={(e) => {
+          const v = parseInt(e.target.value, 10);
+          if (!isNaN(v)) onChange(v);
+        }}
+        className="w-full px-3 py-2 bg-[var(--color-bg)] border border-[var(--color-border)] rounded text-sm font-mono focus:outline-none focus:border-[var(--color-accent)]"
+      />
     </div>
   );
 }
