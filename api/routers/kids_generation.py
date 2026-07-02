@@ -1187,9 +1187,12 @@ def export_kids_pdf(
     from snaptoon_core.logo_composite import composite_logo, parse_logo_params
     from storage.keys import (
         ADMIN_BACK_COVER_TEMPLATE_KEY,
-        ADMIN_LOGO_KEY,
-        ADMIN_LOGO_PARAMS_KEY,
+        admin_logo_key,
+        admin_logo_params_key,
     )
+
+    _ADMIN_LOGO_KEY_LOCAL = admin_logo_key("kids")
+    _ADMIN_LOGO_PARAMS_KEY_LOCAL = admin_logo_params_key("kids")
 
     user_id = uuid.UUID(user["id"])
     pid = _project_or_404(project_id, user_id)
@@ -1223,17 +1226,17 @@ def export_kids_pdf(
         except Exception:
             pass
 
-    # Logo di sistema (opzionale) + parametri (px + posizione X,Y)
+    # Logo di sistema KIDS (opzionale) + parametri (px + posizione X,Y)
     logo_bytes = None
-    if object_exists(ADMIN_LOGO_KEY):
+    if object_exists(_ADMIN_LOGO_KEY_LOCAL):
         try:
-            logo_bytes = download_bytes(ADMIN_LOGO_KEY)
+            logo_bytes = download_bytes(_ADMIN_LOGO_KEY_LOCAL)
         except Exception:
             pass
     logo_params_raw = None
-    if object_exists(ADMIN_LOGO_PARAMS_KEY):
+    if object_exists(_ADMIN_LOGO_PARAMS_KEY_LOCAL):
         try:
-            logo_params_raw = download_bytes(ADMIN_LOGO_PARAMS_KEY)
+            logo_params_raw = download_bytes(_ADMIN_LOGO_PARAMS_KEY_LOCAL)
         except Exception:
             pass
     logo_params = parse_logo_params(logo_params_raw)

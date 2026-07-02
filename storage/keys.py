@@ -61,7 +61,33 @@ def pdf_export_key(project_id: uuid.UUID | str, ts: datetime | None = None) -> s
     return f"exports/{_stringify(project_id)}/comic_{stamp}.pdf"
 
 
+# Chiavi legacy KIDS (retrocompatibilità: puntano ai file esistenti)
 ADMIN_LOGO_KEY = "admin/system_logo.png"
 ADMIN_DEFAULT_COPYRIGHT_KEY = "admin/default_copyright.txt"
 ADMIN_BACK_COVER_TEMPLATE_KEY = "admin/back_cover_template.txt"
 ADMIN_LOGO_PARAMS_KEY = "admin/logo_params.json"
+
+# Chiavi separate per KIND (kids | pro): logo di sistema e parametri
+# possono essere diversi per libretti KIDS e progetti Pro.
+_ADMIN_LOGO_KEYS = {
+    "kids": ADMIN_LOGO_KEY,           # coincide col legacy
+    "pro": "admin/system_logo_pro.png",
+}
+_ADMIN_LOGO_PARAMS_KEYS = {
+    "kids": ADMIN_LOGO_PARAMS_KEY,    # coincide col legacy
+    "pro": "admin/logo_params_pro.json",
+}
+
+
+def admin_logo_key(kind: str) -> str:
+    """Storage key del logo di sistema per KIND (kids | pro)."""
+    if kind not in _ADMIN_LOGO_KEYS:
+        raise ValueError(f"kind logo non valido: {kind}")
+    return _ADMIN_LOGO_KEYS[kind]
+
+
+def admin_logo_params_key(kind: str) -> str:
+    """Storage key dei parametri logo (dimensione + posizione) per KIND."""
+    if kind not in _ADMIN_LOGO_PARAMS_KEYS:
+        raise ValueError(f"kind logo params non valido: {kind}")
+    return _ADMIN_LOGO_PARAMS_KEYS[kind]

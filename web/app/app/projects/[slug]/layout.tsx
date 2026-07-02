@@ -10,6 +10,7 @@ const TABS = [
   { slug: "stile", icon: "stile", label: "Stile" },
   { slug: "personaggi", icon: "personaggi", label: "Personaggi" },
   { slug: "genera", icon: "genera", label: "Genera" },
+  { slug: "copertina", icon: "personaggi", label: "Copertina" },
   { slug: "impagina", icon: "impagina", label: "Impagina" },
 ];
 

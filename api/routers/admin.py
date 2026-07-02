@@ -311,26 +311,42 @@ class LogoParamsIn(BaseModel):
 
 
 class SystemSettingsOut(BaseModel):
-    has_logo: bool
+    # Coppia di stato per KIDS + Pro. I logo/parametri sono INDIPENDENTI
+    # per i due kind (l'admin può caricare loghi diversi). Testi
+    # default_copyright_text e back_cover_template sono invece CONDIVISI.
+    has_logo_kids: bool
+    has_logo_pro: bool
     default_copyright_text: str
     back_cover_template: str
-    logo_params: LogoParamsOut
+    logo_params_kids: LogoParamsOut
+    logo_params_pro: LogoParamsOut
 
 
-def _load_logo_params() -> LogoParamsOut:
-    """Carica i parametri logo dal JSON in object storage (o default)."""
+VALID_KINDS = {"kids", "pro"}
+
+
+def _require_kind(kind: str) -> str:
+    if kind not in VALID_KINDS:
+        raise HTTPException(
+            status_code=400, detail=f"kind non valido: {kind} (kids|pro)"
+        )
+    return kind
+
+
+def _load_logo_params(kind: str) -> LogoParamsOut:
+    """Carica i parametri logo (kids | pro) dal JSON in object storage."""
     from storage.client import download_bytes, object_exists
-    from storage.keys import ADMIN_LOGO_PARAMS_KEY
+    from storage.keys import admin_logo_params_key
     from snaptoon_core.logo_composite import parse_logo_params
 
+    key = admin_logo_params_key(kind)
     raw = None
-    if object_exists(ADMIN_LOGO_PARAMS_KEY):
+    if object_exists(key):
         try:
-            raw = download_bytes(ADMIN_LOGO_PARAMS_KEY)
+            raw = download_bytes(key)
         except Exception:
             pass
-    params = parse_logo_params(raw)
-    return LogoParamsOut(**params)
+    return LogoParamsOut(**parse_logo_params(raw))
 
 
 @router.get("/system-settings", response_model=SystemSettingsOut)
@@ -339,7 +355,7 @@ def get_system_settings(admin: dict = Depends(require_admin)) -> SystemSettingsO
     from storage.keys import (
         ADMIN_BACK_COVER_TEMPLATE_KEY,
         ADMIN_DEFAULT_COPYRIGHT_KEY,
-        ADMIN_LOGO_KEY,
+        admin_logo_key,
     )
 
     default_copyright = ""
@@ -361,10 +377,12 @@ def get_system_settings(admin: dict = Depends(require_admin)) -> SystemSettingsO
             pass
 
     return SystemSettingsOut(
-        has_logo=object_exists(ADMIN_LOGO_KEY),
+        has_logo_kids=object_exists(admin_logo_key("kids")),
+        has_logo_pro=object_exists(admin_logo_key("pro")),
         default_copyright_text=default_copyright,
         back_cover_template=template,
-        logo_params=_load_logo_params(),
+        logo_params_kids=_load_logo_params("kids"),
+        logo_params_pro=_load_logo_params("pro"),
     )
 
 
@@ -377,18 +395,11 @@ class SystemTextsIn(BaseModel):
 def update_system_settings(
     payload: SystemTextsIn, admin: dict = Depends(require_admin)
 ) -> SystemSettingsOut:
-    """Aggiorna testi default per quarta di copertina.
-
-    default_copyright_text: proposto come suggerimento sotto il campo
-      copyright quando l'utente crea un nuovo libretto.
-    back_cover_template: template testo per la sezione "note editore"
-      sulla quarta di copertina di ogni libretto (opzionale).
-    """
-    from storage.client import object_exists, upload_bytes
+    """Aggiorna testi default (condivisi kids + pro) per quarta di copertina."""
+    from storage.client import upload_bytes
     from storage.keys import (
         ADMIN_BACK_COVER_TEMPLATE_KEY,
         ADMIN_DEFAULT_COPYRIGHT_KEY,
-        ADMIN_LOGO_KEY,
     )
 
     if payload.default_copyright_text is not None:
@@ -407,43 +418,48 @@ def update_system_settings(
     return get_system_settings(admin)
 
 
-@router.patch("/logo-params", response_model=SystemSettingsOut)
+@router.patch("/logo-params/{kind}", response_model=SystemSettingsOut)
 def update_logo_params(
-    payload: LogoParamsIn, admin: dict = Depends(require_admin)
+    kind: str,
+    payload: LogoParamsIn,
+    admin: dict = Depends(require_admin),
 ) -> SystemSettingsOut:
-    """Aggiorna dimensione (px) e posizione (X, Y) del logo su copertina e quarta.
+    """Aggiorna dimensione (px) e posizione (X, Y) del logo per KIND (kids|pro).
 
-    Il file JSON viene salvato in object storage. Ogni PATCH fa un merge coi
-    valori esistenti — puoi mandare solo i campi cambiati.
+    Il file JSON è per-kind (loghi Pro e KIDS hanno parametri indipendenti).
+    Ogni PATCH fa un merge coi valori esistenti — puoi mandare solo i campi
+    cambiati.
     """
     import json as _json
     from storage.client import upload_bytes
+    from storage.keys import admin_logo_params_key
 
-    from storage.keys import ADMIN_LOGO_PARAMS_KEY
+    _require_kind(kind)
 
-    current = _load_logo_params().model_dump()
+    current = _load_logo_params(kind).model_dump()
     for field, value in payload.model_dump(exclude_unset=True).items():
         if value is not None:
             current[field] = value
 
     upload_bytes(
-        ADMIN_LOGO_PARAMS_KEY,
+        admin_logo_params_key(kind),
         _json.dumps(current).encode("utf-8"),
         content_type="application/json",
     )
     return get_system_settings(admin)
 
 
-@router.post("/logo")
+@router.post("/logo/{kind}")
 async def upload_system_logo(
-    file: UploadFile = File(...), admin: dict = Depends(require_admin)
+    kind: str,
+    file: UploadFile = File(...),
+    admin: dict = Depends(require_admin),
 ) -> SystemSettingsOut:
-    """Carica il logo di sistema (usato in copertina e quarta di ogni libretto).
-
-    Sostituisce il precedente. PNG/JPEG/WEBP max 4 MB.
-    """
+    """Carica il logo di sistema per KIND (kids|pro). PNG/JPEG/WEBP max 4 MB."""
     from storage.client import upload_bytes
-    from storage.keys import ADMIN_LOGO_KEY
+    from storage.keys import admin_logo_key
+
+    _require_kind(kind)
 
     if file.content_type not in _ACCEPTED_LOGO_MIMES:
         raise HTTPException(
@@ -459,27 +475,34 @@ async def upload_system_logo(
     if len(data) == 0:
         raise HTTPException(status_code=400, detail="File vuoto.")
 
-    upload_bytes(ADMIN_LOGO_KEY, data, content_type=file.content_type)
+    upload_bytes(admin_logo_key(kind), data, content_type=file.content_type)
     return get_system_settings(admin)
 
 
-@router.delete("/logo", status_code=status.HTTP_204_NO_CONTENT)
-def delete_system_logo(admin: dict = Depends(require_admin)) -> None:
+@router.delete("/logo/{kind}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_system_logo(
+    kind: str, admin: dict = Depends(require_admin)
+) -> None:
     from storage.client import delete_object
-    from storage.keys import ADMIN_LOGO_KEY
+    from storage.keys import admin_logo_key
 
-    delete_object(ADMIN_LOGO_KEY)
+    _require_kind(kind)
+    delete_object(admin_logo_key(kind))
 
 
-@router.get("/logo")
-def get_system_logo(admin: dict = Depends(require_admin)) -> Response:
+@router.get("/logo/{kind}")
+def get_system_logo(
+    kind: str, admin: dict = Depends(require_admin)
+) -> Response:
     """Ritorna i bytes del logo per la preview admin."""
     from storage.client import download_bytes, object_exists
-    from storage.keys import ADMIN_LOGO_KEY
+    from storage.keys import admin_logo_key
 
-    if not object_exists(ADMIN_LOGO_KEY):
+    _require_kind(kind)
+    key = admin_logo_key(kind)
+    if not object_exists(key):
         raise HTTPException(status_code=404, detail="Logo non impostato")
-    return Response(content=download_bytes(ADMIN_LOGO_KEY), media_type="image/png")
+    return Response(content=download_bytes(key), media_type="image/png")
 
 
 # Endpoint pubblico: gli utenti kids lo usano per mostrare il logo nella
@@ -488,14 +511,18 @@ def get_system_logo(admin: dict = Depends(require_admin)) -> Response:
 _public_router = APIRouter()
 
 
-@_public_router.get("/logo")
-def get_public_system_logo(user: dict = Depends(require_user)) -> Response:
+@_public_router.get("/logo/{kind}")
+def get_public_system_logo(
+    kind: str, user: dict = Depends(require_user)
+) -> Response:
     from storage.client import download_bytes, object_exists
-    from storage.keys import ADMIN_LOGO_KEY
+    from storage.keys import admin_logo_key
 
-    if not object_exists(ADMIN_LOGO_KEY):
+    _require_kind(kind)
+    key = admin_logo_key(kind)
+    if not object_exists(key):
         raise HTTPException(status_code=404, detail="Logo non impostato")
-    return Response(content=download_bytes(ADMIN_LOGO_KEY), media_type="image/png")
+    return Response(content=download_bytes(key), media_type="image/png")
 
 
 @_public_router.get("/default-copyright")

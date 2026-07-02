@@ -16,6 +16,9 @@ export default function DashboardPage() {
   const [error, setError] = useState<string | null>(null);
   const [showCreate, setShowCreate] = useState(false);
   const [newTitle, setNewTitle] = useState("");
+  const [newSubtitle, setNewSubtitle] = useState("");
+  const [newAuthor, setNewAuthor] = useState("");
+  const [newCopyright, setNewCopyright] = useState("");
   const [newLength, setNewLength] = useState("medio");
   const [creating, setCreating] = useState(false);
 
@@ -40,7 +43,13 @@ export default function DashboardPage() {
     try {
       const p = await apiFetch<Project>("/api/projects", {
         method: "POST",
-        body: JSON.stringify({ title: newTitle, length: newLength }),
+        body: JSON.stringify({
+          title: newTitle,
+          length: newLength,
+          subtitle: newSubtitle,
+          author: newAuthor,
+          copyright_text: newCopyright,
+        }),
       });
       window.location.href = `/app/projects/${p.slug}`;
     } catch (e) {
@@ -99,30 +108,82 @@ export default function DashboardPage() {
         >
           <h3 className="font-semibold mb-4 text-lg">Nuovo progetto</h3>
           <div className="space-y-3">
-            <input
-              type="text"
-              placeholder="Titolo del progetto"
-              value={newTitle}
-              onChange={(e) => setNewTitle(e.target.value)}
-              required
-              autoFocus
-              className="w-full px-3 py-2 bg-[var(--color-bg)] border border-[var(--color-border)] rounded text-[var(--color-fg)] focus:outline-none focus:border-[var(--color-accent)]"
-            />
-            <select
-              value={newLength}
-              onChange={(e) => setNewLength(e.target.value)}
-              className="w-full px-3 py-2 bg-[var(--color-bg)] border border-[var(--color-border)] rounded text-[var(--color-fg)]"
-            >
-              {Object.entries(LENGTH_LABELS).map(([k, v]) => (
-                <option key={k} value={k}>
-                  {v}
-                </option>
-              ))}
-            </select>
+            <div>
+              <label className="block text-xs font-semibold mb-1 text-[var(--color-fg-muted)]">
+                Titolo *
+              </label>
+              <input
+                type="text"
+                placeholder="Titolo del progetto"
+                value={newTitle}
+                onChange={(e) => setNewTitle(e.target.value)}
+                required
+                autoFocus
+                maxLength={255}
+                className="w-full px-3 py-2 bg-[var(--color-bg)] border border-[var(--color-border)] rounded text-[var(--color-fg)] focus:outline-none focus:border-[var(--color-accent)]"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold mb-1 text-[var(--color-fg-muted)]">
+                Sottotitolo (facoltativo)
+              </label>
+              <input
+                type="text"
+                placeholder="Es. Le avventure di..."
+                value={newSubtitle}
+                onChange={(e) => setNewSubtitle(e.target.value)}
+                maxLength={255}
+                className="w-full px-3 py-2 bg-[var(--color-bg)] border border-[var(--color-border)] rounded text-[var(--color-fg)] focus:outline-none focus:border-[var(--color-accent)]"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold mb-1 text-[var(--color-fg-muted)]">
+                Autore *
+              </label>
+              <input
+                type="text"
+                placeholder="Il tuo nome"
+                value={newAuthor}
+                onChange={(e) => setNewAuthor(e.target.value)}
+                maxLength={255}
+                className="w-full px-3 py-2 bg-[var(--color-bg)] border border-[var(--color-border)] rounded text-[var(--color-fg)] focus:outline-none focus:border-[var(--color-accent)]"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold mb-1 text-[var(--color-fg-muted)]">
+                Testo copyright per la quarta (facoltativo)
+              </label>
+              <textarea
+                value={newCopyright}
+                onChange={(e) => setNewCopyright(e.target.value)}
+                rows={2}
+                maxLength={1000}
+                placeholder="Es. Tutti i diritti riservati."
+                className="w-full px-3 py-2 bg-[var(--color-bg)] border border-[var(--color-border)] rounded text-[var(--color-fg)] focus:outline-none focus:border-[var(--color-accent)] resize-none"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold mb-1 text-[var(--color-fg-muted)]">
+                Lunghezza
+              </label>
+              <select
+                value={newLength}
+                onChange={(e) => setNewLength(e.target.value)}
+                className="w-full px-3 py-2 bg-[var(--color-bg)] border border-[var(--color-border)] rounded text-[var(--color-fg)]"
+              >
+                {Object.entries(LENGTH_LABELS).map(([k, v]) => (
+                  <option key={k} value={k}>
+                    {v}
+                  </option>
+                ))}
+              </select>
+            </div>
             <div className="flex gap-2 pt-1">
               <button
                 type="submit"
-                disabled={creating || !newTitle.trim()}
+                disabled={
+                  creating || !newTitle.trim() || !newAuthor.trim()
+                }
                 className="bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] text-[var(--color-bg)] font-semibold px-5 py-2 rounded transition-colors disabled:opacity-50"
               >
                 {creating ? "Creo..." : "Crea"}
@@ -132,6 +193,9 @@ export default function DashboardPage() {
                 onClick={() => {
                   setShowCreate(false);
                   setNewTitle("");
+                  setNewSubtitle("");
+                  setNewAuthor("");
+                  setNewCopyright("");
                 }}
                 className="text-[var(--color-fg-muted)] hover:text-[var(--color-fg)] px-5 py-2 transition-colors"
               >
