@@ -60,6 +60,7 @@ app.include_router(characters_router.router, prefix="/api", tags=["characters"])
 app.include_router(vignettes_router.router, prefix="/api", tags=["vignettes"])
 app.include_router(pages_router.router, prefix="/api", tags=["pages"])
 app.include_router(admin_router.router, prefix="/api/admin", tags=["admin"])
+app.include_router(admin_router._public_router, prefix="/api/system", tags=["system"])
 app.include_router(esplora_router.public_router, prefix="/api/esplora", tags=["esplora"])
 app.include_router(
     esplora_router.admin_router, prefix="/api/admin/esplora", tags=["esplora-admin"]

@@ -8,7 +8,8 @@ import uuid
 from datetime import datetime
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
+from fastapi.responses import Response
 from pydantic import BaseModel, EmailStr, Field
 
 from api.routers.auth import require_user
@@ -277,3 +278,175 @@ def list_roles(admin: dict = Depends(require_admin)) -> dict:
             for r in Role
         ]
     }
+
+
+# ============================================================
+# Sistema — logo e testo default per quarta di copertina
+# Solo admin può modificare. Gli utenti finali lo ricevono già valorizzato.
+# ============================================================
+
+
+_ACCEPTED_LOGO_MIMES = {"image/png", "image/jpeg", "image/jpg", "image/webp"}
+_MAX_LOGO_SIZE = 4 * 1024 * 1024  # 4 MB
+
+
+class SystemSettingsOut(BaseModel):
+    has_logo: bool
+    default_copyright_text: str
+    back_cover_template: str
+
+
+@router.get("/system-settings", response_model=SystemSettingsOut)
+def get_system_settings(admin: dict = Depends(require_admin)) -> SystemSettingsOut:
+    from storage.client import download_bytes, object_exists
+    from storage.keys import (
+        ADMIN_BACK_COVER_TEMPLATE_KEY,
+        ADMIN_DEFAULT_COPYRIGHT_KEY,
+        ADMIN_LOGO_KEY,
+    )
+
+    default_copyright = ""
+    if object_exists(ADMIN_DEFAULT_COPYRIGHT_KEY):
+        try:
+            default_copyright = download_bytes(ADMIN_DEFAULT_COPYRIGHT_KEY).decode(
+                "utf-8"
+            )
+        except Exception:
+            pass
+
+    template = ""
+    if object_exists(ADMIN_BACK_COVER_TEMPLATE_KEY):
+        try:
+            template = download_bytes(ADMIN_BACK_COVER_TEMPLATE_KEY).decode(
+                "utf-8"
+            )
+        except Exception:
+            pass
+
+    return SystemSettingsOut(
+        has_logo=object_exists(ADMIN_LOGO_KEY),
+        default_copyright_text=default_copyright,
+        back_cover_template=template,
+    )
+
+
+class SystemTextsIn(BaseModel):
+    default_copyright_text: Optional[str] = Field(default=None, max_length=1000)
+    back_cover_template: Optional[str] = Field(default=None, max_length=2000)
+
+
+@router.patch("/system-settings", response_model=SystemSettingsOut)
+def update_system_settings(
+    payload: SystemTextsIn, admin: dict = Depends(require_admin)
+) -> SystemSettingsOut:
+    """Aggiorna testi default per quarta di copertina.
+
+    default_copyright_text: proposto come suggerimento sotto il campo
+      copyright quando l'utente crea un nuovo libretto.
+    back_cover_template: template testo per la sezione "note editore"
+      sulla quarta di copertina di ogni libretto (opzionale).
+    """
+    from storage.client import object_exists, upload_bytes
+    from storage.keys import (
+        ADMIN_BACK_COVER_TEMPLATE_KEY,
+        ADMIN_DEFAULT_COPYRIGHT_KEY,
+        ADMIN_LOGO_KEY,
+    )
+
+    if payload.default_copyright_text is not None:
+        upload_bytes(
+            ADMIN_DEFAULT_COPYRIGHT_KEY,
+            payload.default_copyright_text.encode("utf-8"),
+            content_type="text/plain",
+        )
+    if payload.back_cover_template is not None:
+        upload_bytes(
+            ADMIN_BACK_COVER_TEMPLATE_KEY,
+            payload.back_cover_template.encode("utf-8"),
+            content_type="text/plain",
+        )
+
+    return get_system_settings(admin)
+
+
+@router.post("/logo")
+async def upload_system_logo(
+    file: UploadFile = File(...), admin: dict = Depends(require_admin)
+) -> SystemSettingsOut:
+    """Carica il logo di sistema (usato in copertina e quarta di ogni libretto).
+
+    Sostituisce il precedente. PNG/JPEG/WEBP max 4 MB.
+    """
+    from storage.client import upload_bytes
+    from storage.keys import ADMIN_LOGO_KEY
+
+    if file.content_type not in _ACCEPTED_LOGO_MIMES:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Formato non supportato ({file.content_type}). Usa PNG, JPEG o WEBP.",
+        )
+    data = await file.read()
+    if len(data) > _MAX_LOGO_SIZE:
+        raise HTTPException(
+            status_code=413,
+            detail=f"Logo troppo grande (max {_MAX_LOGO_SIZE // (1024*1024)} MB).",
+        )
+    if len(data) == 0:
+        raise HTTPException(status_code=400, detail="File vuoto.")
+
+    upload_bytes(ADMIN_LOGO_KEY, data, content_type=file.content_type)
+    return get_system_settings(admin)
+
+
+@router.delete("/logo", status_code=status.HTTP_204_NO_CONTENT)
+def delete_system_logo(admin: dict = Depends(require_admin)) -> None:
+    from storage.client import delete_object
+    from storage.keys import ADMIN_LOGO_KEY
+
+    delete_object(ADMIN_LOGO_KEY)
+
+
+@router.get("/logo")
+def get_system_logo(admin: dict = Depends(require_admin)) -> Response:
+    """Ritorna i bytes del logo per la preview admin."""
+    from storage.client import download_bytes, object_exists
+    from storage.keys import ADMIN_LOGO_KEY
+
+    if not object_exists(ADMIN_LOGO_KEY):
+        raise HTTPException(status_code=404, detail="Logo non impostato")
+    return Response(content=download_bytes(ADMIN_LOGO_KEY), media_type="image/png")
+
+
+# Endpoint pubblico: gli utenti kids lo usano per mostrare il logo nella
+# preview della quarta di copertina. Non richiede admin, solo utente
+# autenticato per non esporre il logo pubblicamente.
+_public_router = APIRouter()
+
+
+@_public_router.get("/logo")
+def get_public_system_logo(user: dict = Depends(require_user)) -> Response:
+    from storage.client import download_bytes, object_exists
+    from storage.keys import ADMIN_LOGO_KEY
+
+    if not object_exists(ADMIN_LOGO_KEY):
+        raise HTTPException(status_code=404, detail="Logo non impostato")
+    return Response(content=download_bytes(ADMIN_LOGO_KEY), media_type="image/png")
+
+
+@_public_router.get("/default-copyright")
+def get_public_default_copyright(user: dict = Depends(require_user)) -> dict:
+    """Ritorna il testo copyright default (utilizzato come placeholder nel wizard)."""
+    from storage.client import download_bytes, object_exists
+    from storage.keys import ADMIN_DEFAULT_COPYRIGHT_KEY
+
+    if not object_exists(ADMIN_DEFAULT_COPYRIGHT_KEY):
+        return {"text": ""}
+    try:
+        return {
+            "text": download_bytes(ADMIN_DEFAULT_COPYRIGHT_KEY).decode("utf-8")
+        }
+    except Exception:
+        return {"text": ""}
+
+
+# Il router pubblico verrà montato su /api/system in main.py.
