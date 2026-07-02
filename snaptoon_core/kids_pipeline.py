@@ -23,6 +23,7 @@ KIDS_STYLE_MAP = {
     "manga": ("Manga", "japanese_preschool_anime"),
     "chibi": ("Chibi", "chibi_kawaii_emotions"),
     "supereroi": ("Supereroi", "cartoon_superhero_kids"),
+    "fiaba": ("Fiaba", "enchanted_fairytale_princess"),
 }
 KIDS_STYLE_PRESET_IDS = {pid for _, pid in KIDS_STYLE_MAP.values()}
 

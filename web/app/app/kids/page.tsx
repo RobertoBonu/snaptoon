@@ -11,6 +11,7 @@ const STYLE_BADGE: Record<string, { emoji: string; color: string; label: string 
   japanese_preschool_anime: { emoji: "🌸", color: "#EC4899", label: "Manga" },
   chibi_kawaii_emotions: { emoji: "🥰", color: "#F472B6", label: "Chibi" },
   cartoon_superhero_kids: { emoji: "🦸", color: "#3B82F6", label: "Supereroi" },
+  enchanted_fairytale_princess: { emoji: "👑", color: "#A78BFA", label: "Fiaba" },
 };
 
 export default function KidsDashboardPage() {
