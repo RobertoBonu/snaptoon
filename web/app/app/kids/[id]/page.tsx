@@ -144,6 +144,12 @@ export default function KidsPreviewPage({
         </div>
         <div className="flex gap-2 flex-wrap">
           <Link
+            href={`/app/kids/${id}/titolo`}
+            className="border border-[var(--color-border)] hover:border-[var(--color-accent)]/50 text-[var(--color-fg-muted)] hover:text-[var(--color-fg)] px-4 py-2.5 rounded-lg transition-colors"
+          >
+            📝 Titolo & Autore
+          </Link>
+          <Link
             href={`/app/kids/${id}/personaggi`}
             className="border border-[var(--color-border)] hover:border-[var(--color-accent)]/50 text-[var(--color-fg-muted)] hover:text-[var(--color-fg)] px-4 py-2.5 rounded-lg transition-colors"
           >

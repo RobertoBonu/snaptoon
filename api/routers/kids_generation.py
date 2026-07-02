@@ -86,6 +86,20 @@ class KidsStoryEditIn(BaseModel):
     pages: list[KidsPageEditIn]
 
 
+class KidsCoverMetadataOut(BaseModel):
+    title: str
+    subtitle: str
+    author: str
+    copyright_text: str  # per la quarta di copertina
+
+
+class KidsCoverMetadataIn(BaseModel):
+    title: str = Field(default="", max_length=120)
+    subtitle: str = Field(default="", max_length=200)
+    author: str = Field(default="", max_length=120)
+    copyright_text: str = Field(default="", max_length=500)
+
+
 class PanelOut(BaseModel):
     number: int
     description: str
@@ -351,6 +365,71 @@ def update_story(
             for p in pyd_script.pages
         ],
     )
+
+
+@router.get(
+    "/projects/{project_id}/cover-metadata", response_model=KidsCoverMetadataOut
+)
+def get_cover_metadata(
+    project_id: str, user: dict = Depends(require_user)
+) -> KidsCoverMetadataOut:
+    """Restituisce titolo, sottotitolo, autore e testo copyright del libretto."""
+    user_id = uuid.UUID(user["id"])
+    pid = _project_or_404(project_id, user_id)
+    with session_scope() as s:
+        project = projects_repo.get_by_id(s, pid)
+        if project is None or project.owner_user_id != user_id:
+            raise HTTPException(status_code=404, detail="Progetto non trovato")
+        cover = project.cover
+        title = (cover.title if cover else "") or ""
+        subtitle = (cover.subtitle if cover else "") or ""
+        author = (cover.author if cover else "") or ""
+        # copyright_text vive nel project.copyright_text (aggiunto in modello
+        # Project esistente). Se non c'è default alla stringa vuota.
+        cr = getattr(project, "copyright_text", "") or ""
+        return KidsCoverMetadataOut(
+            title=title, subtitle=subtitle, author=author, copyright_text=cr,
+        )
+
+
+@router.patch(
+    "/projects/{project_id}/cover-metadata", response_model=KidsCoverMetadataOut
+)
+def update_cover_metadata(
+    project_id: str,
+    payload: KidsCoverMetadataIn,
+    user: dict = Depends(require_user),
+) -> KidsCoverMetadataOut:
+    """Aggiorna metadati della copertina (titolo/sottotitolo/autore/copyright).
+
+    Non tocca l'illustrazione della copertina — se vuoi vedere il nuovo
+    titolo dentro l'AI-baked cover devi rigenerarla. Ma il titolo
+    stampato nel PDF (sopra e nella quarta di copertina) viene aggiornato
+    subito.
+    """
+    user_id = uuid.UUID(user["id"])
+    pid = _project_or_404(project_id, user_id)
+    with session_scope() as s:
+        project = projects_repo.get_by_id(s, pid)
+        if project is None or project.owner_user_id != user_id:
+            raise HTTPException(status_code=404, detail="Progetto non trovato")
+        cover = covers_repo.get_or_create(s, project)
+        covers_repo.update_text(
+            s, cover,
+            title=payload.title.strip(),
+            subtitle=payload.subtitle.strip(),
+            author=payload.author.strip(),
+        )
+        # Copyright text va sul Project (campo esistente per la quarta)
+        if hasattr(project, "copyright_text"):
+            project.copyright_text = payload.copyright_text.strip()
+
+        return KidsCoverMetadataOut(
+            title=cover.title or "",
+            subtitle=cover.subtitle or "",
+            author=cover.author or "",
+            copyright_text=getattr(project, "copyright_text", "") or "",
+        )
 
 
 @router.get("/projects/{project_id}/details", response_model=KidsProjectDetailsOut)
@@ -635,7 +714,13 @@ def generate_stream(
                         tmp.write(download_bytes(rk))
                         tmp.close()
                         tmp_refs.append(Path(tmp.name))
-                cover_title = pyd_script.logline or project_name
+                # Titolo esplicito su Cover ha priorità su logline / nome progetto
+                explicit_title = ""
+                with session_scope() as _s:
+                    _pj = projects_repo.get_by_id(_s, pid)
+                    if _pj and _pj.cover and _pj.cover.title:
+                        explicit_title = _pj.cover.title.strip()
+                cover_title = explicit_title or pyd_script.logline or project_name
                 prompt = build_cover_prompt(cover_title, cast, style_preset_id)
                 img_bytes = generator._generate_bytes(
                     prompt=prompt,
@@ -822,7 +907,11 @@ def generate_cover_only(
             }
             for cs in project.character_sheets
         ]
-        cover_title = pyd_script.logline or project.name
+        # Priorità titolo: Cover.title esplicito > logline dello script > nome progetto
+        explicit_title = ""
+        if project.cover and project.cover.title:
+            explicit_title = project.cover.title.strip()
+        cover_title = explicit_title or pyd_script.logline or project.name
 
     # Prima assicura le reference dei personaggi (necessarie per cover coerente)
     generator = OpenAIImageGenerator()
