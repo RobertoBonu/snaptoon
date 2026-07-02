@@ -22,7 +22,14 @@ def _slugify(name: str) -> str:
 
 
 def _unique_slug(session: Session, owner_user_id: uuid.UUID, base: str) -> str:
-    """Genera slug univoco per owner."""
+    """Genera slug univoco per owner.
+
+    IMPORTANTE: deve considerare ANCHE i progetti soft-deleted. Il vincolo DB
+    `uq_project_owner_slug` è su (owner_user_id, slug) senza filtro su deleted_at,
+    quindi una riga soft-deleted occupa comunque il suo slug. Se qui filtrassimo
+    `deleted_at IS NULL`, ricreare un progetto con lo stesso titolo di uno
+    eliminato genererebbe lo stesso slug → violazione del vincolo unico → HTTP 500.
+    """
     slug = base
     n = 2
     while True:
@@ -31,7 +38,6 @@ def _unique_slug(session: Session, owner_user_id: uuid.UUID, base: str) -> str:
                 select(Project).where(
                     Project.owner_user_id == owner_user_id,
                     Project.slug == slug,
-                    Project.deleted_at.is_(None),
                 )
             )
             .scalar_one_or_none()
