@@ -1266,7 +1266,9 @@ def regenerate_vignette(
         ]
 
         # Cancella record DB se presente
-        existing = vignettes_repo.get(s, project, page_num, panel_num)
+        existing = vignettes_repo.get(
+            s, project=project, page_number=page_num, panel_number=panel_num
+        )
         if existing is not None:
             vignettes_repo.delete(s, existing)
 
