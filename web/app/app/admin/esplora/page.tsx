@@ -163,12 +163,20 @@ export default function AdminEsploraPage() {
             l&apos;AI, rigenera o elimina.
           </p>
         </div>
-        <a
-          href="/app/admin"
-          className="border border-[var(--color-border)] hover:bg-[var(--color-bg-elev)] text-[var(--color-fg)] font-semibold px-5 py-2.5 rounded-lg"
-        >
-          ← Pannello admin
-        </a>
+        <div className="flex gap-2 flex-wrap">
+          <a
+            href="/app/admin/esplora/personaggi-utenti"
+            className="bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] text-[var(--color-bg)] font-semibold px-4 py-2.5 rounded-lg text-sm"
+          >
+            👥 Personaggi utenti
+          </a>
+          <a
+            href="/app/admin"
+            className="border border-[var(--color-border)] hover:bg-[var(--color-bg-elev)] text-[var(--color-fg)] font-semibold px-5 py-2.5 rounded-lg"
+          >
+            ← Pannello admin
+          </a>
+        </div>
       </header>
 
       {error && (

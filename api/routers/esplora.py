@@ -156,6 +156,9 @@ def _get_or_404(s, asset_id: str) -> EsploraAsset:
 
 @public_router.get("/assets")
 def list_public_assets() -> dict:
+    from db.repos import cast_archive as cast_archive_repo
+    from db.repos import users as users_repo
+
     with session_scope() as s:
         rows = (
             s.execute(
@@ -166,7 +169,59 @@ def list_public_assets() -> dict:
             .scalars()
             .all()
         )
-        return _grouped(rows)
+        result = _grouped(rows)
+
+        # Append i personaggi utenti pubblicati alla sezione "personaggi"
+        shared = cast_archive_repo.list_published_shares(s)
+        if shared:
+            for section in result["sections"]:
+                if section["key"] != "personaggi":
+                    continue
+                for entry in shared:
+                    owner = users_repo.get_by_id(s, entry.user_id)
+                    author_name = ""
+                    if owner and owner.email:
+                        # Fallback amichevole: parte prima della @ dell'email
+                        author_name = owner.email.split("@")[0]
+                    ts = 0
+                    if entry.share_moderated_at:
+                        ts = int(entry.share_moderated_at.timestamp())
+                    section["items"].append(
+                        EsploraAssetOut(
+                            id=str(entry.id),
+                            section="personaggi",
+                            asset_type="COMMUNITY",
+                            title=entry.name,
+                            caption=entry.share_caption or "",
+                            author_name=author_name,
+                            author_role=entry.share_author_role or "",
+                            position=9999,
+                            has_image=True,
+                            image_url=f"/api/esplora/user-characters/{entry.id}/image?v={ts}",
+                            prompt="",
+                            is_active=True,
+                        )
+                    )
+        return result
+
+
+@public_router.get("/user-characters/{entry_id}/image")
+def get_user_character_image(entry_id: str) -> Response:
+    """Serve la reference di un personaggio-utente pubblicato su /esplora.
+
+    Verifica share_status='published' — le entry pending/rejected/not_shared
+    non sono accessibili anche se qualcuno indovina l'URL.
+    """
+    from db.repos import cast_archive as cast_archive_repo
+
+    with session_scope() as s:
+        entry = cast_archive_repo.get_shared_by_id(s, entry_id)
+        if entry is None or entry.share_status != "published":
+            raise HTTPException(status_code=404, detail="Non trovato")
+        if not entry.reference_storage_key:
+            raise HTTPException(status_code=404, detail="Immagine non trovata")
+        key = entry.reference_storage_key
+    return _serve_image(key)
 
 
 def _detect_media_type(data: bytes) -> str:
@@ -380,3 +435,148 @@ def generate_asset_image(
         a.updated_at = utcnow()
         s.flush()
         return _to_out(a, admin=True)
+
+
+# ============================================================
+# Moderazione "Personaggi condivisi dagli utenti"
+#
+# Gli utenti condividono i loro personaggi dall'area "I miei personaggi"
+# (POST /api/my-characters/{id}/share). Le entry con share_status='pending'
+# appaiono qui in admin per approvazione / rifiuto.
+# ============================================================
+
+
+class SharedCharacterAdminOut(BaseModel):
+    id: str
+    name: str
+    visual_description: str
+    author_name: str
+    author_email: str
+    author_role: str
+    caption: str
+    submitted_at: Optional[str]
+    moderated_at: Optional[str]
+    rejection_reason: str
+    share_status: str
+    image_url: str
+
+
+class RejectSharedCharacterIn(BaseModel):
+    reason: str = Field(default="", max_length=1000)
+
+
+def _shared_char_to_out(entry, owner) -> SharedCharacterAdminOut:
+    author_name = ""
+    author_email = ""
+    if owner and owner.email:
+        author_email = owner.email
+        author_name = owner.email.split("@")[0]
+    return SharedCharacterAdminOut(
+        id=str(entry.id),
+        name=entry.name,
+        visual_description=entry.visual_description,
+        author_name=author_name,
+        author_email=author_email,
+        author_role=entry.share_author_role or "",
+        caption=entry.share_caption or "",
+        submitted_at=(
+            entry.share_submitted_at.isoformat() if entry.share_submitted_at else None
+        ),
+        moderated_at=(
+            entry.share_moderated_at.isoformat() if entry.share_moderated_at else None
+        ),
+        rejection_reason=entry.share_rejection_reason or "",
+        share_status=entry.share_status,
+        image_url=f"/api/admin/esplora/user-characters/{entry.id}/image",
+    )
+
+
+@admin_router.get("/user-characters", response_model=list[SharedCharacterAdminOut])
+def list_shared_user_characters(
+    status_filter: str = "pending", admin: dict = Depends(require_admin)
+) -> list[SharedCharacterAdminOut]:
+    """Lista personaggi condivisi dagli utenti per moderazione.
+
+    status_filter: "pending" (default) | "published" | "rejected" | "all"
+    """
+    from db.repos import cast_archive as cast_archive_repo
+    from db.repos import users as users_repo
+    from db.models import CastArchiveEntry
+
+    with session_scope() as s:
+        if status_filter == "pending":
+            entries = cast_archive_repo.list_pending_shares(s)
+        elif status_filter == "published":
+            entries = cast_archive_repo.list_published_shares(s)
+        else:
+            from sqlalchemy import select as _select
+
+            stmt = (
+                _select(CastArchiveEntry)
+                .where(CastArchiveEntry.share_status != "not_shared")
+                .where(CastArchiveEntry.deleted_at.is_(None))
+                .order_by(CastArchiveEntry.share_submitted_at.desc())
+            )
+            entries = list(s.execute(stmt).scalars())
+
+        out = []
+        for entry in entries:
+            owner = users_repo.get_by_id(s, entry.user_id)
+            out.append(_shared_char_to_out(entry, owner))
+        return out
+
+
+@admin_router.get("/user-characters/{entry_id}/image")
+def admin_get_user_character_image(
+    entry_id: str, admin: dict = Depends(require_admin)
+) -> Response:
+    from db.repos import cast_archive as cast_archive_repo
+
+    with session_scope() as s:
+        entry = cast_archive_repo.get_shared_by_id(s, entry_id)
+        if entry is None:
+            raise HTTPException(status_code=404, detail="Non trovato")
+        if not entry.reference_storage_key:
+            raise HTTPException(status_code=404, detail="Immagine non trovata")
+        key = entry.reference_storage_key
+    return _serve_image(key)
+
+
+@admin_router.post(
+    "/user-characters/{entry_id}/approve",
+    response_model=SharedCharacterAdminOut,
+)
+def approve_shared_character(
+    entry_id: str, admin: dict = Depends(require_admin)
+) -> SharedCharacterAdminOut:
+    from db.repos import cast_archive as cast_archive_repo
+    from db.repos import users as users_repo
+
+    with session_scope() as s:
+        entry = cast_archive_repo.get_shared_by_id(s, entry_id)
+        if entry is None:
+            raise HTTPException(status_code=404, detail="Non trovato")
+        cast_archive_repo.approve_sharing(s, entry)
+        owner = users_repo.get_by_id(s, entry.user_id)
+        return _shared_char_to_out(entry, owner)
+
+
+@admin_router.post(
+    "/user-characters/{entry_id}/reject",
+    response_model=SharedCharacterAdminOut,
+)
+def reject_shared_character(
+    entry_id: str,
+    payload: RejectSharedCharacterIn,
+    admin: dict = Depends(require_admin),
+) -> SharedCharacterAdminOut:
+    from db.repos import cast_archive as cast_archive_repo
+    from db.repos import users as users_repo
+
+    with session_scope() as s:
+        entry = cast_archive_repo.get_shared_by_id(s, entry_id)
+        if entry is None:
+            raise HTTPException(status_code=404, detail="Non trovato")
+        cast_archive_repo.reject_sharing(s, entry, reason=payload.reason)
+        owner = users_repo.get_by_id(s, entry.user_id)
+        return _shared_char_to_out(entry, owner)

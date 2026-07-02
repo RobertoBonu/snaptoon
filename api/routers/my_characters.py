@@ -55,6 +55,11 @@ class MyCharacterOut(BaseModel):
     visual_description: str
     has_reference: bool
     created_at: str
+    # Stato condivisione: "not_shared" | "pending" | "published" | "rejected"
+    share_status: str = "not_shared"
+    share_caption: str = ""
+    share_author_role: str = ""
+    share_rejection_reason: str = ""
 
 
 class MyCharactersListOut(BaseModel):
@@ -83,7 +88,16 @@ def _to_out(entry) -> MyCharacterOut:
         visual_description=entry.visual_description,
         has_reference=bool(entry.reference_storage_key),
         created_at=entry.created_at.isoformat(),
+        share_status=getattr(entry, "share_status", "not_shared") or "not_shared",
+        share_caption=getattr(entry, "share_caption", "") or "",
+        share_author_role=getattr(entry, "share_author_role", "") or "",
+        share_rejection_reason=getattr(entry, "share_rejection_reason", "") or "",
     )
+
+
+class ShareIn(BaseModel):
+    caption: str = Field(default="", max_length=500)
+    author_role: str = Field(default="", max_length=80)
 
 
 def _build_neutral_reference_prompt(name: str, visual_description: str) -> str:
@@ -518,6 +532,61 @@ def regenerate_my_character(
         if entry is None:
             raise HTTPException(status_code=500, detail="Entry sparita")
         cast_archive_repo.set_reference_key(s, entry, key)
+        return _to_out(entry)
+
+
+@router.post("/{entry_id}/share", response_model=MyCharacterOut)
+def share_my_character(
+    entry_id: str,
+    payload: ShareIn,
+    user: dict = Depends(require_user),
+) -> MyCharacterOut:
+    """Sottopone il personaggio alla moderazione admin per /esplora.
+
+    Il personaggio DEVE avere una reference generata. Lo status passa a
+    'pending'. Se era già 'published' o 'rejected', si riparte da capo.
+    """
+    user_id = uuid.UUID(user["id"])
+    try:
+        eid = uuid.UUID(entry_id)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="ID non valido")
+
+    with session_scope() as s:
+        u = users_repo.get_by_id(s, user_id)
+        entry = cast_archive_repo.get_by_id(s, u, eid) if u else None
+        if entry is None:
+            raise HTTPException(status_code=404, detail="Personaggio non trovato")
+        if not entry.reference_storage_key:
+            raise HTTPException(
+                status_code=400,
+                detail="Genera prima la reference AI, poi condividi",
+            )
+        cast_archive_repo.submit_for_sharing(
+            s, entry,
+            caption=payload.caption,
+            author_role=payload.author_role,
+        )
+        return _to_out(entry)
+
+
+@router.post("/{entry_id}/unshare", response_model=MyCharacterOut)
+def unshare_my_character(
+    entry_id: str, user: dict = Depends(require_user)
+) -> MyCharacterOut:
+    """Ritira la condivisione (rimuove da moderazione e da /esplora se pubblicato)."""
+    user_id = uuid.UUID(user["id"])
+    try:
+        eid = uuid.UUID(entry_id)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="ID non valido")
+
+    with session_scope() as s:
+        u = users_repo.get_by_id(s, user_id)
+        entry = cast_archive_repo.get_by_id(s, u, eid) if u else None
+        if entry is None:
+            raise HTTPException(status_code=404, detail="Personaggio non trovato")
+        cast_archive_repo.unshare(s, entry)
         return _to_out(entry)
 
 

@@ -139,6 +139,95 @@ def soft_delete(session: Session, entry: CastArchiveEntry) -> None:
     entry.deleted_at = datetime.now(timezone.utc)
 
 
+# === Condivisione su /esplora ===
+
+
+def submit_for_sharing(
+    session: Session,
+    entry: CastArchiveEntry,
+    *,
+    caption: str = "",
+    author_role: str = "",
+) -> None:
+    """Marca il personaggio come 'in attesa' di approvazione admin."""
+    entry.share_status = "pending"
+    entry.share_caption = caption.strip()[:500]
+    entry.share_author_role = author_role.strip()[:80]
+    entry.share_submitted_at = datetime.now(timezone.utc)
+    entry.share_moderated_at = None
+    entry.share_rejection_reason = ""
+
+
+def unshare(session: Session, entry: CastArchiveEntry) -> None:
+    """Rimuove la condivisione (torna 'not_shared', mantiene il record)."""
+    entry.share_status = "not_shared"
+    entry.share_moderated_at = None
+    entry.share_rejection_reason = ""
+
+
+def approve_sharing(session: Session, entry: CastArchiveEntry) -> None:
+    entry.share_status = "published"
+    entry.share_moderated_at = datetime.now(timezone.utc)
+    entry.share_rejection_reason = ""
+
+
+def reject_sharing(
+    session: Session, entry: CastArchiveEntry, reason: str = ""
+) -> None:
+    entry.share_status = "rejected"
+    entry.share_moderated_at = datetime.now(timezone.utc)
+    entry.share_rejection_reason = reason.strip()[:1000]
+
+
+def list_pending_shares(session: Session) -> list[CastArchiveEntry]:
+    """Personaggi in attesa di moderazione, ordinati per data di submit."""
+    from sqlalchemy import select
+
+    stmt = (
+        select(CastArchiveEntry)
+        .where(CastArchiveEntry.share_status == "pending")
+        .where(CastArchiveEntry.deleted_at.is_(None))
+        .order_by(CastArchiveEntry.share_submitted_at)
+    )
+    return list(session.execute(stmt).scalars())
+
+
+def list_published_shares(session: Session) -> list[CastArchiveEntry]:
+    """Personaggi pubblicati (visibili su /esplora)."""
+    from sqlalchemy import select
+
+    stmt = (
+        select(CastArchiveEntry)
+        .where(CastArchiveEntry.share_status == "published")
+        .where(CastArchiveEntry.deleted_at.is_(None))
+        .where(CastArchiveEntry.reference_storage_key.is_not(None))
+        .order_by(CastArchiveEntry.share_moderated_at.desc())
+    )
+    return list(session.execute(stmt).scalars())
+
+
+def get_shared_by_id(
+    session: Session, entry_id
+) -> CastArchiveEntry | None:
+    """Lookup per admin (senza ownership check — l'ownership è dell'utente
+    che ha condiviso, ma l'admin può moderare tutti)."""
+    import uuid as _uuid
+    from sqlalchemy import select
+
+    if isinstance(entry_id, str):
+        try:
+            entry_id = _uuid.UUID(entry_id)
+        except ValueError:
+            return None
+
+    stmt = (
+        select(CastArchiveEntry)
+        .where(CastArchiveEntry.id == entry_id)
+        .where(CastArchiveEntry.deleted_at.is_(None))
+    )
+    return session.execute(stmt).scalar_one_or_none()
+
+
 # Retrocompatibilità: alcune parti del codice chiamano ancora delete(entry)
 def delete(session: Session, entry: CastArchiveEntry) -> None:
     soft_delete(session, entry)

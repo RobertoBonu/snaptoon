@@ -489,6 +489,27 @@ class CastArchiveEntry(UUIDPrimaryKeyMixin, TimestampMixin, UpdatedAtMixin, Base
         DateTime(timezone=True), nullable=True
     )
 
+    # === Condivisione su /esplora ===
+    # Stati: "not_shared" (default) | "pending" | "published" | "rejected"
+    share_status: Mapped[str] = mapped_column(
+        String(20), nullable=False, default="not_shared", server_default="not_shared"
+    )
+    share_caption: Mapped[str] = mapped_column(
+        String(500), nullable=False, default="", server_default=""
+    )
+    share_author_role: Mapped[str] = mapped_column(
+        String(80), nullable=False, default="", server_default=""
+    )
+    share_submitted_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    share_moderated_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    share_rejection_reason: Mapped[str] = mapped_column(
+        Text, nullable=False, default="", server_default=""
+    )
+
 
 class AdminStyle(UUIDPrimaryKeyMixin, TimestampMixin, UpdatedAtMixin, Base):
     """Stili visivi creati/curati dall'admin, disponibili a tutti gli utenti.
