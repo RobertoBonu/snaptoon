@@ -31,6 +31,7 @@ export default function KidsPersonaggiPage({
   const [chars, setChars] = useState<KidsCharacter[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [uploading, setUploading] = useState<string | null>(null);
+  const [generating, setGenerating] = useState<string | null>(null);
   const [refreshTag, setRefreshTag] = useState<number>(Date.now());
 
   async function load() {
@@ -52,6 +53,23 @@ export default function KidsPersonaggiPage({
   useEffect(() => {
     load();
   }, []);
+
+  async function handleGenerateRef(charId: string) {
+    setGenerating(charId);
+    setError(null);
+    try {
+      await apiFetch<KidsCharacter>(
+        `/api/kids/projects/${id}/characters/${charId}/generate-reference`,
+        { method: "POST" }
+      );
+      setRefreshTag(Date.now());
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setGenerating(null);
+    }
+  }
 
   async function handleUploadRef(charId: string, file: File) {
     const okTypes = ["image/png", "image/jpeg", "image/jpg", "image/webp"];
@@ -154,28 +172,41 @@ export default function KidsPersonaggiPage({
                 <p className="text-xs text-[var(--color-fg-muted)] mb-3 line-clamp-3">
                   {c.visual_description}
                 </p>
-                <label
-                  className={`inline-block text-sm border border-[var(--color-border)] hover:border-[var(--color-accent)] hover:text-[var(--color-accent)] text-[var(--color-fg-muted)] px-4 py-1.5 rounded cursor-pointer transition-colors ${
-                    uploading === c.id ? "opacity-50" : ""
-                  }`}
-                >
-                  {uploading === c.id
-                    ? "Carico..."
-                    : c.has_reference
-                      ? "📁 Sostituisci foto"
-                      : "📁 Carica foto"}
-                  <input
-                    type="file"
-                    accept="image/png,image/jpeg,image/jpg,image/webp"
-                    onChange={(e) => {
-                      const f = e.target.files?.[0];
-                      if (f) handleUploadRef(c.id, f);
-                      e.target.value = "";
-                    }}
-                    disabled={uploading === c.id}
-                    className="hidden"
-                  />
-                </label>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    onClick={() => handleGenerateRef(c.id)}
+                    disabled={generating === c.id || uploading === c.id}
+                    className="text-sm bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] text-[var(--color-bg)] font-medium px-4 py-1.5 rounded disabled:opacity-50"
+                  >
+                    {generating === c.id
+                      ? "Genero..."
+                      : c.has_reference
+                        ? "🔄 Rigenera AI (1 cr)"
+                        : "✨ Genera con AI (1 cr)"}
+                  </button>
+                  <label
+                    className={`inline-block text-sm border border-[var(--color-border)] hover:border-[var(--color-accent)] hover:text-[var(--color-accent)] text-[var(--color-fg-muted)] px-4 py-1.5 rounded cursor-pointer transition-colors ${
+                      uploading === c.id || generating === c.id ? "opacity-50" : ""
+                    }`}
+                  >
+                    {uploading === c.id
+                      ? "Carico..."
+                      : c.has_reference
+                        ? "📁 Sostituisci con foto"
+                        : "📁 Carica foto"}
+                    <input
+                      type="file"
+                      accept="image/png,image/jpeg,image/jpg,image/webp"
+                      onChange={(e) => {
+                        const f = e.target.files?.[0];
+                        if (f) handleUploadRef(c.id, f);
+                        e.target.value = "";
+                      }}
+                      disabled={uploading === c.id || generating === c.id}
+                      className="hidden"
+                    />
+                  </label>
+                </div>
               </div>
             </div>
           </div>

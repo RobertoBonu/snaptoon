@@ -268,6 +268,11 @@ def delete_kids_project(project_id: str, user: dict = Depends(require_user)) -> 
 from storage.client import download_bytes, object_exists, upload_bytes
 from storage.keys import reference_key
 from db.repos import characters as characters_repo
+from db.repos import credits as credits_repo
+from db.repos import users as users_repo
+from db.repos.credits import InsufficientCreditsError
+from db.models import CreditOperation
+from billing.plans import cost_for_operation
 
 
 class KidsCharacterOut(BaseModel):
@@ -337,6 +342,99 @@ def get_kids_character_reference(
     if not object_exists(rk):
         raise HTTPException(status_code=404, detail="Reference non trovata")
     return Response(content=download_bytes(rk), media_type="image/png")
+
+
+@router.post(
+    "/projects/{project_id}/characters/{char_id}/generate-reference",
+    response_model=KidsCharacterOut,
+)
+def generate_kids_character_reference(
+    project_id: str, char_id: str, user: dict = Depends(require_user)
+) -> KidsCharacterOut:
+    """Genera AI la reference image (slot 1) del personaggio KIDS.
+
+    Costa generate_reference (1 cr). Refund automatico su errore.
+    Usa build_reference_prompt di snaptoon_core.kids_pipeline.
+    """
+    from snaptoon_core.generator import OpenAIImageGenerator
+    from snaptoon_core.kids_pipeline import build_reference_prompt
+
+    user_id = uuid.UUID(user["id"])
+    pid = _kids_project_or_404(project_id, user_id)
+    try:
+        cid = uuid.UUID(char_id)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="ID personaggio invalido")
+
+    with session_scope() as s:
+        project = projects_repo.get_by_id(s, pid)
+        if project is None or project.owner_user_id != user_id:
+            raise HTTPException(status_code=404, detail="Progetto non trovato")
+        cs = next((c for c in project.character_sheets if c.id == cid), None)
+        if cs is None:
+            raise HTTPException(status_code=404, detail="Personaggio non trovato")
+        style_preset_id = project.style_id
+        if not style_preset_id:
+            raise HTTPException(
+                status_code=400,
+                detail="Stile non impostato sul progetto",
+            )
+        char_name = cs.name
+        char_desc = cs.visual_description
+
+    # Charge
+    cost = cost_for_operation("generate_reference")
+    try:
+        with session_scope() as s:
+            u = users_repo.get_by_id(s, user_id)
+            credits_repo.charge(
+                s, u, cost=cost,
+                operation=CreditOperation.generate_reference,
+                reason=f"KIDS reference {char_name}",
+                reference_id=str(pid),
+            )
+    except InsufficientCreditsError as e:
+        raise HTTPException(
+            status_code=402,
+            detail=f"Crediti insufficienti: servono {e.required}, ne hai {e.available}",
+        )
+
+    # Genera
+    try:
+        generator = OpenAIImageGenerator()
+        prompt = build_reference_prompt(char_name, char_desc, style_preset_id)
+        img_bytes = generator._generate_bytes(
+            prompt=prompt, size="1024x1024",
+            reference_images=None, quality="medium",
+        )
+    except Exception as e:
+        with session_scope() as s:
+            u = users_repo.get_by_id(s, user_id)
+            credits_repo.refund(
+                s, u, amount=cost,
+                reason=f"Refund KIDS ref {char_name}: {str(e)[:200]}",
+            )
+        raise HTTPException(
+            status_code=502, detail=f"Errore generazione: {str(e)[:300]}"
+        )
+
+    # Upload + save
+    rk = reference_key(pid, cid, 1)
+    upload_bytes(rk, img_bytes, content_type="image/png")
+    with session_scope() as s:
+        project = projects_repo.get_by_id(s, pid)
+        cs = next((c for c in project.character_sheets if c.id == cid), None)
+        if cs is not None:
+            characters_repo.upsert_reference(
+                s, cs, slot_number=1, storage_key=rk,
+                mime_type="image/png", file_size=len(img_bytes),
+            )
+        return KidsCharacterOut(
+            id=str(cs.id) if cs else char_id,
+            name=char_name,
+            visual_description=char_desc,
+            has_reference=True,
+        )
 
 
 @router.post(
