@@ -396,16 +396,42 @@ def build_cover_prompt(
     title: str,
     cast: list[dict],
     style_preset_id: str,
+    story_description: str = "",
+    volume_number: int = 1,
+    year: int | None = None,
 ) -> str:
-    """Prompt per la copertina del libretto (2:3 verticale, titolo AI-bake)."""
+    """Prompt per la copertina del libretto (2:3 verticale, titolo AI-bake).
+
+    Layout stile "vero fumetto":
+      - Titolo grande centrale (AI-bake)
+      - Badge alto-sinistra: "VOL. #01" + anno
+      - Badge alto-destra: "SNAP TOON" su due righe
+      - Badge SFX basso-sinistra: parola sonora coerente con la storia
+      - Personaggi centrali in posa iconica
+
+    Args:
+        title: Titolo del libretto
+        cast: Lista personaggi con nome+descrizione
+        style_preset_id: ID stile visivo
+        story_description: Logline della storia (per SFX contestuale)
+        volume_number: Numero del volume (default 1 per libretti singoli)
+        year: Anno da mostrare (default = anno corrente)
+    """
+    from datetime import datetime
+
     preset = get_preset(style_preset_id)
+    if year is None:
+        year = datetime.now().year
+
     parts = []
     parts.append(
         "=== RENDER MODE ===\n"
-        "Vertical book cover illustration for a children's picture book. "
-        "Edge-to-edge full-bleed. Cinematic poster composition, eye-catching, "
-        "bright friendly colors. No frame, no border. The title and characters "
-        "should be the focus."
+        "Vertical comic book / picture book COVER illustration, 2:3 aspect "
+        "ratio. Edge-to-edge full-bleed. Cinematic poster composition like a "
+        "vintage comic magazine, eye-catching, bright friendly colors. NO "
+        "outer frame, NO black margin. Layout: dynamic central action pose "
+        "of the characters, with 4 corner badges — top-left, top-right, "
+        "bottom-left, bottom-right (see BADGES block below)."
     )
     if preset:
         parts.append(f"=== STYLE ===\n{preset.expansion.strip()}")
@@ -417,22 +443,64 @@ def build_cover_prompt(
         for cs in cast:
             cast_block.append(f"- {cs['name']}: {cs['description']}")
         cast_block.append(
-            "Characters must look IDENTICAL to reference images. Hero pose, "
-            "friendly expression."
+            "Characters must look IDENTICAL to reference images. Hero pose "
+            "in the CENTER of the image, friendly expression, mid-air / "
+            "action feel."
         )
         parts.append("\n".join(cast_block))
 
+    # Blocco titolo (grande, centrale-alto)
     parts.append(
         f"=== TITLE TEXT (DRAW IT IN THE IMAGE) ===\n"
-        f"At the top of the image, draw the title in big bold playful "
-        f"children's book font: '{title.upper()}'. Use clear readable letters, "
-        f"strong outline so it stands out from the background. No subtitle, "
-        f"no author name."
+        f"Draw the main title in the CENTER-TOP area, in big bold playful "
+        f"children's-comic-book font: '{title.upper()}'. Very clear readable "
+        f"letters, strong outline (chunky yellow letters with red outline is "
+        f"a classic comic look). The title MUST stand out from the "
+        f"background. No subtitle. No author name in this area."
     )
+
+    # 4 BADGE angolari, stile vera copertina di fumetto
+    badges = [
+        "=== CORNER BADGES (DRAW EACH ONE INSIDE THE ILLUSTRATION) ===",
+        "The cover MUST have 4 small graphic badges, one per corner. Each "
+        "badge is a small ROUNDED RECTANGLE or STARBURST shape with clear "
+        "outline, filled with solid color, containing readable hand-lettered "
+        "text. They must be small (about 12-18% of image width) and NOT "
+        "cover the characters' faces.",
+        "",
+        f"TOP-LEFT BADGE — small YELLOW rectangle with black outline. Two "
+        f"lines of hand-lettered black text: line 1 'VOL. #{volume_number:02d}' "
+        f"in bold, line 2 '{year}' smaller below.",
+        "",
+        "TOP-RIGHT BADGE — small WHITE rectangle with black outline. Two "
+        "lines of hand-lettered black text stacked: line 1 'SNAP', line 2 "
+        "'TOON'. Simple sans-serif comic font.",
+        "",
+        "BOTTOM-LEFT BADGE — a comic-style SFX STARBURST (jagged explosion "
+        "shape). Choose a short punchy sound-effect word (1-3 letters or "
+        "short syllables) that fits the story mood. Examples of the STYLE "
+        "you can pick from: POW! · BAM! · ZOOM! · WOW! · YAY! · SNAP! · "
+        "BOING! · ZAP! · WOOSH! · MAGIC! · TA-DA! — CHOOSE one that "
+        "matches the story tone described below. The text is chunky, "
+        "hand-lettered, all-caps with exclamation mark, filled in bright "
+        "color (yellow/red/orange) with strong outline.",
+    ]
+    if story_description.strip():
+        badges.append("")
+        badges.append(f"STORY TONE (for SFX choice): {story_description.strip()}")
+    badges.append("")
+    badges.append(
+        "BOTTOM-RIGHT BADGE — optional small colored starburst with 1-2 words "
+        "of a positive tagline in the story language (e.g. 'AVVENTURA!', "
+        "'MAGIA!', 'AMICI!', 'DIVERTIMENTO!'). Chunky hand-lettered caps."
+    )
+    parts.append("\n".join(badges))
 
     parts.append(
         "=== AVOID ===\n"
-        "scary, dark themes, frame, border, watermark, multiple titles, "
-        "scrambled text, weird letters, misspelled words"
+        "scary, dark themes, frame, black border margin, watermark, "
+        "multiple titles, scrambled text, weird letters, misspelled words, "
+        "badges covering character faces, badges bigger than 20% of image "
+        "width, real-world brand logos, more than 4 badges, empty badges."
     )
     return "\n\n".join(parts)

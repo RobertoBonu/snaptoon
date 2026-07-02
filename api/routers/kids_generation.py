@@ -734,7 +734,10 @@ def generate_stream(
                     if _pj and _pj.cover and _pj.cover.title:
                         explicit_title = _pj.cover.title.strip()
                 cover_title = explicit_title or pyd_script.logline or project_name
-                prompt = build_cover_prompt(cover_title, cast, style_preset_id)
+                prompt = build_cover_prompt(
+                    cover_title, cast, style_preset_id,
+                    story_description=pyd_script.logline or "",
+                )
                 img_bytes = generator._generate_bytes(
                     prompt=prompt,
                     size="1024x1536",
@@ -912,6 +915,7 @@ def generate_cover_only(
         if not style_preset_id:
             raise HTTPException(status_code=400, detail="Stile non impostato")
         pyd_script = scripts_repo.load_pydantic(project.script)
+        story_logline_for_cover = pyd_script.logline or ""
         cast = [
             {
                 "name": cs.name,
@@ -1006,7 +1010,10 @@ def generate_cover_only(
                 tmp.close()
                 tmp_refs.append(Path(tmp.name))
 
-        cover_prompt = build_cover_prompt(cover_title, cast, style_preset_id)
+        cover_prompt = build_cover_prompt(
+            cover_title, cast, style_preset_id,
+            story_description=story_logline_for_cover,
+        )
         img_bytes = generator._generate_bytes(
             prompt=cover_prompt,
             size="1024x1536",
