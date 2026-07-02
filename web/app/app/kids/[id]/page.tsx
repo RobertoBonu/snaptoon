@@ -18,6 +18,62 @@ export default function KidsPreviewPage({
   // Refresh-tag per forzare ricarica immagini dopo rigenerazione
   const [refreshTag, setRefreshTag] = useState<number>(Date.now());
   const [downloadingPdf, setDownloadingPdf] = useState(false);
+  // Set di chiavi "cover" | "p<page>v<panel>" attualmente in rigenerazione
+  const [regenerating, setRegenerating] = useState<Set<string>>(new Set());
+
+  async function regenerateCover() {
+    if (
+      !confirm(
+        "Rigenerare la copertina consuma 1 credito. La copertina attuale sarà eliminata. Procedo?",
+      )
+    )
+      return;
+    setRegenerating((prev) => new Set(prev).add("cover"));
+    setError(null);
+    try {
+      await apiFetch(`/api/kids/projects/${id}/regenerate-cover`, {
+        method: "POST",
+      });
+      setRefreshTag(Date.now());
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setRegenerating((prev) => {
+        const next = new Set(prev);
+        next.delete("cover");
+        return next;
+      });
+    }
+  }
+
+  async function regenerateVignette(page: number, panel: number) {
+    const key = `p${page}v${panel}`;
+    if (
+      !confirm(
+        `Rigenerare la vignetta P${page}V${panel} consuma 1 credito. L'immagine attuale sarà eliminata. Procedo?`,
+      )
+    )
+      return;
+    setRegenerating((prev) => new Set(prev).add(key));
+    setError(null);
+    try {
+      await apiFetch(
+        `/api/kids/projects/${id}/regenerate-vignette/${page}/${panel}`,
+        { method: "POST" },
+      );
+      setRefreshTag(Date.now());
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setRegenerating((prev) => {
+        const next = new Set(prev);
+        next.delete(key);
+        return next;
+      });
+    }
+  }
 
   async function load() {
     try {
@@ -202,11 +258,33 @@ export default function KidsPreviewPage({
       <section className="mb-10">
         <h2 className="text-lg font-semibold mb-3">📕 Copertina</h2>
         {details.has_cover ? (
-          <img
-            src={`/api/kids/projects/${id}/images/cover?t=${refreshTag}`}
-            alt="Cover"
-            className="rounded-xl max-w-md w-full border border-[var(--color-border)]"
-          />
+          <div className="max-w-md">
+            <div className="relative">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={`/api/kids/projects/${id}/images/cover?t=${refreshTag}`}
+                alt="Cover"
+                className={`rounded-xl w-full border border-[var(--color-border)] ${
+                  regenerating.has("cover") ? "opacity-30" : ""
+                }`}
+              />
+              {regenerating.has("cover") && (
+                <div className="absolute inset-0 flex items-center justify-center bg-black/40 rounded-xl">
+                  <p className="text-sm bg-[var(--color-bg)] px-3 py-1.5 rounded-full">
+                    Rigenero...
+                  </p>
+                </div>
+              )}
+            </div>
+            <button
+              onClick={regenerateCover}
+              disabled={regenerating.has("cover")}
+              className="mt-2 text-sm border border-[var(--color-border)] hover:border-[var(--color-accent)] hover:text-[var(--color-accent)] text-[var(--color-fg-muted)] px-4 py-1.5 rounded transition-colors disabled:opacity-50"
+              title="Elimina e ri-genera la copertina (1 credito)"
+            >
+              🔄 Rigenera copertina (1 cr)
+            </button>
+          </div>
         ) : (
           <div className="bg-[var(--color-bg-elev)] border border-dashed border-[var(--color-border)] rounded-xl p-12 text-center max-w-md">
             <p className="text-[var(--color-fg-muted)]">
@@ -230,17 +308,41 @@ export default function KidsPreviewPage({
               <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
                 {p.panels.map((pn) => {
                   const isGenerated = vigSet.has(`${p.number}_${pn.number}`);
+                  const rKey = `p${p.number}v${pn.number}`;
+                  const isRegen = regenerating.has(rKey);
                   return (
                     <div
                       key={pn.number}
-                      className="bg-[var(--color-bg-elev)] border border-[var(--color-border)] rounded-lg overflow-hidden"
+                      className="bg-[var(--color-bg-elev)] border border-[var(--color-border)] rounded-lg overflow-hidden group relative"
                     >
                       {isGenerated ? (
-                        <img
-                          src={`/api/kids/projects/${id}/images/panel/${p.number}/${pn.number}?t=${refreshTag}`}
-                          alt={`P${p.number}V${pn.number}`}
-                          className="w-full aspect-square object-cover"
-                        />
+                        <div className="relative">
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img
+                            src={`/api/kids/projects/${id}/images/panel/${p.number}/${pn.number}?t=${refreshTag}`}
+                            alt={`P${p.number}V${pn.number}`}
+                            className={`w-full aspect-square object-cover ${
+                              isRegen ? "opacity-30" : ""
+                            }`}
+                          />
+                          {isRegen ? (
+                            <div className="absolute inset-0 flex items-center justify-center bg-black/40">
+                              <p className="text-xs bg-[var(--color-bg)] px-2 py-1 rounded-full">
+                                Rigenero...
+                              </p>
+                            </div>
+                          ) : (
+                            <button
+                              onClick={() =>
+                                regenerateVignette(p.number, pn.number)
+                              }
+                              className="absolute top-1.5 right-1.5 bg-[var(--color-bg)]/85 hover:bg-[var(--color-accent)] hover:text-[var(--color-bg)] text-[var(--color-fg)] text-xs px-2 py-1 rounded shadow opacity-0 group-hover:opacity-100 transition-opacity"
+                              title={`Rigenera P${p.number}V${pn.number} (1 credito)`}
+                            >
+                              🔄 Rigenera
+                            </button>
+                          )}
+                        </div>
                       ) : (
                         <div className="w-full aspect-square flex items-center justify-center bg-[var(--color-bg)]">
                           <p className="text-xs text-[var(--color-fg-muted)]">

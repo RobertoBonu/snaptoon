@@ -49,7 +49,7 @@ from snaptoon_core.kids_pipeline import (
     panel_size_for,
 )
 from snaptoon_core.models import Script as PydScript
-from storage.client import download_bytes, object_exists, upload_bytes
+from storage.client import delete_object, download_bytes, object_exists, upload_bytes
 from storage.keys import (
     cover_illustration_key,
     reference_key,
@@ -1155,6 +1155,198 @@ def generate_single_page(
             ok=True, kind="page",
             detail=f"Pagina {page_num}: {len(generated)} vignette generate",
             generated_panels=generated,
+        )
+    finally:
+        for p in tmp_refs:
+            try:
+                p.unlink()
+            except OSError:
+                pass
+
+
+# ============================================================
+# Rigenera SINGOLA immagine (cover o vignetta)
+# ============================================================
+
+
+@router.post(
+    "/projects/{project_id}/regenerate-cover",
+    response_model=StepResultOut,
+)
+def regenerate_cover(
+    project_id: str, user: dict = Depends(require_user)
+) -> StepResultOut:
+    """Elimina la cover esistente e la ri-genera da zero.
+
+    Consuma crediti come una nuova generazione. Il vecchio file viene
+    eliminato dall'object storage e da Cover.illustration_storage_key
+    PRIMA della nuova charge (così in caso di errore parte il refund
+    e l'utente ha ancora una cover, per quanto vecchia).
+
+    In realtà cancelliamo prima. Se la nuova generazione fallisce,
+    fa refund crediti ma la cover vecchia non è recuperabile. È il
+    trade-off giusto: senza delete, generate_cover_only sarebbe
+    idempotente e non farebbe nulla.
+    """
+    user_id = uuid.UUID(user["id"])
+    pid = _project_or_404(project_id, user_id)
+
+    # Elimina cover storage + DB pointer
+    ck = cover_illustration_key(pid)
+    if object_exists(ck):
+        try:
+            delete_object(ck)
+        except Exception as e:
+            logger.warning("Delete cover storage fallito: %s", e)
+
+    with session_scope() as s:
+        project = projects_repo.get_by_id(s, pid)
+        if project is not None and project.cover is not None:
+            covers_repo.update_illustration_key(s, project.cover, None)
+
+    # Delega la generazione all'endpoint idempotente esistente
+    return generate_cover_only(project_id=project_id, user=user)
+
+
+@router.post(
+    "/projects/{project_id}/regenerate-vignette/{page_num}/{panel_num}",
+    response_model=StepResultOut,
+)
+def regenerate_vignette(
+    project_id: str,
+    page_num: int,
+    panel_num: int,
+    user: dict = Depends(require_user),
+) -> StepResultOut:
+    """Elimina una singola vignetta e la ri-genera.
+
+    Consuma crediti come una nuova generazione. La vecchia immagine
+    viene rimossa da object storage e il record Vignette dal DB
+    prima di generare la nuova.
+    """
+    from snaptoon_core.generator import OpenAIImageGenerator
+    from snaptoon_core.kids_pipeline import build_panel_prompt, panel_size_for
+
+    user_id = uuid.UUID(user["id"])
+    pid = _project_or_404(project_id, user_id)
+
+    # 1. Load context + delete existing vignette
+    with session_scope() as s:
+        project = projects_repo.get_by_id(s, pid)
+        if project is None or project.owner_user_id != user_id:
+            raise HTTPException(status_code=404, detail="Progetto non trovato")
+        if project.script is None:
+            raise HTTPException(status_code=400, detail="Storia non ancora generata")
+        style_preset_id = project.style_id
+        if not style_preset_id:
+            raise HTTPException(status_code=400, detail="Stile non impostato")
+
+        pyd_script = scripts_repo.load_pydantic(project.script)
+        target_page = next(
+            (p for p in pyd_script.pages if p.number == page_num), None
+        )
+        if target_page is None:
+            raise HTTPException(
+                status_code=404, detail=f"Pagina {page_num} non trovata"
+            )
+        target_panel = next(
+            (pn for pn in target_page.panels if pn.number == panel_num), None
+        )
+        if target_panel is None:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Vignetta {panel_num} non trovata in pagina {page_num}",
+            )
+
+        page_layouts = {pl.page_number: pl.grid_id for pl in project.page_layouts}
+        grid_id = page_layouts.get(page_num, "2x2")
+        cast = [
+            {"name": cs.name, "description": cs.visual_description, "id": str(cs.id)}
+            for cs in project.character_sheets
+        ]
+
+        # Cancella record DB se presente
+        existing = vignettes_repo.get(s, project, page_num, panel_num)
+        if existing is not None:
+            vignettes_repo.delete(s, existing)
+
+    # Cancella storage
+    vk = vignette_key(pid, page_num, panel_num)
+    if object_exists(vk):
+        try:
+            delete_object(vk)
+        except Exception as e:
+            logger.warning("Delete vignette storage fallito p%dv%d: %s",
+                           page_num, panel_num, e)
+
+    # 2. Charge crediti
+    cost = cost_for_operation("generate_panel", quality="medium")
+    try:
+        with session_scope() as s:
+            u = users_repo.get_by_id(s, user_id)
+            credits_repo.charge(
+                s, u, cost=cost,
+                operation=CreditOperation.generate_panel,
+                reason=f"KIDS regen p{page_num}v{panel_num}",
+                reference_id=str(pid),
+            )
+    except InsufficientCreditsError as e:
+        raise HTTPException(
+            status_code=402,
+            detail=f"Crediti insufficienti: servono {e.required}, ne hai {e.available}",
+        )
+
+    # 3. Generate
+    generator = OpenAIImageGenerator()
+    tmp_refs: list[Path] = []
+    try:
+        for c in cast:
+            rk = reference_key(pid, uuid.UUID(c["id"]), 1)
+            if object_exists(rk):
+                tmp = tempfile.NamedTemporaryFile(suffix=".png", delete=False)
+                tmp.write(download_bytes(rk))
+                tmp.close()
+                tmp_refs.append(Path(tmp.name))
+
+        size_str, aspect_key, fmt_label = panel_size_for(grid_id, panel_num)
+        prompt = build_panel_prompt(
+            target_panel, cast, style_preset_id, {}, panel_format=fmt_label,
+        )
+        img_bytes = generator._generate_bytes(
+            prompt=prompt, size=size_str,
+            reference_images=tmp_refs if tmp_refs else None,
+            quality="medium",
+        )
+        upload_bytes(vk, img_bytes, content_type="image/png")
+
+        with session_scope() as s:
+            project = projects_repo.get_by_id(s, pid)
+            vignettes_repo.upsert(
+                s, project=project,
+                page_number=page_num, panel_number=panel_num,
+                storage_key=vk,
+                prompt_hash=_hash_prompt(prompt),
+                quality="medium",
+                aspect_ratio_key=aspect_key,
+                provider="openai",
+                model="gpt-image-2",
+            )
+
+        return StepResultOut(
+            ok=True, kind="vignette",
+            detail=f"Vignetta P{page_num}V{panel_num} rigenerata",
+            generated_panels=[{"page": page_num, "panel": panel_num}],
+        )
+    except Exception as e:
+        with session_scope() as s:
+            u = users_repo.get_by_id(s, user_id)
+            credits_repo.refund(
+                s, u, amount=cost,
+                reason=f"Refund regen p{page_num}v{panel_num}: {str(e)[:200]}",
+            )
+        raise HTTPException(
+            status_code=502,
+            detail=f"Errore rigenerazione: {str(e)[:200]}",
         )
     finally:
         for p in tmp_refs:
