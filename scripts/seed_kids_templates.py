@@ -5,12 +5,14 @@ Esegui DOPO `alembic upgrade head`:
 
 Idempotente: usa upsert sullo slug.
 
-Schemi (la copertina è INCLUSA nel conteggio totale del libretto):
-- Breve = copertina + 5 pagine interne (12 vignette interne).
-- Lungo = copertina + 15 pagine interne (44 vignette interne).
+Schemi (copertina + pagine interne + quarta di copertina):
+- Breve = copertina + 4 pagine interne + quarta = 6 pagine PDF (9 vignette interne).
+- Lungo = copertina + 14 pagine interne + quarta = 16 pagine PDF (~40 vignette interne).
 
 Quindi grid_distribution rappresenta SOLO le pagine interne. La copertina
-viene generata a parte come pagina aggiuntiva con prompt dedicato.
+viene generata a parte come pagina aggiuntiva con prompt dedicato. La quarta
+di copertina viene compositata programmaticamente in PIL come ultima pagina
+del PDF (kids_back_cover.py).
 
 3 template per le 2 lunghezze = 6 record totali. La differenza tra "1/2/3
 personaggi" influisce SOLO sul prompt Claude (gabbie/scene identiche).
@@ -32,10 +34,12 @@ from db.session import session_scope
 # Distribuzione gabbie + scene
 # ============================================================
 
-# 5 pagine interne — sequenza grid_id (la copertina è esterna)
-GRIDS_BREVE = ["splash", "1+2", "2x2", "1+2", "splash"]
+# 4 pagine interne — sequenza grid_id (cover e quarta sono esterne)
+# 1 + 3 + 4 + 1 = 9 vignette
+GRIDS_BREVE = ["splash", "1+2", "2x2", "splash"]
 
-# 15 pagine interne — sequenza grid_id (con 3 splash strategici)
+# 14 pagine interne — sequenza grid_id (con 3 splash strategici)
+# 1+3+3+4+4+1+4+4+3+4+4+3+1+1 = 40 vignette
 GRIDS_LUNGO = [
     "splash",  # 1 — apertura
     "1+2", "1+2",  # 2-3 — setup
@@ -46,8 +50,7 @@ GRIDS_LUNGO = [
     "2x2", "2x2",  # 10-11
     "1+2",  # 12
     "splash",  # 13 — climax 2
-    "2x2",  # 14
-    "splash",  # 15 — finale
+    "splash",  # 14 — finale
 ]
 
 
@@ -121,7 +124,7 @@ TEMPLATES = [
         "n_characters": 1,
         "length_target": LengthTarget.breve,
         "grid_distribution": GRIDS_BREVE,
-        "notes": "Focus assoluto su un singolo personaggio. Copertina + 5 pagine, 12 vignette.",
+        "notes": "Focus assoluto su un singolo personaggio. Copertina + 4 pagine + quarta, 9 vignette.",
     },
     {
         "slug": "kids_1p_lungo",
@@ -129,7 +132,7 @@ TEMPLATES = [
         "n_characters": 1,
         "length_target": LengthTarget.lungo,
         "grid_distribution": GRIDS_LUNGO,
-        "notes": "Avventura completa di un singolo personaggio. Copertina + 15 pagine, ~44 vignette.",
+        "notes": "Avventura completa di un singolo personaggio. Copertina + 14 pagine + quarta, ~40 vignette.",
     },
     # 2 personaggi
     {
@@ -138,7 +141,7 @@ TEMPLATES = [
         "n_characters": 2,
         "length_target": LengthTarget.breve,
         "grid_distribution": GRIDS_BREVE,
-        "notes": "Duo di personaggi. Dialoghi 50/50. Copertina + 5 pagine, 12 vignette.",
+        "notes": "Duo di personaggi. Dialoghi 50/50. Copertina + 4 pagine + quarta, 9 vignette.",
     },
     {
         "slug": "kids_2p_lungo",
@@ -146,7 +149,7 @@ TEMPLATES = [
         "n_characters": 2,
         "length_target": LengthTarget.lungo,
         "grid_distribution": GRIDS_LUNGO,
-        "notes": "Storia di due personaggi. Copertina + 15 pagine, ~44 vignette.",
+        "notes": "Storia di due personaggi. Copertina + 14 pagine + quarta, ~40 vignette.",
     },
     # 3 personaggi
     {
@@ -155,7 +158,7 @@ TEMPLATES = [
         "n_characters": 3,
         "length_target": LengthTarget.breve,
         "grid_distribution": GRIDS_BREVE,
-        "notes": "Trio di amici. Copertina + 5 pagine, 12 vignette.",
+        "notes": "Trio di amici. Copertina + 4 pagine + quarta, 9 vignette.",
     },
     {
         "slug": "kids_3p_lungo",
@@ -163,7 +166,7 @@ TEMPLATES = [
         "n_characters": 3,
         "length_target": LengthTarget.lungo,
         "grid_distribution": GRIDS_LUNGO,
-        "notes": "Avventura di gruppo. Copertina + 15 pagine, ~44 vignette.",
+        "notes": "Avventura di gruppo. Copertina + 14 pagine + quarta, ~40 vignette.",
     },
 ]
 
