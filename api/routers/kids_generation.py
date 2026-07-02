@@ -1173,12 +1173,21 @@ def generate_single_page(
 def export_kids_pdf(
     project_id: str, user: dict = Depends(require_user)
 ) -> Response:
-    """Genera il PDF del libretto KIDS con COVER come pagina 1 + tavole.
+    """Genera il PDF del libretto KIDS con COVER pagina 1 + tavole + QUARTA.
 
-    Riusa snaptoon_core.layout.render_page + export_pdf come per Pro,
-    ma antepone la cover come prima pagina "splash" del PDF.
+    Struttura del PDF:
+      Pagina 1: cover illustrata (AI-baked, verticale 2:3)
+      Pagine 2..N-1: tavole interne (grid + vignette)
+      Pagina N (ultima): quarta di copertina (compositata in PIL con
+          logo di sistema, titolo, autore, testo editoriale sistema-wide
+          e testo copyright specifico del libretto)
     """
+    from snaptoon_core.kids_back_cover import render_back_cover
     from snaptoon_core.layout import GRIDS, export_pdf, render_page
+    from storage.keys import (
+        ADMIN_BACK_COVER_TEMPLATE_KEY,
+        ADMIN_LOGO_KEY,
+    )
 
     user_id = uuid.UUID(user["id"])
     pid = _project_or_404(project_id, user_id)
@@ -1194,6 +1203,31 @@ def export_kids_pdf(
         layouts = {pl.page_number: pl for pl in project.page_layouts}
         project_slug = project.slug
         project_name = project.name
+
+        # Metadati per la quarta di copertina
+        cover_orm = project.cover
+        bc_title = (cover_orm.title if cover_orm else "") or project_name
+        bc_subtitle = (cover_orm.subtitle if cover_orm else "") or ""
+        bc_author = (cover_orm.author if cover_orm else "") or ""
+        bc_copyright = getattr(project, "copyright_text", "") or ""
+
+    # Testo editoriale sistema-wide (dall'admin, opzionale)
+    bc_template = ""
+    if object_exists(ADMIN_BACK_COVER_TEMPLATE_KEY):
+        try:
+            bc_template = download_bytes(ADMIN_BACK_COVER_TEMPLATE_KEY).decode(
+                "utf-8"
+            )
+        except Exception:
+            pass
+
+    # Logo di sistema (opzionale)
+    logo_bytes = None
+    if object_exists(ADMIN_LOGO_KEY):
+        try:
+            logo_bytes = download_bytes(ADMIN_LOGO_KEY)
+        except Exception:
+            pass
 
     temp_files: list[Path] = []
     page_temp_paths: list[Path] = []
@@ -1252,6 +1286,25 @@ def export_kids_pdf(
                 status_code=400,
                 detail="Nessuna pagina da esportare (né cover né vignette generate).",
             )
+
+        # === ULTIMA PAGINA: la quarta di copertina ===
+        back_cover_tmp = tempfile.NamedTemporaryFile(suffix=".png", delete=False)
+        back_cover_tmp.close()
+        back_cover_path = Path(back_cover_tmp.name)
+        temp_files.append(back_cover_path)
+        try:
+            render_back_cover(
+                title=bc_title,
+                author=bc_author,
+                subtitle=bc_subtitle,
+                copyright_text=bc_copyright,
+                back_cover_template=bc_template,
+                logo_bytes=logo_bytes,
+                out_path=back_cover_path,
+            )
+            page_temp_paths.append(back_cover_path)
+        except Exception as e:
+            logger.warning("Back cover generation failed, skipping: %s", str(e))
 
         pdf_tmp = tempfile.NamedTemporaryFile(suffix=".pdf", delete=False)
         pdf_tmp.close()
