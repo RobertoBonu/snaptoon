@@ -10,12 +10,13 @@ import {
   type KidsTemplate,
 } from "@/lib/api";
 
-type Step = 1 | 2 | 3;
+type Step = 1 | 2 | 3 | 4;
 
 const STEP_LABELS: Record<Step, string> = {
   1: "Template & Stile",
-  2: "Scintilla & nomi",
-  3: "Personaggi",
+  2: "Titolo & Autore",
+  3: "Scintilla & nomi",
+  4: "Personaggi",
 };
 
 export default function NewKidsPage() {
@@ -31,6 +32,10 @@ export default function NewKidsPage() {
   // Scelte utente
   const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null);
   const [selectedStyleSlug, setSelectedStyleSlug] = useState<string | null>(null);
+  const [title, setTitle] = useState("");
+  const [subtitle, setSubtitle] = useState("");
+  const [author, setAuthor] = useState("");
+  const [copyrightText, setCopyrightText] = useState("");
   const [scintilla, setScintilla] = useState("");
   const [characters, setCharacters] = useState<KidsCharacterIn[]>([]);
   const [creating, setCreating] = useState(false);
@@ -80,12 +85,22 @@ export default function NewKidsPage() {
   }
 
   function canGoToStep3(): boolean {
-    return canGoToStep2() && scintilla.trim().length > 10 && characters.every((c) => c.name.trim());
+    return (
+      canGoToStep2() && title.trim().length >= 1 && author.trim().length >= 1
+    );
+  }
+
+  function canGoToStep4(): boolean {
+    return (
+      canGoToStep3() &&
+      scintilla.trim().length > 10 &&
+      characters.every((c) => c.name.trim())
+    );
   }
 
   function canSubmit(): boolean {
     return (
-      canGoToStep3() &&
+      canGoToStep4() &&
       characters.every((c) => c.description.trim().length >= 5)
     );
   }
@@ -102,6 +117,10 @@ export default function NewKidsPage() {
           style_slug: selectedStyleSlug,
           scintilla,
           characters,
+          title: title.trim(),
+          subtitle: subtitle.trim(),
+          author: author.trim(),
+          copyright_text: copyrightText.trim(),
         }),
       });
       // Va all'anteprima del libretto (Sett. 4 = step generazione)
@@ -134,12 +153,12 @@ export default function NewKidsPage() {
 
       <h1 className="text-3xl font-bold mb-1">⭐ Nuovo libretto KIDS</h1>
       <p className="text-sm text-[var(--color-fg-muted)] mb-8">
-        Step {step} di 3 — {STEP_LABELS[step]}
+        Step {step} di 4 — {STEP_LABELS[step]}
       </p>
 
       {/* Step indicator */}
       <div className="flex gap-2 mb-8">
-        {([1, 2, 3] as Step[]).map((n) => (
+        {([1, 2, 3, 4] as Step[]).map((n) => (
           <div
             key={n}
             className={`flex-1 h-1.5 rounded-full transition-colors ${
@@ -211,16 +230,120 @@ export default function NewKidsPage() {
         </div>
       )}
 
-      {/* STEP 2 — Scintilla + nomi */}
+      {/* STEP 2 — Titolo, Sottotitolo, Autore, Copyright */}
       {step === 2 && (
+        <div className="space-y-6">
+          <section>
+            <label className="block text-lg font-semibold mb-2">
+              📕 Titolo del libretto <span className="text-red-400">*</span>
+            </label>
+            <p className="text-sm text-[var(--color-fg-muted)] mb-3">
+              Il titolo apparirà sulla copertina illustrata, sopra la prima
+              pagina e sulla quarta di copertina.
+            </p>
+            <input
+              type="text"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder="Es. Le avventure di Lillo nel bosco"
+              maxLength={120}
+              className="w-full px-4 py-2.5 bg-[var(--color-bg-elev)] border border-[var(--color-border)] rounded-lg text-[var(--color-fg)] focus:outline-none focus:border-[var(--color-accent)] text-lg"
+            />
+            <p className="text-xs text-[var(--color-fg-muted)] mt-1">
+              {title.length}/120 · consigliato max 40 caratteri
+            </p>
+          </section>
+
+          <section>
+            <label className="block text-lg font-semibold mb-2">
+              Sottotitolo{" "}
+              <span className="text-[var(--color-fg-muted)] font-normal text-sm">
+                (opzionale)
+              </span>
+            </label>
+            <input
+              type="text"
+              value={subtitle}
+              onChange={(e) => setSubtitle(e.target.value)}
+              placeholder="Es. Una storia di amicizia"
+              maxLength={200}
+              className="w-full px-4 py-2.5 bg-[var(--color-bg-elev)] border border-[var(--color-border)] rounded-lg text-[var(--color-fg)] focus:outline-none focus:border-[var(--color-accent)]"
+            />
+          </section>
+
+          <section>
+            <label className="block text-lg font-semibold mb-2">
+              ✍️ Autore <span className="text-red-400">*</span>
+            </label>
+            <p className="text-sm text-[var(--color-fg-muted)] mb-3">
+              Come firmi il libretto. Es. <em>"Mamma di Lillo"</em>,{" "}
+              <em>"Zio Marco"</em>, <em>"Nonna Anna"</em>.
+            </p>
+            <input
+              type="text"
+              value={author}
+              onChange={(e) => setAuthor(e.target.value)}
+              placeholder="Es. Mamma di Lillo"
+              maxLength={120}
+              className="w-full px-4 py-2.5 bg-[var(--color-bg-elev)] border border-[var(--color-border)] rounded-lg text-[var(--color-fg)] focus:outline-none focus:border-[var(--color-accent)]"
+            />
+          </section>
+
+          <section>
+            <label className="block text-lg font-semibold mb-2">
+              Testo per la quarta di copertina{" "}
+              <span className="text-[var(--color-fg-muted)] font-normal text-sm">
+                (opzionale)
+              </span>
+            </label>
+            <p className="text-sm text-[var(--color-fg-muted)] mb-3">
+              Copyright, dedica o testo che vuoi far apparire sull'ultima
+              pagina.
+            </p>
+            <textarea
+              value={copyrightText}
+              onChange={(e) => setCopyrightText(e.target.value)}
+              rows={3}
+              placeholder="Es. © 2026 Famiglia Rossi. Per Lillo, con amore."
+              maxLength={500}
+              className="w-full px-4 py-2.5 bg-[var(--color-bg-elev)] border border-[var(--color-border)] rounded-lg text-[var(--color-fg)] focus:outline-none focus:border-[var(--color-accent)] text-sm"
+            />
+            <p className="text-xs text-[var(--color-fg-muted)] mt-1">
+              {copyrightText.length}/500
+            </p>
+          </section>
+
+          <div className="flex justify-between pt-4">
+            <button
+              onClick={() => setStep(1)}
+              className="text-[var(--color-fg-muted)] hover:text-[var(--color-fg)] px-5 py-2 transition-colors"
+            >
+              ← Indietro
+            </button>
+            <button
+              onClick={() => setStep(3)}
+              disabled={!canGoToStep3()}
+              className="bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] text-[var(--color-bg)] font-semibold px-6 py-2.5 rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              Avanti →
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* STEP 3 — Scintilla + nomi */}
+      {step === 3 && (
         <div className="space-y-6">
           <section>
             <label htmlFor="scintilla" className="block text-lg font-semibold mb-2">
               ✨ Scintilla narrativa
             </label>
             <p className="text-sm text-[var(--color-fg-muted)] mb-3">
-              Una frase o un paragrafo che descrive la storia. Es: <em>"Mia il riccio
-              perde la mamma nel bosco e con l'aiuto di nuovi amici torna a casa."</em>
+              Una frase o un paragrafo che descrive la storia. Es:{" "}
+              <em>
+                "Mia il riccio perde la mamma nel bosco e con l'aiuto di nuovi
+                amici torna a casa."
+              </em>
             </p>
             <textarea
               id="scintilla"
@@ -253,14 +376,14 @@ export default function NewKidsPage() {
 
           <div className="flex justify-between pt-4">
             <button
-              onClick={() => setStep(1)}
+              onClick={() => setStep(2)}
               className="text-[var(--color-fg-muted)] hover:text-[var(--color-fg)] px-5 py-2 transition-colors"
             >
               ← Indietro
             </button>
             <button
-              onClick={() => setStep(3)}
-              disabled={!canGoToStep3()}
+              onClick={() => setStep(4)}
+              disabled={!canGoToStep4()}
               className="bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] text-[var(--color-bg)] font-semibold px-6 py-2.5 rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
             >
               Avanti →
@@ -269,8 +392,8 @@ export default function NewKidsPage() {
         </div>
       )}
 
-      {/* STEP 3 — Descrizioni personaggi */}
-      {step === 3 && (
+      {/* STEP 4 — Descrizioni personaggi */}
+      {step === 4 && (
         <div className="space-y-6">
           <section>
             <h2 className="text-lg font-semibold mb-2">
@@ -308,15 +431,14 @@ export default function NewKidsPage() {
               <span className="text-[var(--color-accent)] font-semibold">
                 Prossimo:
               </span>{" "}
-              al click su "Crea libretto" salviamo il progetto. Generazione AI
-              della storia e delle vignette arriva nel prossimo aggiornamento
-              dell'app.
+              al click su "Crea libretto" salviamo il progetto e potrai
+              generare la storia con Claude, poi le immagini.
             </p>
           </div>
 
           <div className="flex justify-between pt-4">
             <button
-              onClick={() => setStep(2)}
+              onClick={() => setStep(3)}
               className="text-[var(--color-fg-muted)] hover:text-[var(--color-fg)] px-5 py-2 transition-colors"
             >
               ← Indietro

@@ -84,9 +84,14 @@ class CharacterIn(BaseModel):
 
 class KidsProjectCreateIn(BaseModel):
     template_id: str
-    style_slug: str  # flat | 3d | manga
+    style_slug: str  # flat | 3d | manga | chibi | supereroi | fiaba
     scintilla: str = Field(..., min_length=1, max_length=4000)
     characters: list[CharacterIn] = Field(..., min_length=1, max_length=5)
+    # Metadati copertina (obbligatori: titolo e autore)
+    title: str = Field(..., min_length=1, max_length=120)
+    author: str = Field(..., min_length=1, max_length=120)
+    subtitle: str = Field(default="", max_length=200)
+    copyright_text: str = Field(default="", max_length=500)
 
 
 # ============================================================
@@ -220,8 +225,8 @@ def create_kids_project(
         except ValueError:
             length_target = LengthTarget.breve
 
-        # Nome del progetto: usa primo personaggio + label template
-        project_name = f"{tpl.label} — {payload.characters[0].name}"
+        # Nome del progetto: il titolo dato dall'utente
+        project_name = payload.title.strip()
 
         project = projects_repo.create_project(
             s, owner=u, name=project_name, length_target=length_target
@@ -229,6 +234,22 @@ def create_kids_project(
         projects_repo.set_style(s, project, preset_id)
         # Salvo la scintilla come source_text
         projects_repo.set_source_text(s, project, payload.scintilla)
+
+        # Copyright text sul Project (per la quarta di copertina)
+        if hasattr(project, "copyright_text"):
+            project.copyright_text = payload.copyright_text.strip()
+
+        # Metadati copertina: titolo, sottotitolo, autore
+        from db.repos import covers as covers_repo
+
+        cover_orm = covers_repo.get_or_create(s, project)
+        covers_repo.update_text(
+            s, cover_orm,
+            title=payload.title.strip(),
+            subtitle=payload.subtitle.strip(),
+            author=payload.author.strip(),
+            description=payload.scintilla.strip(),
+        )
 
         # Crea i personaggi
         for ch in payload.characters:
