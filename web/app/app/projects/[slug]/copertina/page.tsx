@@ -27,6 +27,33 @@ export default function CopertinaPage({
   const [saving, setSaving] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [refreshTag, setRefreshTag] = useState<number>(Date.now());
+  // Community share (cover)
+  const [shareOpen, setShareOpen] = useState(false);
+  const [shareCaption, setShareCaption] = useState("");
+  const [shareAuthorRole, setShareAuthorRole] = useState("");
+  const [sharing, setSharing] = useState(false);
+
+  async function handleShareSubmit() {
+    setSharing(true);
+    setError(null);
+    try {
+      await apiFetch(`/api/project-shares/cover/${slug}`, {
+        method: "POST",
+        body: JSON.stringify({
+          caption: shareCaption,
+          author_role: shareAuthorRole,
+        }),
+      });
+      setShareOpen(false);
+      setShareCaption("");
+      setShareAuthorRole("");
+      alert("Richiesta inviata! Un admin la esaminerà a breve.");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setSharing(false);
+    }
+  }
 
   async function load() {
     try {
@@ -241,16 +268,76 @@ export default function CopertinaPage({
                   : "✨ Genera copertina"}
             </button>
             {meta.has_illustration && (
-              <button
-                onClick={handleDeleteCover}
-                className="text-sm border border-[var(--color-border)] hover:border-red-400 hover:text-red-400 text-[var(--color-fg-muted)] px-4 py-2 rounded text-left"
-              >
-                🗑 Elimina copertina generata
-              </button>
+              <>
+                <button
+                  onClick={() => setShareOpen(true)}
+                  className="text-sm border border-[var(--color-border)] hover:border-[var(--color-accent)] hover:text-[var(--color-accent)] text-[var(--color-fg-muted)] px-4 py-2 rounded text-left"
+                  title="Proponi la copertina per la pagina Esplora"
+                >
+                  🌐 Condividi con la community
+                </button>
+                <button
+                  onClick={handleDeleteCover}
+                  className="text-sm border border-[var(--color-border)] hover:border-red-400 hover:text-red-400 text-[var(--color-fg-muted)] px-4 py-2 rounded text-left"
+                >
+                  🗑 Elimina copertina generata
+                </button>
+              </>
             )}
           </div>
         </div>
       </section>
+
+      {shareOpen && (
+        <div
+          className="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-50"
+          onClick={() => (sharing ? null : setShareOpen(false))}
+        >
+          <div
+            className="bg-[var(--color-bg-elev)] border border-[var(--color-border)] rounded-xl p-6 max-w-lg w-full"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 className="text-lg font-semibold mb-2">
+              🌐 Condividi la copertina
+            </h2>
+            <p className="text-sm text-[var(--color-fg-muted)] mb-4">
+              Un admin dovrà approvare prima che appaia su Esplora.
+            </p>
+            <textarea
+              value={shareCaption}
+              onChange={(e) => setShareCaption(e.target.value)}
+              rows={2}
+              maxLength={500}
+              placeholder="Didascalia breve (facoltativa)"
+              className="w-full px-3 py-2 bg-[var(--color-bg)] border border-[var(--color-border)] rounded text-sm resize-none mb-3"
+            />
+            <input
+              type="text"
+              value={shareAuthorRole}
+              onChange={(e) => setShareAuthorRole(e.target.value)}
+              maxLength={80}
+              placeholder="Il tuo ruolo (es. Illustratore) — facoltativo"
+              className="w-full px-3 py-2 bg-[var(--color-bg)] border border-[var(--color-border)] rounded text-sm mb-4"
+            />
+            <div className="flex gap-2">
+              <button
+                onClick={handleShareSubmit}
+                disabled={sharing}
+                className="bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] text-[var(--color-bg)] font-semibold px-4 py-2 rounded disabled:opacity-50"
+              >
+                {sharing ? "Invio..." : "🌐 Invia"}
+              </button>
+              <button
+                onClick={() => setShareOpen(false)}
+                disabled={sharing}
+                className="text-[var(--color-fg-muted)] px-4 py-2"
+              >
+                Annulla
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

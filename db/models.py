@@ -563,6 +563,69 @@ class EsploraAsset(UUIDPrimaryKeyMixin, TimestampMixin, UpdatedAtMixin, Base):
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
 
 
+class ProjectAssetShare(UUIDPrimaryKeyMixin, TimestampMixin, UpdatedAtMixin, Base):
+    """Condivisione community di copertine e tavole di progetti KIDS o Pro.
+
+    L'utente sottopone una cover (kind='cover') o una tavola (kind='tavola'
+    con page_number) all'admin. Approvato → visibile su /esplora nella
+    sezione corrispondente.
+
+    storage_key punta al PNG servito su Esplora. Impostato al momento del
+    submit (per cover = cover_illustration_key, per tavola = page_render_key
+    dopo render on-demand).
+    """
+
+    __tablename__ = "project_asset_shares"
+    __table_args__ = (
+        Index("ix_project_asset_shares_status", "share_status"),
+        Index("ix_project_asset_shares_project", "project_id"),
+    )
+
+    project_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("projects.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    # Denormalizzato per query admin senza JOIN
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    # "cover" | "tavola"
+    asset_kind: Mapped[str] = mapped_column(String(20), nullable=False)
+    # Solo per kind='tavola'
+    page_number: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    # Snapshot dei metadati progetto al momento del submit
+    project_title: Mapped[str] = mapped_column(String(255), nullable=False, default="")
+    project_flow: Mapped[str] = mapped_column(String(10), nullable=False, default="pro")
+    # ^ "pro" | "kids" — serve per instradare il render
+    # Chiave dove leggere l'immagine PNG
+    storage_key: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    # === Condivisione (stesso pattern di CastArchiveEntry) ===
+    share_status: Mapped[str] = mapped_column(
+        String(20), nullable=False, default="pending", server_default="pending"
+    )
+    share_caption: Mapped[str] = mapped_column(
+        String(500), nullable=False, default="", server_default=""
+    )
+    share_author_role: Mapped[str] = mapped_column(
+        String(80), nullable=False, default="", server_default=""
+    )
+    share_submitted_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    share_moderated_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    share_rejection_reason: Mapped[str] = mapped_column(
+        Text, nullable=False, default="", server_default=""
+    )
+    deleted_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+
+
 class AdminAudit(UUIDPrimaryKeyMixin, Base):
     """Log azioni admin (creazione utenti, grant crediti, disable account)."""
 

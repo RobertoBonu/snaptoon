@@ -47,6 +47,43 @@ export default function KidsPreviewPage({
     }
   }
 
+  // === Community share (cover + tavole) ===
+  const [shareModal, setShareModal] = useState<
+    | { kind: "cover" } | { kind: "tavola"; page: number } | null
+  >(null);
+  const [shareCaption, setShareCaption] = useState("");
+  const [shareAuthorRole, setShareAuthorRole] = useState("");
+  const [sharing, setSharing] = useState(false);
+
+  async function submitShare() {
+    if (!shareModal) return;
+    setSharing(true);
+    setError(null);
+    try {
+      const url =
+        shareModal.kind === "cover"
+          ? `/api/project-shares/cover/${id}`
+          : `/api/project-shares/tavola/${id}/${shareModal.page}`;
+      await apiFetch(url, {
+        method: "POST",
+        body: JSON.stringify({
+          caption: shareCaption,
+          author_role: shareAuthorRole,
+        }),
+      });
+      setShareModal(null);
+      setShareCaption("");
+      setShareAuthorRole("");
+      alert(
+        "Richiesta inviata! Un admin la esaminerà a breve. Se approvata, apparirà nella pagina Esplora.",
+      );
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setSharing(false);
+    }
+  }
+
   async function regenerateVignette(page: number, panel: number) {
     const key = `p${page}v${panel}`;
     if (
@@ -284,14 +321,27 @@ export default function KidsPreviewPage({
                 </div>
               )}
             </div>
-            <button
-              onClick={regenerateCover}
-              disabled={regenerating.has("cover")}
-              className="mt-2 text-sm border border-[var(--color-border)] hover:border-[var(--color-accent)] hover:text-[var(--color-accent)] text-[var(--color-fg-muted)] px-4 py-1.5 rounded transition-colors disabled:opacity-50"
-              title="Elimina e ri-genera la copertina (1 credito)"
-            >
-              🔄 Rigenera copertina (1 cr)
-            </button>
+            <div className="mt-2 flex gap-2 flex-wrap">
+              <button
+                onClick={regenerateCover}
+                disabled={regenerating.has("cover")}
+                className="text-sm border border-[var(--color-border)] hover:border-[var(--color-accent)] hover:text-[var(--color-accent)] text-[var(--color-fg-muted)] px-4 py-1.5 rounded transition-colors disabled:opacity-50"
+                title="Elimina e ri-genera la copertina (1 credito)"
+              >
+                🔄 Rigenera copertina (1 cr)
+              </button>
+              <button
+                onClick={() => {
+                  setShareCaption("");
+                  setShareAuthorRole("");
+                  setShareModal({ kind: "cover" });
+                }}
+                className="text-sm border border-[var(--color-border)] hover:border-[var(--color-accent)] hover:text-[var(--color-accent)] text-[var(--color-fg-muted)] px-4 py-1.5 rounded transition-colors"
+                title="Proponi la copertina per la pagina Esplora"
+              >
+                🌐 Condividi
+              </button>
+            </div>
           </div>
         ) : (
           <div className="bg-[var(--color-bg-elev)] border border-dashed border-[var(--color-border)] rounded-xl p-12 text-center max-w-md">
@@ -310,9 +360,22 @@ export default function KidsPreviewPage({
         <div className="space-y-8">
           {details.story?.pages.map((p) => (
             <div key={p.number}>
-              <h3 className="text-sm font-medium text-[var(--color-fg-muted)] mb-3">
-                Pagina {p.number}
-              </h3>
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-sm font-medium text-[var(--color-fg-muted)]">
+                  Pagina {p.number}
+                </h3>
+                <button
+                  onClick={() => {
+                    setShareCaption("");
+                    setShareAuthorRole("");
+                    setShareModal({ kind: "tavola", page: p.number });
+                  }}
+                  className="text-xs border border-[var(--color-border)] hover:border-[var(--color-accent)] hover:text-[var(--color-accent)] text-[var(--color-fg-muted)] px-3 py-1 rounded transition-colors"
+                  title="Proponi la tavola per Esplora"
+                >
+                  🌐 Condividi tavola
+                </button>
+              </div>
               <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
                 {p.panels.map((pn) => {
                   const isGenerated = vigSet.has(`${p.number}_${pn.number}`);
@@ -380,6 +443,74 @@ export default function KidsPreviewPage({
           >
             {downloadingPdf ? "Genero PDF..." : "📥 Scarica il libretto in PDF"}
           </button>
+        </div>
+      )}
+
+      {/* Modale condivisione community */}
+      {shareModal && (
+        <div
+          className="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-50"
+          onClick={() => (sharing ? null : setShareModal(null))}
+        >
+          <div
+            className="bg-[var(--color-bg-elev)] border border-[var(--color-border)] rounded-xl p-6 max-w-lg w-full"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 className="text-lg font-semibold mb-2">
+              🌐 Condividi{" "}
+              {shareModal.kind === "cover"
+                ? "la copertina"
+                : `la tavola (pagina ${shareModal.page})`}
+            </h2>
+            <p className="text-sm text-[var(--color-fg-muted)] mb-4">
+              Un admin dovrà approvare prima che appaia su Esplora. Potrai
+              ritirare la richiesta dalla lista delle tue condivisioni.
+            </p>
+            <div className="space-y-3">
+              <div>
+                <label className="block text-sm font-semibold mb-1">
+                  Didascalia breve (facoltativa)
+                </label>
+                <textarea
+                  value={shareCaption}
+                  onChange={(e) => setShareCaption(e.target.value)}
+                  rows={2}
+                  maxLength={500}
+                  placeholder="Es. Il momento più tenero della storia..."
+                  className="w-full px-3 py-2 bg-[var(--color-bg)] border border-[var(--color-border)] rounded text-sm resize-none"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-semibold mb-1">
+                  Il tuo ruolo (facoltativo)
+                </label>
+                <input
+                  type="text"
+                  value={shareAuthorRole}
+                  onChange={(e) => setShareAuthorRole(e.target.value)}
+                  maxLength={80}
+                  placeholder="Es. Papà creativo, Illustratrice"
+                  className="w-full px-3 py-2 bg-[var(--color-bg)] border border-[var(--color-border)] rounded text-sm"
+                />
+              </div>
+              <div className="flex gap-2 pt-2">
+                <button
+                  onClick={submitShare}
+                  disabled={sharing}
+                  className="bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] text-[var(--color-bg)] font-semibold px-4 py-2 rounded disabled:opacity-50"
+                >
+                  {sharing ? "Invio..." : "🌐 Invia per approvazione"}
+                </button>
+                <button
+                  onClick={() => setShareModal(null)}
+                  disabled={sharing}
+                  className="text-[var(--color-fg-muted)] px-4 py-2"
+                >
+                  Annulla
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
       )}
     </div>

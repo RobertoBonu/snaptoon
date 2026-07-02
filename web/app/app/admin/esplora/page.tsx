@@ -171,6 +171,12 @@ export default function AdminEsploraPage() {
             👥 Personaggi utenti
           </a>
           <a
+            href="/app/admin/esplora/community-shares"
+            className="bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] text-[var(--color-bg)] font-semibold px-4 py-2.5 rounded-lg text-sm"
+          >
+            🎨 Cover + tavole utenti
+          </a>
+          <a
             href="/app/admin"
             className="border border-[var(--color-border)] hover:bg-[var(--color-bg-elev)] text-[var(--color-fg)] font-semibold px-5 py-2.5 rounded-lg"
           >

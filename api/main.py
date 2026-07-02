@@ -26,6 +26,7 @@ from api.routers import kids as kids_router
 from api.routers import kids_generation as kids_gen_router
 from api.routers import my_characters as my_characters_router
 from api.routers import pages as pages_router
+from api.routers import project_shares as project_shares_router
 from api.routers import projects as projects_router
 from api.routers import script as script_router
 from api.routers import styles as styles_router
@@ -56,6 +57,12 @@ app.include_router(account_router.router, prefix="/api/account", tags=["account"
 app.include_router(kids_router.router, prefix="/api/kids", tags=["kids"])
 app.include_router(kids_gen_router.router, prefix="/api/kids", tags=["kids-generation"])
 app.include_router(my_characters_router.router, prefix="/api/my-characters", tags=["my-characters"])
+app.include_router(project_shares_router.router, prefix="/api/project-shares", tags=["project-shares"])
+app.include_router(
+    project_shares_router.admin_router,
+    prefix="/api/admin/esplora",
+    tags=["project-shares-admin"],
+)
 app.include_router(script_router.router, prefix="/api", tags=["script"])
 app.include_router(styles_router.router, prefix="/api/styles", tags=["styles"])
 app.include_router(characters_router.router, prefix="/api", tags=["characters"])

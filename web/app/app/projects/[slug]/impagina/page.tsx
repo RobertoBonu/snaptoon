@@ -21,6 +21,34 @@ export default function ImpaginaPage({
   // Default false → l'utente sceglie quando calcolare il render (più
   // esplicito rispetto al caricamento auto della V2 originale).
   const [previewOn, setPreviewOn] = useState<Record<number, boolean>>({});
+  // Modal condivisione tavola
+  const [sharePage, setSharePage] = useState<number | null>(null);
+  const [shareCaption, setShareCaption] = useState("");
+  const [shareAuthorRole, setShareAuthorRole] = useState("");
+  const [sharing, setSharing] = useState(false);
+
+  async function submitShare() {
+    if (sharePage === null) return;
+    setSharing(true);
+    setError(null);
+    try {
+      await apiFetch(`/api/project-shares/tavola/${slug}/${sharePage}`, {
+        method: "POST",
+        body: JSON.stringify({
+          caption: shareCaption,
+          author_role: shareAuthorRole,
+        }),
+      });
+      setSharePage(null);
+      setShareCaption("");
+      setShareAuthorRole("");
+      alert("Richiesta inviata! Un admin la esaminerà a breve.");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setSharing(false);
+    }
+  }
 
   async function load() {
     try {
@@ -207,12 +235,25 @@ export default function ImpaginaPage({
 
                 {/* Controls */}
                 <div className="flex-1 min-w-0">
-                  <h3 className="font-semibold mb-3">
-                    Pagina {p.page_number}{" "}
-                    <span className="text-sm text-[var(--color-fg-muted)] font-normal">
-                      ({p.n_panels} vignette)
-                    </span>
-                  </h3>
+                  <div className="flex items-center justify-between mb-3 gap-2 flex-wrap">
+                    <h3 className="font-semibold">
+                      Pagina {p.page_number}{" "}
+                      <span className="text-sm text-[var(--color-fg-muted)] font-normal">
+                        ({p.n_panels} vignette)
+                      </span>
+                    </h3>
+                    <button
+                      onClick={() => {
+                        setShareCaption("");
+                        setShareAuthorRole("");
+                        setSharePage(p.page_number);
+                      }}
+                      className="text-xs border border-[var(--color-border)] hover:border-[var(--color-accent)] hover:text-[var(--color-accent)] text-[var(--color-fg-muted)] px-3 py-1 rounded transition-colors"
+                      title="Proponi questa tavola per la pagina Esplora"
+                    >
+                      🌐 Condividi tavola
+                    </button>
+                  </div>
 
                   <div className="space-y-3">
                     <div>
@@ -286,9 +327,61 @@ export default function ImpaginaPage({
       <div className="mt-6 bg-[var(--color-bg-elev)] border border-[var(--color-border)] rounded-xl p-4 text-sm text-[var(--color-fg-muted)]">
         💡 <strong>Come funziona</strong>: prima scegli grid e balloon per
         ciascuna pagina. Quando sei soddisfatto delle impostazioni, click
-        "Genera anteprima" per vedere il render. Quando tutte le pagine
+        &quot;Genera anteprima&quot; per vedere il render. Quando tutte le pagine
         sono a posto, scarica il PDF.
       </div>
+
+      {sharePage !== null && (
+        <div
+          className="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-50"
+          onClick={() => (sharing ? null : setSharePage(null))}
+        >
+          <div
+            className="bg-[var(--color-bg-elev)] border border-[var(--color-border)] rounded-xl p-6 max-w-lg w-full"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 className="text-lg font-semibold mb-2">
+              🌐 Condividi tavola (pagina {sharePage})
+            </h2>
+            <p className="text-sm text-[var(--color-fg-muted)] mb-4">
+              La tavola verrà renderizzata e sottoposta a un admin. Se
+              approvata, apparirà nella sezione Tavole di Esplora.
+            </p>
+            <textarea
+              value={shareCaption}
+              onChange={(e) => setShareCaption(e.target.value)}
+              rows={2}
+              maxLength={500}
+              placeholder="Didascalia breve (facoltativa)"
+              className="w-full px-3 py-2 bg-[var(--color-bg)] border border-[var(--color-border)] rounded text-sm resize-none mb-3"
+            />
+            <input
+              type="text"
+              value={shareAuthorRole}
+              onChange={(e) => setShareAuthorRole(e.target.value)}
+              maxLength={80}
+              placeholder="Il tuo ruolo (facoltativo)"
+              className="w-full px-3 py-2 bg-[var(--color-bg)] border border-[var(--color-border)] rounded text-sm mb-4"
+            />
+            <div className="flex gap-2">
+              <button
+                onClick={submitShare}
+                disabled={sharing}
+                className="bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] text-[var(--color-bg)] font-semibold px-4 py-2 rounded disabled:opacity-50"
+              >
+                {sharing ? "Invio..." : "🌐 Invia"}
+              </button>
+              <button
+                onClick={() => setSharePage(null)}
+                disabled={sharing}
+                className="text-[var(--color-fg-muted)] px-4 py-2"
+              >
+                Annulla
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

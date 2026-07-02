@@ -202,7 +202,66 @@ def list_public_assets() -> dict:
                             is_active=True,
                         )
                     )
+
+        # Append cover + tavole community pubblicate
+        from db.repos import project_asset_shares as shares_repo
+
+        for kind, section_key in (("cover", "copertine"), ("tavola", "tavole")):
+            published = shares_repo.list_published_by_kind(s, kind)
+            if not published:
+                continue
+            for section in result["sections"]:
+                if section["key"] != section_key:
+                    continue
+                for share in published:
+                    owner = users_repo.get_by_id(s, share.user_id)
+                    author_name = ""
+                    if owner and owner.email:
+                        author_name = owner.email.split("@")[0]
+                    ts = 0
+                    if share.share_moderated_at:
+                        ts = int(share.share_moderated_at.timestamp())
+                    title = share.project_title or ""
+                    if kind == "tavola" and share.page_number:
+                        title = f"{title} — Pagina {share.page_number}" if title else f"Pagina {share.page_number}"
+                    section["items"].append(
+                        EsploraAssetOut(
+                            id=str(share.id),
+                            section=section_key,
+                            asset_type="COMMUNITY",
+                            title=title,
+                            caption=share.share_caption or "",
+                            author_name=author_name,
+                            author_role=share.share_author_role or "",
+                            position=9999,
+                            has_image=True,
+                            image_url=f"/api/esplora/project-shares/{share.id}/image?v={ts}",
+                            prompt="",
+                            is_active=True,
+                        )
+                    )
         return result
+
+
+@public_router.get("/project-shares/{share_id}/image")
+def get_project_share_image_public(share_id: str) -> Response:
+    """Serve cover/tavola pubblicata di un progetto utente."""
+    from db.repos import project_asset_shares as shares_repo
+
+    try:
+        sid = uuid.UUID(share_id)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="ID non valido")
+
+    with session_scope() as s:
+        share = shares_repo.get_by_id(s, sid)
+        if share is None or share.share_status != "published":
+            raise HTTPException(status_code=404, detail="Non trovato")
+        key = share.storage_key
+
+    if not key:
+        raise HTTPException(status_code=404, detail="Immagine non trovata")
+    return _serve_image(key)
 
 
 @public_router.get("/user-characters/{entry_id}/image")
