@@ -9,7 +9,10 @@ import AppSidebarNav from "@/components/AppSidebarNav";
  * Server component: legge il cookie e decide se mostrare Admin link.
  * Fetch a /api/auth/me via cookie forwarding per ricavare is_admin.
  */
-async function getCurrentUser(): Promise<{ is_admin: boolean } | null> {
+async function getCurrentUser(): Promise<{
+  is_admin: boolean;
+  role: string;
+} | null> {
   const cookieStore = await cookies();
   const token = cookieStore.get("snaptoon_token");
   if (!token) return null;
@@ -32,6 +35,7 @@ export default async function AppLayout({
 }) {
   const user = await getCurrentUser();
   const isAdmin = user?.is_admin ?? false;
+  const role = user?.role ?? "";
 
   return (
     <div className="min-h-screen flex">
@@ -45,7 +49,7 @@ export default async function AppLayout({
           </Link>
         </div>
 
-        <AppSidebarNav isAdmin={isAdmin} />
+        <AppSidebarNav isAdmin={isAdmin} role={role} />
 
         <div className="p-3 border-t border-[var(--color-border)]">
           <LogoutButton />

@@ -11,13 +11,16 @@ type Item = {
   isActive: (path: string) => boolean;
 };
 
-const ITEMS: Item[] = [
-  {
-    href: "/app",
-    icon: "home",
-    label: "I MIEI PROGETTI",
-    isActive: (p) => p === "/app" || p.startsWith("/app/projects"),
-  },
+// Item base "I MIEI PROGETTI" (flusso Pro), nascosto agli account con
+// role="kids" perché non hanno accesso al flusso Pro.
+const PROGETTI_ITEM: Item = {
+  href: "/app",
+  icon: "home",
+  label: "I MIEI PROGETTI",
+  isActive: (p) => p === "/app" || p.startsWith("/app/projects"),
+};
+
+const ITEMS_COMUNI: Item[] = [
   {
     href: "/app/kids",
     icon: "star",
@@ -38,12 +41,26 @@ const ITEMS: Item[] = [
   },
 ];
 
-export default function AppSidebarNav({ isAdmin }: { isAdmin: boolean }) {
+export default function AppSidebarNav({
+  isAdmin,
+  role,
+}: {
+  isAdmin: boolean;
+  role?: string;
+}) {
   const pathname = usePathname() ?? "";
+
+  // Gli account KIDS vedono solo: KIDS, I MIEI PERSONAGGI, Account (+ Admin
+  // se admin, ma un utente KIDS non può essere admin nella pratica).
+  // Gli altri ruoli vedono anche "I MIEI PROGETTI" (flusso Pro).
+  const isKidsOnly = role === "kids";
+  const baseItems: Item[] = isKidsOnly
+    ? ITEMS_COMUNI
+    : [PROGETTI_ITEM, ...ITEMS_COMUNI];
 
   const items: Item[] = isAdmin
     ? [
-        ...ITEMS,
+        ...baseItems,
         {
           href: "/app/admin",
           icon: "admin",
@@ -51,7 +68,7 @@ export default function AppSidebarNav({ isAdmin }: { isAdmin: boolean }) {
           isActive: (p) => p.startsWith("/app/admin"),
         },
       ]
-    : ITEMS;
+    : baseItems;
 
   return (
     <nav className="flex-1 px-2 py-2 space-y-1 overflow-y-auto">

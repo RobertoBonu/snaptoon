@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { apiFetch, type Project, type ProjectList } from "@/lib/api";
 
@@ -12,6 +13,24 @@ const LENGTH_LABELS: Record<string, string> = {
 };
 
 export default function DashboardPage() {
+  const router = useRouter();
+  // Gli account con role="kids" non hanno accesso al flusso Pro:
+  // se atterrano qui li reindirizziamo alla loro dashboard KIDS.
+  const [kidsRedirecting, setKidsRedirecting] = useState(false);
+  useEffect(() => {
+    (async () => {
+      try {
+        const me = await apiFetch<{ role: string }>("/api/auth/me");
+        if (me.role === "kids") {
+          setKidsRedirecting(true);
+          router.replace("/app/kids");
+        }
+      } catch {
+        // Se /me fallisce, il middleware auth farà comunque il suo lavoro.
+      }
+    })();
+  }, [router]);
+
   const [data, setData] = useState<ProjectList | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [showCreate, setShowCreate] = useState(false);
@@ -66,6 +85,16 @@ export default function DashboardPage() {
     } catch (e) {
       alert(e instanceof Error ? e.message : String(e));
     }
+  }
+
+  if (kidsRedirecting) {
+    return (
+      <div className="p-8">
+        <p className="text-[var(--color-fg-muted)]">
+          Redirect alla dashboard KIDS...
+        </p>
+      </div>
+    );
   }
 
   if (data === null && !error) {

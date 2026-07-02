@@ -100,6 +100,13 @@ def create_project(
     payload: ProjectCreateIn, user: dict = Depends(require_user)
 ) -> ProjectOut:
     user_id = uuid.UUID(user["id"])
+    # Blocca la creazione di progetti Pro per gli account KIDS
+    # (la sidebar li reindirizza già, ma difendo anche l'API).
+    if user.get("role") == "kids":
+        raise HTTPException(
+            status_code=403,
+            detail="Il tuo account non ha accesso al flusso Pro. Usa la sezione KIDS.",
+        )
     with session_scope() as s:
         u = users_repo.get_by_id(s, user_id)
         if u is None:
