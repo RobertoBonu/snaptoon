@@ -17,12 +17,39 @@ export default function AccountPage() {
   const [pwdMsg, setPwdMsg] = useState<{ ok: boolean; msg: string } | null>(
     null
   );
+  const [pseudonym, setPseudonym] = useState("");
+  const [savingPseudonym, setSavingPseudonym] = useState(false);
+  const [pseudMsg, setPseudMsg] = useState<{ ok: boolean; msg: string } | null>(
+    null,
+  );
+
+  async function handleSavePseudonym(e: React.FormEvent) {
+    e.preventDefault();
+    setSavingPseudonym(true);
+    setPseudMsg(null);
+    try {
+      const acc = await apiFetch<Account>("/api/account/me", {
+        method: "PATCH",
+        body: JSON.stringify({ pseudonym }),
+      });
+      setAccount(acc);
+      setPseudMsg({ ok: true, msg: "Pseudonimo aggiornato." });
+    } catch (e) {
+      setPseudMsg({
+        ok: false,
+        msg: e instanceof Error ? e.message : String(e),
+      });
+    } finally {
+      setSavingPseudonym(false);
+    }
+  }
 
   async function load() {
     try {
       setError(null);
       const acc = await apiFetch<Account>("/api/account/me");
       setAccount(acc);
+      setPseudonym(acc.pseudonym || "");
       const h = await apiFetch<CreditHistory>("/api/account/credits-history");
       setHistory(h.entries);
     } catch (e) {
@@ -106,6 +133,47 @@ export default function AccountPage() {
                 {new Date(account.created_at).toLocaleDateString("it-IT")}
               </dd>
             </dl>
+          </section>
+
+          {/* Pseudonimo / Brand (per Esplora) */}
+          <section className="bg-[var(--color-bg-elev)] border border-[var(--color-border)] rounded-xl p-6 mb-6">
+            <h2 className="text-lg font-semibold mb-2">
+              🎭 Pseudonimo / Brand
+            </h2>
+            <p className="text-sm text-[var(--color-fg-muted)] mb-4">
+              Il nome che compare come autore sulle card di{" "}
+              <a href="/esplora" className="underline">
+                Esplora
+              </a>{" "}
+              quando condividi personaggi, copertine o tavole. Se lasciato
+              vuoto, verrà mostrato il prefisso della tua email.
+            </p>
+            <form onSubmit={handleSavePseudonym} className="flex gap-3">
+              <input
+                type="text"
+                placeholder="Es. Rob Bonu · CreaToon · Mamma di Lollo"
+                value={pseudonym}
+                onChange={(e) => setPseudonym(e.target.value)}
+                maxLength={80}
+                className="flex-1 px-3 py-2 bg-[var(--color-bg)] border border-[var(--color-border)] rounded focus:outline-none focus:border-[var(--color-accent)]"
+              />
+              <button
+                type="submit"
+                disabled={savingPseudonym || pseudonym === (account.pseudonym || "")}
+                className="bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] text-[var(--color-bg)] font-semibold px-5 py-2 rounded transition-colors disabled:opacity-50"
+              >
+                {savingPseudonym ? "..." : "💾 Salva"}
+              </button>
+            </form>
+            {pseudMsg && (
+              <p
+                className={`text-sm mt-3 ${
+                  pseudMsg.ok ? "text-green-400" : "text-red-400"
+                }`}
+              >
+                {pseudMsg.msg}
+              </p>
+            )}
           </section>
 
           {/* Cambio password */}

@@ -177,12 +177,10 @@ def list_public_assets() -> dict:
             for section in result["sections"]:
                 if section["key"] != "personaggi":
                     continue
+                from api.utils.user_display import public_author_name
                 for entry in shared:
                     owner = users_repo.get_by_id(s, entry.user_id)
-                    author_name = ""
-                    if owner and owner.email:
-                        # Fallback amichevole: parte prima della @ dell'email
-                        author_name = owner.email.split("@")[0]
+                    author_name = public_author_name(owner)
                     ts = 0
                     if entry.share_moderated_at:
                         ts = int(entry.share_moderated_at.timestamp())
@@ -213,11 +211,10 @@ def list_public_assets() -> dict:
             for section in result["sections"]:
                 if section["key"] != section_key:
                     continue
+                from api.utils.user_display import public_author_name
                 for share in published:
                     owner = users_repo.get_by_id(s, share.user_id)
-                    author_name = ""
-                    if owner and owner.email:
-                        author_name = owner.email.split("@")[0]
+                    author_name = public_author_name(owner)
                     ts = 0
                     if share.share_moderated_at:
                         ts = int(share.share_moderated_at.timestamp())
@@ -525,11 +522,10 @@ class RejectSharedCharacterIn(BaseModel):
 
 
 def _shared_char_to_out(entry, owner) -> SharedCharacterAdminOut:
-    author_name = ""
-    author_email = ""
-    if owner and owner.email:
-        author_email = owner.email
-        author_name = owner.email.split("@")[0]
+    from api.utils.user_display import public_author_name
+
+    author_name = public_author_name(owner)
+    author_email = owner.email if owner and owner.email else ""
     return SharedCharacterAdminOut(
         id=str(entry.id),
         name=entry.name,

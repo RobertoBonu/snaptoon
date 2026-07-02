@@ -26,6 +26,7 @@ router = APIRouter()
 class AccountOut(BaseModel):
     id: str
     email: str
+    pseudonym: str
     role: str
     is_admin: bool
     plan: str
@@ -36,6 +37,10 @@ class AccountOut(BaseModel):
     max_projects: int  # 0 = illimitato
     created_at: datetime
     must_change_password: bool
+
+
+class UpdateProfileIn(BaseModel):
+    pseudonym: str = Field(default="", max_length=80)
 
 
 class CreditEntryOut(BaseModel):
@@ -71,6 +76,7 @@ def get_account(user: dict = Depends(require_user)) -> AccountOut:
         return AccountOut(
             id=str(u.id),
             email=u.email,
+            pseudonym=(u.pseudonym or ""),
             role=u.role.value if hasattr(u.role, "value") else str(u.role),
             is_admin=u.is_admin,
             plan=u.plan.value if hasattr(u.plan, "value") else str(u.plan),
@@ -82,6 +88,20 @@ def get_account(user: dict = Depends(require_user)) -> AccountOut:
             created_at=u.created_at,
             must_change_password=u.must_change_password,
         )
+
+
+@router.patch("/me", response_model=AccountOut)
+def update_profile(
+    payload: UpdateProfileIn, user: dict = Depends(require_user)
+) -> AccountOut:
+    """Aggiorna il profilo utente (per ora solo pseudonimo/brand)."""
+    user_id = uuid.UUID(user["id"])
+    with session_scope() as s:
+        u = users_repo.get_by_id(s, user_id)
+        if u is None:
+            raise HTTPException(status_code=404, detail="User not found")
+        u.pseudonym = payload.pseudonym.strip()[:80]
+    return get_account(user)
 
 
 @router.get("/credits-history", response_model=CreditHistoryOut)

@@ -117,6 +117,13 @@ class User(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     must_change_password: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     has_seen_onboarding: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
+    # Pseudonimo/brand pubblico usato al posto dell'email nelle card
+    # Esplora quando l'utente condivide personaggi/cover/tavole. Default
+    # stringa vuota — se vuoto, si ricade sul prefisso dell'email.
+    pseudonym: Mapped[str] = mapped_column(
+        String(80), nullable=False, default="", server_default=""
+    )
+
     # Ruolo (autoritativo per permessi/qualità). is_admin resta come flag
     # legacy ma è derivabile da role == Role.admin.
     role: Mapped[Role] = mapped_column(

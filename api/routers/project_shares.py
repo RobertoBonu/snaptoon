@@ -128,11 +128,10 @@ def _to_out(share, base_url: str = "/api/project-shares") -> ProjectShareOut:
 
 
 def _to_admin_out(share, owner) -> ShareAdminOut:
-    author_name = ""
-    author_email = ""
-    if owner and owner.email:
-        author_email = owner.email
-        author_name = owner.email.split("@")[0]
+    from api.utils.user_display import public_author_name
+
+    author_name = public_author_name(owner)
+    author_email = owner.email if owner and owner.email else ""
     return ShareAdminOut(
         id=str(share.id),
         project_id=str(share.project_id),

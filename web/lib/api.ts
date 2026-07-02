@@ -33,6 +33,7 @@ export interface ProjectList {
 export interface Account {
   id: string;
   email: string;
+  pseudonym: string;
   role: string;
   is_admin: boolean;
   plan: string;
