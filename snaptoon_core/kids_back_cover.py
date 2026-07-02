@@ -1,48 +1,61 @@
-"""Rendering della quarta di copertina dei libretti KIDS.
+"""Rendering della quarta di copertina dei libretti KIDS + Pro.
 
-Composta programmaticamente con PIL:
-  - Sfondo pastello (gradiente ambra→crema o palette coerente)
-  - Bordo decorativo
-  - Titolo del libretto centrato
-  - Sottotitolo (opzionale)
-  - Autore
-  - Testo editoriale dal template admin (opzionale)
-  - Testo copyright del libretto in basso
+Layout (v2, minimalista):
+  - Sfondo grigio chiaro uniforme #F7F7F7 (no cornice, no gradiente)
+  - Titolo grande in ROSSO in alto (uppercase, wrap automatico)
+  - Miniatura della COVER del libretto centrata con bordo scuro 5px
+  - "di" + autore (uppercase grigio scuro)
+  - Testo editoriale sistema-wide (opzionale)
+  - Testo copyright del libretto in basso (opzionale)
 
-Il LOGO è compositato separatamente da logo_composite.composite_logo() con
-dimensione e posizione controllate dall'admin (px + coordinate X,Y).
+Il LOGO è compositato separatamente da logo_composite.composite_logo()
+con dimensione e posizione controllate dall'admin (px + coordinate X,Y).
 
-Ritorna un file PNG nella dimensione della cover (1024x1536, 2:3 verticale)
-pronto per essere inserito come ULTIMA pagina del PDF.
+Ritorna un file PNG (1024x1536, 2:3 verticale) pronto per essere inserito
+come ULTIMA pagina del PDF.
 """
 from __future__ import annotations
 
+import io
 from pathlib import Path
+from typing import Optional
 
 from PIL import Image, ImageDraw, ImageFont
 
-# Dimensioni back cover (identiche alla cover per continuità visiva)
 BACK_COVER_W = 1024
 BACK_COVER_H = 1536
 
-# Palette (coerente col tema SnapToon)
-BG_TOP = (255, 245, 220)      # crema chiara
-BG_BOTTOM = (245, 220, 200)   # pesca chiara
-TEXT_DARK = (60, 40, 30)      # marrone caldo
-TEXT_MUTED = (120, 100, 90)   # marrone chiaro
-ACCENT = (245, 158, 11)       # ambra SnapToon
+# Palette v2 (allineata a mockup Rob)
+BG_COLOR = (247, 247, 247)      # #F7F7F7 grigio chiaro uniforme
+TITLE_RED = (220, 30, 30)       # rosso vivo per il titolo
+AUTHOR_DARK = (85, 85, 85)      # grigio scuro per l'autore (uppercase)
+LABEL_MUTED = (140, 140, 140)   # grigio medio per "di" e testo editoriale
+COPYRIGHT_MUTED = (150, 150, 150)
+COVER_BORDER = (40, 40, 40)     # bordo scuro 5px attorno alla miniatura cover
+COVER_BORDER_PX = 5
 
 
-def _find_font(size: int) -> ImageFont.FreeTypeFont:
-    """Trova un font utilizzabile, con fallback progressive."""
-    candidates = [
-        "/System/Library/Fonts/Helvetica.ttc",
-        "/System/Library/Fonts/HelveticaNeue.ttc",
-        "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
-        "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
-        "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf",
-        "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf",
-    ]
+def _find_font(size: int, bold: bool = False) -> ImageFont.FreeTypeFont:
+    """Trova un font utilizzabile con fallback progressivi.
+
+    bold=True prova prima le varianti Bold del font.
+    """
+    if bold:
+        candidates = [
+            "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
+            "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf",
+            "/System/Library/Fonts/HelveticaNeueBold.ttf",
+            "/System/Library/Fonts/Helvetica.ttc",
+            "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+        ]
+    else:
+        candidates = [
+            "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+            "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf",
+            "/System/Library/Fonts/Helvetica.ttc",
+            "/System/Library/Fonts/HelveticaNeue.ttc",
+            "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
+        ]
     for path in candidates:
         try:
             return ImageFont.truetype(path, size)
@@ -110,128 +123,132 @@ def render_back_cover(
     *,
     title: str,
     author: str,
-    subtitle: str = "",
+    subtitle: str = "",  # non usato nel layout v2 ma mantenuto per API compat
     copyright_text: str = "",
     back_cover_template: str = "",
+    cover_bytes: Optional[bytes] = None,
     out_path: Path,
 ) -> Path:
-    """Genera la quarta di copertina del libretto come immagine PNG (SENZA logo).
+    """Genera la quarta di copertina come PNG (SENZA logo).
 
-    Il logo viene compositato separatamente da composite_logo() a valle,
-    con dimensione e posizione controllate dall'admin.
+    Layout minimalista allineato al mockup:
+      - Sfondo #F7F7F7 uniforme, NESSUNA cornice
+      - Titolo grande ROSSO in alto (uppercase, wrap automatico)
+      - Miniatura cover centrata con bordo scuro 5px
+      - "di" + AUTORE (uppercase grigio scuro)
+      - Testo editoriale sistema (opzionale, grigio medio)
+      - Copyright in basso (opzionale)
+
+    Il logo viene compositato separatamente da composite_logo() a valle
+    (dimensione + posizione da admin).
 
     Args:
-        title: Titolo del libretto (obbligatorio)
-        author: Autore (es. "Mamma di Lillo")
-        subtitle: Sottotitolo (opzionale)
-        copyright_text: Testo copyright per la quarta (dal libretto specifico)
-        back_cover_template: Testo editoriale sistema-wide (dall'admin)
-        out_path: dove salvare il PNG risultante
-
-    Returns:
-        out_path (per convenienza)
+        title: Titolo (obbligatorio, sarà stampato uppercase)
+        author: Autore (stampato uppercase)
+        subtitle: NON usato nel layout v2 (compat API)
+        copyright_text: Testo copyright della quarta
+        back_cover_template: Testo editoriale sistema-wide dall'admin
+        cover_bytes: PNG della cover del libretto (mostrato come miniatura).
+                     Se None, l'area miniatura è vuota.
+        out_path: destinazione PNG
     """
-    canvas = Image.new("RGB", (BACK_COVER_W, BACK_COVER_H), BG_TOP)
+    canvas = Image.new("RGB", (BACK_COVER_W, BACK_COVER_H), BG_COLOR)
     draw = ImageDraw.Draw(canvas)
 
-    # Sfondo con gradiente verticale sottile
-    for y in range(BACK_COVER_H):
-        t = y / BACK_COVER_H
-        r = int(BG_TOP[0] + (BG_BOTTOM[0] - BG_TOP[0]) * t)
-        g = int(BG_TOP[1] + (BG_BOTTOM[1] - BG_TOP[1]) * t)
-        b = int(BG_TOP[2] + (BG_BOTTOM[2] - BG_TOP[2]) * t)
-        draw.line([(0, y), (BACK_COVER_W, y)], fill=(r, g, b))
+    # Margini generali
+    hmargin = 80    # margine orizzontale (px)
+    top_margin = 100
 
-    # Bordo interno decorativo
-    margin = 60
-    draw.rectangle(
-        [(margin, margin), (BACK_COVER_W - margin, BACK_COVER_H - margin)],
-        outline=ACCENT,
-        width=4,
+    y = top_margin
+
+    # === Titolo grande rosso ===
+    title_font = _find_font(84, bold=True)
+    title_lines = _wrap_text(
+        title.upper(), title_font, BACK_COVER_W - 2 * hmargin
     )
-
-    # Il testo parte da un offset in alto sufficiente a lasciare spazio
-    # a un eventuale logo compositato in alto. Se admin sceglie di piazzarlo
-    # altrove (basso, destra, ecc.) questa area rimane libera.
-    y = margin + 220
-
-    # === Titolo grande ===
-    title_font = _find_font(72)
-    title_lines = _wrap_text(title.upper(), title_font, BACK_COVER_W - 200)
     y = _draw_multiline_centered(
-        draw, title_lines, title_font, y, BACK_COVER_W, TEXT_DARK,
+        draw, title_lines, title_font, y, BACK_COVER_W, TITLE_RED,
+        line_height_mul=1.1,
+    )
+    y += 50
+
+    # === Miniatura cover con bordo scuro ===
+    if cover_bytes:
+        try:
+            cover_img = Image.open(io.BytesIO(cover_bytes)).convert("RGB")
+            # Ridimensiona a larghezza fissa mantenendo aspect
+            target_w = 420
+            aspect = cover_img.height / cover_img.width
+            target_h = int(target_w * aspect)
+            cover_img = cover_img.resize(
+                (target_w, target_h), Image.LANCZOS
+            )
+            # Piazza centrata orizzontalmente
+            cx = (BACK_COVER_W - target_w) // 2
+            cy = y
+            # Bordo: disegna rettangolo scuro dietro + paste cover
+            draw.rectangle(
+                [
+                    (cx - COVER_BORDER_PX, cy - COVER_BORDER_PX),
+                    (cx + target_w + COVER_BORDER_PX,
+                     cy + target_h + COVER_BORDER_PX),
+                ],
+                fill=COVER_BORDER,
+            )
+            canvas.paste(cover_img, (cx, cy))
+            y = cy + target_h + COVER_BORDER_PX + 50
+        except Exception:
+            # Se la cover è malformata, salta senza bloccare
+            y += 40
+
+    # === "di" ===
+    di_font = _find_font(34)
+    y = _draw_multiline_centered(
+        draw, ["di"], di_font, y, BACK_COVER_W, LABEL_MUTED,
+    )
+    y += 10
+
+    # === Autore (uppercase grigio scuro, bold) ===
+    author_font = _find_font(56, bold=True)
+    author_lines = _wrap_text(
+        author.upper(), author_font, BACK_COVER_W - 2 * hmargin
+    )
+    y = _draw_multiline_centered(
+        draw, author_lines, author_font, y, BACK_COVER_W, AUTHOR_DARK,
         line_height_mul=1.15,
-    )
-    y += 20
-
-    # === Sottotitolo (se presente) ===
-    if subtitle.strip():
-        sub_font = _find_font(36)
-        sub_lines = _wrap_text(subtitle, sub_font, BACK_COVER_W - 200)
-        y = _draw_multiline_centered(
-            draw, sub_lines, sub_font, y, BACK_COVER_W, TEXT_MUTED,
-            line_height_mul=1.3,
-        )
-        y += 20
-
-    # === Separatore decorativo ===
-    sep_y = y + 20
-    draw.line(
-        [
-            (BACK_COVER_W // 2 - 100, sep_y),
-            (BACK_COVER_W // 2 + 100, sep_y),
-        ],
-        fill=ACCENT,
-        width=3,
-    )
-    y = sep_y + 40
-
-    # === Autore ===
-    author_label_font = _find_font(28)
-    y = _draw_multiline_centered(
-        draw, ["di"], author_label_font, y, BACK_COVER_W, TEXT_MUTED,
-    )
-    y += 5
-
-    author_font = _find_font(52)
-    author_lines = _wrap_text(author, author_font, BACK_COVER_W - 200)
-    y = _draw_multiline_centered(
-        draw, author_lines, author_font, y, BACK_COVER_W, TEXT_DARK,
-        line_height_mul=1.2,
     )
     y += 60
 
-    # === Testo editoriale sistema (dal template admin) ===
+    # === Testo editoriale sistema (opzionale) ===
     if back_cover_template.strip():
         ed_font = _find_font(28)
         ed_lines = _wrap_text(
-            back_cover_template.strip(), ed_font, BACK_COVER_W - 200
+            back_cover_template.strip(),
+            ed_font, BACK_COVER_W - 2 * hmargin,
         )
-        # Limita a max 8 righe per non straripare
         ed_lines = ed_lines[:8]
         y = _draw_multiline_centered(
-            draw, ed_lines, ed_font, y, BACK_COVER_W, TEXT_MUTED,
+            draw, ed_lines, ed_font, y, BACK_COVER_W, LABEL_MUTED,
             line_height_mul=1.4,
         )
         y += 30
 
-    # === Copyright del libretto in basso ===
+    # === Copyright in basso (posizionato in fondo indipendentemente) ===
     if copyright_text.strip():
         cr_font = _find_font(22)
         cr_lines = _wrap_text(
-            copyright_text.strip(), cr_font, BACK_COVER_W - 200
+            copyright_text.strip(), cr_font, BACK_COVER_W - 2 * hmargin,
         )
-        cr_lines = cr_lines[:5]  # max 5 righe
-        # Posizionato in basso, indipendentemente dallo y corrente
+        cr_lines = cr_lines[:5]
         try:
             base_h = cr_font.getbbox("Ay")[3] - cr_font.getbbox("Ay")[1]
         except Exception:
             base_h = 22
         line_h = int(base_h * 1.4)
         total_h = line_h * len(cr_lines)
-        cr_y = BACK_COVER_H - margin - 40 - total_h
+        cr_y = BACK_COVER_H - 100 - total_h
         _draw_multiline_centered(
-            draw, cr_lines, cr_font, cr_y, BACK_COVER_W, TEXT_MUTED,
+            draw, cr_lines, cr_font, cr_y, BACK_COVER_W, COPYRIGHT_MUTED,
             line_height_mul=1.4,
         )
 

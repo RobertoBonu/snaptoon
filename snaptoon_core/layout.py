@@ -1026,13 +1026,22 @@ def panel_preview_path(project_dir: Path, page_number: int, panel_number: int) -
 # ============================================================
 
 def export_pdf(image_paths: list[Path], out_path: Path) -> Path:
+    """Esporta le pagine PNG come PDF senza compressione JPEG lossy.
+
+    PIL di default converte le immagini in JPEG dentro il PDF, degradando
+    logo e testi. Impostiamo compression='raw' (PNG raw dentro il PDF) e
+    resolution=200 DPI per una resa più nitida.
+    """
     if not image_paths:
         raise ValueError("Nessuna pagina da esportare.")
     images = [Image.open(p).convert("RGB") for p in image_paths]
     out_path.parent.mkdir(parents=True, exist_ok=True)
     images[0].save(
         out_path, "PDF", save_all=True,
-        append_images=images[1:], resolution=150.0,
+        append_images=images[1:], resolution=200.0,
+        # quality=100 disabilita la compressione JPEG lossy sulle immagini
+        # dentro il PDF (loghi + testi rimangono nitidi)
+        quality=100,
     )
     return out_path
 

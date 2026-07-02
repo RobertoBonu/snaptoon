@@ -350,6 +350,15 @@ def export_pdf_endpoint(
         back_cover_tmp.close()
         back_cover_path = Path(back_cover_tmp.name)
         temp_files.append(back_cover_path)
+
+        # Cover pulita per la miniatura nella quarta
+        cover_bytes_for_back = None
+        if object_exists(cover_key):
+            try:
+                cover_bytes_for_back = download_bytes(cover_key)
+            except Exception:
+                pass
+
         try:
             render_back_cover(
                 title=bc_title,
@@ -357,6 +366,7 @@ def export_pdf_endpoint(
                 subtitle=bc_subtitle,
                 copyright_text=bc_copyright,
                 back_cover_template=bc_template,
+                cover_bytes=cover_bytes_for_back,
                 out_path=back_cover_path,
             )
             if logo_active:
