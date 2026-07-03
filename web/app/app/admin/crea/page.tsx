@@ -65,14 +65,38 @@ export default function AdminCreaPage() {
     );
   }
 
+  // Raggruppa per sezione: gli slot senza campo `section` (retrocompat)
+  // ricadono su "autori".
+  const bySection: Record<string, CreaImage[]> = {};
+  for (const img of images || []) {
+    const key = (img as { section?: string }).section || "autori";
+    (bySection[key] ||= []).push(img);
+  }
+  const sectionMeta: Record<string, { title: string; subtitle: string }> = {
+    autori: {
+      title: "📖 Pagina /crea (Autori)",
+      subtitle:
+        "Hero + 5 step del workflow Pro sulla landing pubblica /crea.",
+    },
+    kids: {
+      title: "⭐ Pagina /kids",
+      subtitle:
+        "Hero + 6 step della landing pubblica per bambini/genitori.",
+    },
+  };
+  const sectionOrder = ["autori", "kids"];
+
   return (
     <div className="p-8 max-w-7xl mx-auto">
       <header className="flex justify-between items-start mb-8">
         <div>
-          <h1 className="text-3xl font-bold mb-1">🎨 Immagini CREA</h1>
+          <h1 className="text-3xl font-bold mb-1">
+            🎨 Immagini pagine landing
+          </h1>
           <p className="text-sm text-[var(--color-fg-muted)]">
-            Gestisci le 6 immagini della pagina pubblica /crea: carica una tua
-            immagine o ripristina quella di default.
+            Gestisci le immagini delle pagine pubbliche /crea (Autori) e
+            /kids. Per ogni slot puoi caricare una tua immagine o
+            ripristinare il default.
           </p>
         </div>
         <a
@@ -89,17 +113,37 @@ export default function AdminCreaPage() {
         </p>
       )}
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        {images?.map((img) => (
-          <CreaCard
-            key={img.slot}
-            img={img}
-            busy={working === img.slot}
-            onUpload={(file) => upload(img, file)}
-            onReset={() => reset(img)}
-          />
-        ))}
-      </div>
+      {sectionOrder.map((sec) => {
+        const items = bySection[sec] || [];
+        if (items.length === 0) return null;
+        const meta = sectionMeta[sec] || {
+          title: sec,
+          subtitle: "",
+        };
+        return (
+          <section key={sec} className="mb-10">
+            <div className="mb-4">
+              <h2 className="text-xl font-semibold">{meta.title}</h2>
+              {meta.subtitle && (
+                <p className="text-sm text-[var(--color-fg-muted)]">
+                  {meta.subtitle}
+                </p>
+              )}
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {items.map((img) => (
+                <CreaCard
+                  key={img.slot}
+                  img={img}
+                  busy={working === img.slot}
+                  onUpload={(file) => upload(img, file)}
+                  onReset={() => reset(img)}
+                />
+              ))}
+            </div>
+          </section>
+        );
+      })}
     </div>
   );
 }

@@ -40,37 +40,90 @@ admin_router = APIRouter()
 # Config slot (fissi, in ordine di apparizione sulla pagina)
 # ============================================================
 
-# slot → (label UI, aspect-ratio CSS, path statico di default)
+# slot → (label UI, aspect-ratio CSS, path statico di default, sezione).
+# La "section" serve solo all'admin per raggruppare visivamente:
+#   "autori" → 6 slot della pagina /crea (ex-Crea, ora "Autori")
+#   "kids"   → 7 slot della pagina /kids showcase pubblica
 SLOTS: dict[str, dict] = {
+    # === Autori (/crea) ===
     "dashboard": {
         "label": "Dashboard · I miei progetti",
         "aspect": "4 / 3",
         "default": "/images/crea/dashboard.png",
+        "section": "autori",
     },
     "step-testo": {
         "label": "Pagina /testo · script generato",
         "aspect": "4 / 3",
         "default": "/images/crea/step-testo.png",
+        "section": "autori",
     },
     "step-stile": {
         "label": "Griglia stili",
         "aspect": "4 / 3",
         "default": "/images/crea/step-stile.png",
+        "section": "autori",
     },
     "step-personaggi": {
         "label": "Card personaggio · reference image",
         "aspect": "4 / 3",
         "default": "/images/crea/step-personaggi.png",
+        "section": "autori",
     },
     "step-genera": {
         "label": "Pagina /genera · scene selector",
         "aspect": "4 / 3",
         "default": "/images/crea/step-genera.png",
+        "section": "autori",
     },
     "step-impagina": {
         "label": "Pagina completa renderizzata",
         "aspect": "4 / 3",
         "default": "/images/crea/step-impagina.png",
+        "section": "autori",
+    },
+    # === Kids (/kids) ===
+    "kids-hero": {
+        "label": "Hero · wizard KIDS + anteprima",
+        "aspect": "4 / 3",
+        "default": "/images/kids/hero.png",
+        "section": "kids",
+    },
+    "kids-step-1": {
+        "label": "1. Il tuo stile (13 stili + 6 ritmi)",
+        "aspect": "4 / 3",
+        "default": "/images/kids/step-1-stile.png",
+        "section": "kids",
+    },
+    "kids-step-2": {
+        "label": "2. La scintilla (titolo + storia)",
+        "aspect": "4 / 3",
+        "default": "/images/kids/step-2-storia.png",
+        "section": "kids",
+    },
+    "kids-step-3": {
+        "label": "3. I personaggi (foto + archivio)",
+        "aspect": "4 / 3",
+        "default": "/images/kids/step-3-personaggi.png",
+        "section": "kids",
+    },
+    "kids-step-4": {
+        "label": "4. La copertina (badge fumetto)",
+        "aspect": "4 / 3",
+        "default": "/images/kids/step-4-copertina.png",
+        "section": "kids",
+    },
+    "kids-step-5": {
+        "label": "5. Le vignette (rigenera singola)",
+        "aspect": "4 / 3",
+        "default": "/images/kids/step-5-vignette.png",
+        "section": "kids",
+    },
+    "kids-step-6": {
+        "label": "6. Il libretto (PDF + community)",
+        "aspect": "4 / 3",
+        "default": "/images/kids/step-6-pdf.png",
+        "section": "kids",
     },
 }
 
@@ -85,6 +138,7 @@ class CreaImageOut(BaseModel):
     label: str
     aspect: str
     default_src: str
+    section: str = "autori"  # "autori" | "kids" — retrocompat default
     has_image: bool
     image_url: Optional[str] = None
 
@@ -113,6 +167,7 @@ def _to_out(slot: str, row: Optional[CreaImage], *, admin: bool = False) -> Crea
         label=cfg["label"],
         aspect=cfg["aspect"],
         default_src=cfg["default"],
+        section=cfg.get("section", "autori"),
         has_image=has_image,
         image_url=image_url,
     )

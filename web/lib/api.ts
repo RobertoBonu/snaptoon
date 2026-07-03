@@ -349,6 +349,7 @@ export interface CreaImage {
   label: string;
   aspect: string;
   default_src: string;
+  section?: string; // "autori" | "kids"
   has_image: boolean;
   image_url?: string | null;
 }

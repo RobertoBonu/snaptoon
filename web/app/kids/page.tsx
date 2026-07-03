@@ -63,9 +63,10 @@ const KIDS_STEPS = [
 ];
 
 export default function KidsShowcasePage() {
-  // Come per /crea: consenti override immagini dall'admin (endpoint identico
-  // /api/crea/images con slot dedicati "kids-step-N"). Per ora l'admin non
-  // gestisce ancora questi slot: fallback ai path statici sotto /public/images/kids.
+  // Come per /crea: consenti override immagini dall'admin. L'endpoint
+  // /api/crea/images restituisce SIA gli slot Autori sia i "kids-*"
+  // (gestiti in /app/admin/crea con sezione dedicata). Se un slot non è
+  // ancora stato caricato, ricade sul path statico sotto /public/images/kids.
   const [overrides, setOverrides] = useState<Record<string, string>>({});
 
   useEffect(() => {
