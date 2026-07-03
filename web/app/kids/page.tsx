@@ -23,7 +23,16 @@ const KIDS_STEPS = [
   {
     slot: "kids-step-2",
     heading: "2. 📖 La scintilla",
-    body: "Racconta la tua scintilla: \"Un bambino trova un drago timido nel giardino\", oppure \"La nonna insegna al gatto a fare le crêpes\". Claude, il nostro cervello scrittore, la trasforma in una storia vera con titolo, sceneggiatura, dialoghi e un finale a sorpresa che fa ridere. Poi la puoi rileggere, cambiare, riscrivere — è tutta tua.",
+    body: (
+      <>
+        Racconta la tua scintilla: &quot;Un bambino trova un drago timido nel
+        giardino&quot;, oppure &quot;La nonna insegna al gatto a fare le
+        crêpes&quot;. <strong>Bea</strong>, la nostra Autrice-illustratrice,
+        la trasforma in una storia vera con titolo, sceneggiatura, dialoghi
+        e un finale a sorpresa che fa ridere. Poi la puoi rileggere,
+        cambiare, riscrivere — è tutta tua.
+      </>
+    ),
     highlight: "Anche tu diventi un vero scrittore. In 20 secondi.",
     img: "/images/kids/step-2-storia.png",
     label: "Titolo + storia",
