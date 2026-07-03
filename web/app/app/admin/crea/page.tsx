@@ -73,6 +73,11 @@ export default function AdminCreaPage() {
     (bySection[key] ||= []).push(img);
   }
   const sectionMeta: Record<string, { title: string; subtitle: string }> = {
+    home: {
+      title: "🏠 Home (landing principale)",
+      subtitle:
+        "6 illustrazioni per la home: Hero + Autori + KIDS + Esplora + BookShop + CTA finale.",
+    },
     autori: {
       title: "📖 Pagina /crea (Autori)",
       subtitle:
@@ -84,7 +89,7 @@ export default function AdminCreaPage() {
         "Hero + 6 step della landing pubblica per bambini/genitori.",
     },
   };
-  const sectionOrder = ["autori", "kids"];
+  const sectionOrder = ["home", "autori", "kids"];
 
   return (
     <div className="p-8 max-w-7xl mx-auto">

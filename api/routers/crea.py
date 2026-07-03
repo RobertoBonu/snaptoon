@@ -45,6 +45,43 @@ admin_router = APIRouter()
 #   "autori" → 6 slot della pagina /crea (ex-Crea, ora "Autori")
 #   "kids"   → 7 slot della pagina /kids showcase pubblica
 SLOTS: dict[str, dict] = {
+    # === Home / (landing pubblica principale) ===
+    "home-hero": {
+        "label": "Home · Hero (Bea & Dante insieme)",
+        "aspect": "16 / 9",
+        "default": "/images/home/hero.png",
+        "section": "home",
+    },
+    "home-autori": {
+        "label": "Home · Section Autori (Dante + Bea, scrivania Pro)",
+        "aspect": "4 / 3",
+        "default": "/images/home/autori.png",
+        "section": "home",
+    },
+    "home-kids": {
+        "label": "Home · Section KIDS (Bea con bambini)",
+        "aspect": "4 / 3",
+        "default": "/images/home/kids.png",
+        "section": "home",
+    },
+    "home-esplora": {
+        "label": "Home · Section Esplora (community wall)",
+        "aspect": "16 / 9",
+        "default": "/images/home/esplora.png",
+        "section": "home",
+    },
+    "home-bookshop": {
+        "label": "Home · Section BookShop (Dante bibliotecario)",
+        "aspect": "4 / 3",
+        "default": "/images/home/bookshop.png",
+        "section": "home",
+    },
+    "home-cta": {
+        "label": "Home · CTA finale (Bea & Dante salutano)",
+        "aspect": "4 / 3",
+        "default": "/images/home/cta.png",
+        "section": "home",
+    },
     # === Autori (/crea) ===
     "dashboard": {
         "label": "Dashboard · I miei progetti",

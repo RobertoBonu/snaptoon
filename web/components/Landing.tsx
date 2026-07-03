@@ -1,278 +1,674 @@
 "use client";
 
-import {
-  ArrowRight,
-  PlayCircle,
-  BookOpen,
-  LayoutTemplate,
-  BoxSelect,
-  Sparkles,
-  Settings2,
-  Zap,
-} from "lucide-react";
-import { SiteShell } from "@/components/site";
+import { ArrowRight, Sparkles } from "lucide-react";
+import { useEffect, useState } from "react";
+import { SiteShell, MediaFrame } from "@/components/site";
+import { apiFetch, type CreaImagesOut } from "@/lib/api";
+
+// Firma discreta sotto ogni illustrazione (guide del sito).
+function BeaDanteSignature() {
+  return (
+    <div
+      style={{
+        marginTop: 10,
+        fontSize: 12,
+        color: "#64748B",
+        letterSpacing: "0.06em",
+        textAlign: "center",
+        fontStyle: "italic",
+      }}
+    >
+      con Bea &amp; Dante — le tue guide
+    </div>
+  );
+}
 
 export default function Landing() {
+  const [overrides, setOverrides] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    apiFetch<CreaImagesOut>("/api/crea/images", { cache: "no-store" })
+      .then((d) => {
+        const map: Record<string, string> = {};
+        for (const it of d.images) {
+          if (it.image_url) map[it.slot] = it.image_url;
+        }
+        setOverrides(map);
+      })
+      .catch(() => {
+        /* fallback statici */
+      });
+  }, []);
+
+  const src = (slot: string, fallback: string) =>
+    overrides[slot] || fallback;
+
   return (
     <SiteShell active="/">
-      <HeroSection />
-      <ProductsSection />
-      <WorkflowSection />
+      <HeroSection src={src} />
+      <AutoriSection src={src} />
+      <KidsSection src={src} />
+      <EsploraSection src={src} />
+      <BookshopSection src={src} />
+      <FinalCtaSection src={src} />
     </SiteShell>
   );
 }
 
-function HeroSection() {
-  return (
-    <section className="section" style={{ position: "relative", overflow: "hidden", paddingTop: "120px", paddingBottom: "120px" }}>
-      {/* Background Gradients */}
-      <div style={{ position: "absolute", top: "-20%", left: "50%", transform: "translateX(-50%)", width: "80%", height: "80%", background: "radial-gradient(circle, rgba(245, 158, 11, 0.08) 0%, rgba(13, 16, 23, 0) 70%)", zIndex: 0, pointerEvents: "none" }} />
-      <div style={{ position: "absolute", top: "20%", right: "-10%", width: "40%", height: "60%", background: "radial-gradient(circle, rgba(124, 58, 237, 0.05) 0%, rgba(13, 16, 23, 0) 70%)", zIndex: 0, pointerEvents: "none" }} />
+// ============================================================
+// Hero — presenta il duo: fumetti Pro + libretti KIDS
+// ============================================================
 
-      <div className="lp-container" style={{ position: "relative", zIndex: 1 }}>
-        <div style={{ textAlign: "center", maxWidth: "800px", margin: "0 auto", marginBottom: "64px" }}>
-          <div className="animate-fade-in" style={{ display: "inline-flex", alignItems: "center", gap: "8px", background: "rgba(245, 158, 11, 0.1)", border: "1px solid rgba(245, 158, 11, 0.2)", padding: "6px 12px", borderRadius: "100px", color: "#F59E0B", fontSize: "13px", fontWeight: 600, marginBottom: "24px" }}>
+function HeroSection({
+  src,
+}: {
+  src: (slot: string, fallback: string) => string;
+}) {
+  return (
+    <section
+      className="section"
+      style={{
+        position: "relative",
+        overflow: "hidden",
+        paddingTop: "120px",
+        paddingBottom: "80px",
+      }}
+    >
+      <div
+        style={{
+          position: "absolute",
+          top: "-20%",
+          left: "50%",
+          transform: "translateX(-50%)",
+          width: "80%",
+          height: "80%",
+          background:
+            "radial-gradient(circle, rgba(245, 158, 11, 0.08) 0%, rgba(13, 16, 23, 0) 70%)",
+          zIndex: 0,
+          pointerEvents: "none",
+        }}
+      />
+      <div
+        style={{
+          position: "absolute",
+          top: "20%",
+          right: "-10%",
+          width: "40%",
+          height: "60%",
+          background:
+            "radial-gradient(circle, rgba(124, 58, 237, 0.05) 0%, rgba(13, 16, 23, 0) 70%)",
+          zIndex: 0,
+          pointerEvents: "none",
+        }}
+      />
+
+      <div
+        className="lp-container"
+        style={{ position: "relative", zIndex: 1 }}
+      >
+        <div
+          style={{
+            textAlign: "center",
+            maxWidth: "820px",
+            margin: "0 auto 48px auto",
+          }}
+        >
+          <div
+            className="animate-fade-in"
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: "8px",
+              background: "rgba(245, 158, 11, 0.1)",
+              border: "1px solid rgba(245, 158, 11, 0.2)",
+              padding: "6px 12px",
+              borderRadius: "100px",
+              color: "#F59E0B",
+              fontSize: "13px",
+              fontWeight: 600,
+              marginBottom: "24px",
+            }}
+          >
             <Sparkles size={14} />
-            <span>Nuovo motore di generazione V2 disponibile</span>
+            <span>Uno studio creativo. Due modi di raccontare.</span>
           </div>
 
-          <h1 className="animate-fade-in" style={{ fontSize: "clamp(3rem, 5vw, 4.5rem)", fontWeight: 800, color: "#F1F5F9", lineHeight: 1.1, letterSpacing: "-0.03em", marginBottom: "24px", animationDelay: "0.1s" }}>
-            Dall&apos;idea al fumetto,<br />in uno <span style={{ color: "#F59E0B" }}>snap.</span>
+          <h1
+            className="animate-fade-in"
+            style={{
+              fontSize: "clamp(3rem, 5vw, 4.5rem)",
+              fontWeight: 800,
+              color: "#F1F5F9",
+              lineHeight: 1.05,
+              letterSpacing: "-0.03em",
+              marginBottom: "24px",
+              animationDelay: "0.1s",
+            }}
+          >
+            Dall&apos;idea al fumetto,
+            <br />
+            in uno <span style={{ color: "#F59E0B" }}>snap.</span>
           </h1>
 
-          <p className="animate-fade-in" style={{ fontSize: "1.125rem", color: "#94A3B8", lineHeight: 1.6, marginBottom: "40px", animationDelay: "0.2s", maxWidth: "640px", margin: "0 auto 40px auto" }}>
-            Il primo studio creativo AI desktop-first che trasforma testi, sceneggiature e idee in tavole a fumetti professionali. Senza saper disegnare, con il pieno controllo.
+          <p
+            className="animate-fade-in"
+            style={{
+              fontSize: "1.125rem",
+              color: "#94A3B8",
+              lineHeight: 1.6,
+              marginBottom: "40px",
+              animationDelay: "0.2s",
+              maxWidth: "680px",
+              margin: "0 auto 40px auto",
+            }}
+          >
+            SnapToon ha due anime: la <strong>modalità Autori</strong> per
+            scrittori e illustratori professionisti, e la{" "}
+            <strong>modalità KIDS</strong> per bambini, genitori e
+            insegnanti. Bea &amp; Dante ti guidano in entrambe.
           </p>
 
-          <div className="animate-fade-in" style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "16px", animationDelay: "0.3s" }}>
-            <a href="/login" className="btn btn-primary" style={{ padding: "14px 28px", fontSize: "15px" }}>
-              Inizia gratis <ArrowRight size={18} />
+          <div
+            className="animate-fade-in"
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: "16px",
+              flexWrap: "wrap",
+              animationDelay: "0.3s",
+            }}
+          >
+            <a
+              href="/crea"
+              className="btn btn-secondary"
+              style={{ padding: "14px 28px", fontSize: "15px" }}
+            >
+              📖 Modalità Autori
             </a>
-            <button className="btn btn-secondary" style={{ padding: "14px 28px", fontSize: "15px" }}>
-              <PlayCircle size={18} /> Guarda come funziona
-            </button>
+            <a
+              href="/kids"
+              className="btn btn-primary"
+              style={{ padding: "14px 28px", fontSize: "15px" }}
+            >
+              ⭐ Modalità KIDS <ArrowRight size={18} />
+            </a>
           </div>
         </div>
 
-        {/* Hero Visual */}
-        <div className="animate-fade-in" style={{ animationDelay: "0.4s", position: "relative", borderRadius: "24px", padding: "8px", background: "linear-gradient(180deg, rgba(30, 36, 54, 0.5) 0%, rgba(13, 16, 23, 0) 100%)", border: "1px solid rgba(45, 55, 72, 0.5)", borderTopColor: "rgba(245, 158, 11, 0.3)", boxShadow: "0 24px 64px rgba(0,0,0,0.4)" }}>
-          <div style={{ borderRadius: "16px", overflow: "hidden", aspectRatio: "16/9", background: "#0A0E17", position: "relative" }}>
-            <img
-              src="/images/hero-comic.png"
-              alt="SnapToon Hero Collage"
-              style={{ width: "100%", height: "100%", objectFit: "cover" }}
-              onError={(e) => {
-                e.currentTarget.src = "";
-                e.currentTarget.style.background = "#161B26";
-              }}
-            />
-            {/* UI Overlay mock */}
-            <div style={{ position: "absolute", bottom: "24px", left: "24px", right: "24px", display: "flex", justifyContent: "space-between", alignItems: "flex-end" }}>
-              <div style={{ background: "rgba(13, 16, 23, 0.8)", backdropFilter: "blur(8px)", padding: "16px", borderRadius: "12px", border: "1px solid #2D3748", maxWidth: "320px" }}>
-                <div style={{ fontSize: "12px", color: "#F59E0B", fontWeight: 600, marginBottom: "4px", textTransform: "uppercase" }}>Generazione completata</div>
-                <div style={{ fontSize: "14px", color: "#F1F5F9" }}>Tavola 1: Introduzione nella metropoli cyber-punk...</div>
-              </div>
-            </div>
-          </div>
+        {/* Illustrazione hero: Bea + Dante che presentano i due prodotti */}
+        <div style={{ maxWidth: "900px", margin: "0 auto" }}>
+          <MediaFrame
+            src={src("home-hero", "/images/home/hero.png")}
+            label="Bea & Dante — le due anime di SnapToon"
+            aspect="16 / 9"
+            rounded={20}
+          />
+          <BeaDanteSignature />
         </div>
-
       </div>
     </section>
   );
 }
 
-function ProductsSection() {
-  const cards = [
-    {
-      title: "Writing Room",
-      desc: "Adatta soggetto, sceneggiatura e dialoghi senza inventare nulla",
-      img: "/images/card-generator.png",
-      actions: ["Prova ora"],
-    },
-    {
-      title: "Stili Artistici",
-      desc: "Oltre 100 stili di illustrazione, inquadrature, balloon e griglie.",
-      img: "/images/card-styles.png",
-      actions: ["Prova ora", "Scopri di più"],
-    },
-    {
-      title: "Personaggi Coerenti",
-      desc: "Mantieni i tuoi personaggi identici in ogni vignetta.",
-      img: "/images/card-characters.png",
-      actions: ["Prova ora", "Scopri di più"],
-    },
-    {
-      title: "Impaginazione Smart",
-      desc: "Publishing rapido per Ebook, WebToon, Stampa tipografica.",
-      img: "/images/card-layout.png",
-      actions: ["Prova ora", "Scopri di più"],
-    },
-  ];
+// ============================================================
+// Autori — flow Pro
+// ============================================================
 
+function AutoriSection({
+  src,
+}: {
+  src: (slot: string, fallback: string) => string;
+}) {
   return (
-    <section className="section" style={{ background: "#0A0E17", borderTop: "1px solid #1E2436", borderBottom: "1px solid #1E2436" }}>
-      <div className="lp-container">
-        <div style={{ textAlign: "center", marginBottom: "64px", maxWidth: "800px", margin: "0 auto 64px auto" }}>
-          <h2 style={{ fontSize: "clamp(2rem, 3vw, 2.5rem)", fontWeight: 700, color: "#F1F5F9", letterSpacing: "-0.02em", marginBottom: "16px" }}>
-            Tutto ciò che ti serve per trasformare la tua creatività in un fumetto.
+    <section
+      className="section"
+      style={{
+        background: "#0A0E17",
+        borderTop: "1px solid #1E2436",
+        borderBottom: "1px solid #1E2436",
+      }}
+    >
+      <div
+        className="lp-container"
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fit, minmax(360px, 1fr))",
+          gap: "48px",
+          alignItems: "center",
+        }}
+      >
+        <div>
+          <span className="eyebrow">📖 Per gli Autori</span>
+          <h2
+            style={{
+              fontSize: "clamp(2rem, 3.5vw, 2.75rem)",
+              fontWeight: 800,
+              color: "#F1F5F9",
+              letterSpacing: "-0.02em",
+              lineHeight: 1.1,
+              margin: "20px 0",
+            }}
+          >
+            Dalla scintilla alla stampa tipografica.
           </h2>
-          <p style={{ fontSize: "1.125rem", color: "#94A3B8" }}>
-            I nostri ultimi modelli e strumenti
+          <p
+            style={{
+              fontSize: "1.0625rem",
+              color: "#94A3B8",
+              lineHeight: 1.7,
+              marginBottom: "24px",
+            }}
+          >
+            Un sistema completo per fumetti e graphic novel professionali:
+            scrittura di sceneggiatura, <strong>96 stili visivi</strong>,
+            controllo fine su ogni singola vignetta, gabbia di ogni pagina,
+            balloon, inquadrature e mood. Export PDF stampabile o file per
+            Adobe InDesign.
           </p>
+          <ul
+            style={{
+              listStyle: "none",
+              padding: 0,
+              margin: "0 0 32px 0",
+              display: "grid",
+              gap: "8px",
+            }}
+          >
+            {[
+              "Sceneggiatura assistita con Dante — modifica ogni riga",
+              "96 stili: noir, franco-belga, manga, watercolor, e altri",
+              "Controllo pixel-perfect di gabbia, balloon e SFX",
+              "Personaggi coerenti in ogni tavola",
+              "Export PDF stampabile + IDML per Adobe InDesign",
+            ].map((line) => (
+              <li
+                key={line}
+                style={{
+                  fontSize: "14px",
+                  color: "#CBD5E1",
+                  display: "flex",
+                  gap: "8px",
+                  alignItems: "flex-start",
+                }}
+              >
+                <span style={{ color: "#F59E0B", marginTop: "2px" }}>✓</span>
+                <span>{line}</span>
+              </li>
+            ))}
+          </ul>
+          <a
+            href="/crea"
+            className="btn btn-primary"
+            style={{ padding: "14px 28px", fontSize: "15px" }}
+          >
+            Scopri Autori <ArrowRight size={18} />
+          </a>
         </div>
-
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: "24px" }}>
-          {cards.map((card, idx) => (
-            <div key={idx} className="product-card">
-              <div style={{ aspectRatio: "4/3", overflow: "hidden", background: "#0D1017", borderBottom: "1px solid #1E2436" }}>
-                <img
-                  src={card.img}
-                  alt={card.title}
-                  style={{ width: "100%", height: "100%", objectFit: "cover", transition: "transform 0.5s ease" }}
-                  onMouseOver={(e) => (e.currentTarget.style.transform = "scale(1.05)")}
-                  onMouseOut={(e) => (e.currentTarget.style.transform = "scale(1)")}
-                  onError={(e) => {
-                    e.currentTarget.style.display = "none";
-                  }}
-                />
-              </div>
-              <div style={{ padding: "24px", display: "flex", flexDirection: "column", flex: 1 }}>
-                <h3 style={{ fontSize: "1.125rem", fontWeight: 700, color: "#F1F5F9", marginBottom: "8px" }}>{card.title}</h3>
-                <p style={{ fontSize: "0.875rem", color: "#94A3B8", lineHeight: 1.5, marginBottom: "24px", flex: 1 }}>{card.desc}</p>
-                <div style={{ display: "flex", gap: "8px" }}>
-                  <a href="/login" className="btn btn-secondary" style={{ padding: "8px 16px", fontSize: "13px", flex: card.actions.length === 1 ? 1 : "auto" }}>
-                    {card.actions[0]}
-                  </a>
-                  {card.actions[1] && (
-                    <button className="btn btn-ghost" style={{ padding: "8px 12px", fontSize: "13px" }}>
-                      {card.actions[1]}
-                    </button>
-                  )}
-                </div>
-              </div>
-            </div>
-          ))}
+        <div>
+          <MediaFrame
+            src={src("home-autori", "/images/home/autori.png")}
+            label="Dante & Bea — la scrittura professionale"
+            aspect="4 / 3"
+            rounded={16}
+          />
+          <BeaDanteSignature />
         </div>
       </div>
     </section>
   );
 }
 
-function WorkflowSection() {
+// ============================================================
+// KIDS — flow semplice
+// ============================================================
+
+function KidsSection({
+  src,
+}: {
+  src: (slot: string, fallback: string) => string;
+}) {
   return (
-    <section className="section" style={{ position: "relative", overflow: "hidden" }}>
-      {/* Grid Background */}
-      <div style={{ position: "absolute", inset: 0, backgroundImage: "linear-gradient(rgba(30, 36, 54, 0.3) 1px, transparent 1px), linear-gradient(90deg, rgba(30, 36, 54, 0.3) 1px, transparent 1px)", backgroundSize: "40px 40px", zIndex: 0, opacity: 0.5 }} />
-
-      <div className="lp-container" style={{ position: "relative", zIndex: 1 }}>
-        <div style={{ textAlign: "center", marginBottom: "64px" }}>
-          <h2 style={{ fontSize: "clamp(2rem, 3vw, 2.75rem)", fontWeight: 700, color: "#F1F5F9", letterSpacing: "-0.02em", marginBottom: "16px", maxWidth: "600px", margin: "0 auto 16px auto", lineHeight: 1.1 }}>
-            Un Workflow su Misura per Te
-          </h2>
-          <p style={{ fontSize: "1.125rem", color: "#94A3B8", maxWidth: "640px", margin: "0 auto 32px auto" }}>
-            Flussi semplificati per darti il pieno controllo delle tue creazioni.
-          </p>
-          <button className="btn" style={{ background: "transparent", border: "1px solid #F59E0B", color: "#F59E0B", borderRadius: "100px", padding: "10px 24px" }}>
-            Scopri di più sui Workflow
-          </button>
+    <section
+      className="section"
+      style={{
+        position: "relative",
+        overflow: "hidden",
+      }}
+    >
+      {/* alone caldo per differenziare dalla section Autori */}
+      <div
+        style={{
+          position: "absolute",
+          top: "-20%",
+          left: "20%",
+          width: "60%",
+          height: "80%",
+          background:
+            "radial-gradient(circle, rgba(245,158,11,0.08) 0%, rgba(13,16,23,0) 70%)",
+          zIndex: 0,
+          pointerEvents: "none",
+        }}
+      />
+      <div
+        className="lp-container"
+        style={{
+          position: "relative",
+          zIndex: 1,
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fit, minmax(360px, 1fr))",
+          gap: "48px",
+          alignItems: "center",
+        }}
+      >
+        <div style={{ order: 2 }}>
+          <MediaFrame
+            src={src("home-kids", "/images/home/kids.png")}
+            label="Bea — divertente ed educativo"
+            aspect="4 / 3"
+            rounded={16}
+          />
+          <BeaDanteSignature />
         </div>
-
-        {/* Node Diagram Canvas */}
-        <div style={{ height: "600px", position: "relative", background: "rgba(10, 14, 23, 0.6)", border: "1px solid #1E2436", borderRadius: "24px", backdropFilter: "blur(8px)", overflow: "hidden" }}>
-
-          {/* SVG Connections */}
-          <svg style={{ position: "absolute", inset: 0, width: "100%", height: "100%", pointerEvents: "none" }}>
-            <defs>
-              <linearGradient id="wireGrad" x1="0%" y1="0%" x2="100%" y2="0%">
-                <stop offset="0%" stopColor="#475569" />
-                <stop offset="50%" stopColor="#7C3AED" />
-                <stop offset="100%" stopColor="#F59E0B" />
-              </linearGradient>
-            </defs>
-            {/* Wires */}
-            <path d="M 260 180 C 290 180, 290 120, 320 120" fill="none" stroke="#475569" strokeWidth="2" />
-            <path d="M 260 250 C 290 250, 290 300, 320 300" fill="none" stroke="#475569" strokeWidth="2" />
-            <path d="M 600 120 C 615 120, 615 210, 630 210" fill="none" stroke="#475569" strokeWidth="2" />
-            <path d="M 600 300 C 615 300, 615 210, 630 210" fill="none" stroke="#475569" strokeWidth="2" />
-
-            <path d="M 910 210 C 925 210, 925 320, 940 320" fill="none" stroke="url(#wireGrad)" strokeWidth="3" className="animated-wire" />
-          </svg>
-
-          {/* Nodes */}
-          {/* Node 1: Testo */}
-          <div className="node-card" style={{ position: "absolute", top: "150px", left: "20px" }}>
-            <div className="node-header">
-              <BookOpen size={16} color="#F59E0B" />
-              <span style={{ fontSize: "14px", fontWeight: 600, color: "#F1F5F9" }}>Input: Testo</span>
-            </div>
-            <div style={{ background: "#0D1017", padding: "12px", borderRadius: "6px", fontSize: "12px", color: "#94A3B8", fontFamily: "monospace", border: "1px solid #1E2436" }}>
-              &quot;La città di Neo-Roma era avvolta dalla nebbia di smog e neon...&quot;
-            </div>
-            <div className="node-port out active" style={{ top: "180px" }}></div>
-            <div className="node-port out active" style={{ top: "250px" }}></div>
-          </div>
-
-          {/* Node 2: Stile */}
-          <div className="node-card" style={{ position: "absolute", top: "60px", left: "320px" }}>
-            <div className="node-port in"></div>
-            <div className="node-header">
-              <Settings2 size={16} color="#7C3AED" />
-              <span style={{ fontSize: "14px", fontWeight: 600, color: "#F1F5F9" }}>Configura Stile</span>
-            </div>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: "#0D1017", padding: "8px 12px", borderRadius: "6px", border: "1px solid #1E2436", marginBottom: "8px" }}>
-              <span style={{ fontSize: "12px", color: "#94A3B8" }}>Modello</span>
-              <span style={{ fontSize: "12px", color: "#F1F5F9", fontWeight: 500 }}>Fumetto V2</span>
-            </div>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: "#0D1017", padding: "8px 12px", borderRadius: "6px", border: "1px solid #1E2436" }}>
-              <span style={{ fontSize: "12px", color: "#94A3B8" }}>Inchiostrazione</span>
-              <span style={{ fontSize: "12px", color: "#F1F5F9", fontWeight: 500 }}>Nera pesante</span>
-            </div>
-            <div className="node-port out active"></div>
-          </div>
-
-          {/* Node 3: Personaggi */}
-          <div className="node-card" style={{ position: "absolute", top: "240px", left: "320px" }}>
-            <div className="node-port in"></div>
-            <div className="node-header">
-              <BoxSelect size={16} color="#10B981" />
-              <span style={{ fontSize: "14px", fontWeight: 600, color: "#F1F5F9" }}>Cast Personaggi</span>
-            </div>
-            <div style={{ display: "flex", gap: "8px" }}>
-              <div style={{ width: "40px", height: "40px", borderRadius: "4px", background: "#2D3748" }}></div>
-              <div style={{ width: "40px", height: "40px", borderRadius: "4px", background: "#2D3748" }}></div>
-              <div style={{ width: "40px", height: "40px", borderRadius: "4px", background: "#1E2436", display: "flex", alignItems: "center", justifyContent: "center", color: "#64748B", fontSize: "16px" }}>+</div>
-            </div>
-            <div className="node-port out active"></div>
-          </div>
-
-          {/* Node 4: Genera */}
-          <div className="node-card" style={{ position: "absolute", top: "120px", left: "630px", borderColor: "#F59E0B", boxShadow: "0 0 0 1px rgba(245, 158, 11, 0.2), 0 8px 32px rgba(245, 158, 11, 0.1)" }}>
-            <div className="node-port in" style={{ top: "90px" }}></div>
-            <div className="node-header" style={{ borderBottomColor: "rgba(245,158,11,0.2)" }}>
-              <Zap size={16} color="#F59E0B" />
-              <span style={{ fontSize: "14px", fontWeight: 600, color: "#F59E0B" }}>Genera Tavola</span>
-            </div>
-            <div style={{ width: "100%", height: "140px", background: "#0D1017", borderRadius: "8px", overflow: "hidden", border: "1px solid #2D3748" }}>
-              <img src="/images/card-generator.png" alt="Generazione" style={{ width: "100%", height: "100%", objectFit: "cover", opacity: 0.8 }} onError={(e) => (e.currentTarget.style.display = "none")} />
-            </div>
-            <div className="node-port out active"></div>
-          </div>
-
-          {/* Node 5: Impagina */}
-          <div className="node-card" style={{ position: "absolute", top: "240px", left: "940px" }}>
-            <div className="node-port in"></div>
-            <div className="node-header">
-              <LayoutTemplate size={16} color="#3B82F6" />
-              <span style={{ fontSize: "14px", fontWeight: 600, color: "#F1F5F9" }}>Impaginazione Smart</span>
-            </div>
-            <div style={{ width: "100%", height: "100px", background: "#0D1017", borderRadius: "8px", overflow: "hidden", border: "1px solid #2D3748" }}>
-              <img src="/images/card-layout.png" alt="Impaginazione" style={{ width: "100%", height: "100%", objectFit: "cover", opacity: 0.8 }} onError={(e) => (e.currentTarget.style.display = "none")} />
-            </div>
-          </div>
-
+        <div style={{ order: 1 }}>
+          <span className="eyebrow">⭐ Per Bambini, Genitori, Insegnanti</span>
+          <h2
+            style={{
+              fontSize: "clamp(2rem, 3.5vw, 2.75rem)",
+              fontWeight: 800,
+              color: "#F1F5F9",
+              letterSpacing: "-0.02em",
+              lineHeight: 1.1,
+              margin: "20px 0",
+            }}
+          >
+            Il fumetto sei TU. In 5 minuti.
+          </h2>
+          <p
+            style={{
+              fontSize: "1.0625rem",
+              color: "#94A3B8",
+              lineHeight: 1.7,
+              marginBottom: "24px",
+            }}
+          >
+            Un sistema <strong>divertente ed educativo</strong> per creare
+            libretti illustrati in pochi minuti. Wizard semplificato in 6
+            step: nessuna competenza tecnica richiesta. Perfetto per
+            laboratori scolastici, regali di compleanno, o per sorprendere
+            i propri figli.
+          </p>
+          <ul
+            style={{
+              listStyle: "none",
+              padding: 0,
+              margin: "0 0 32px 0",
+              display: "grid",
+              gap: "8px",
+            }}
+          >
+            {[
+              "13 stili colorati: chibi, supereroi, pixar, fiaba, acquerello",
+              "Il tuo bambino può essere il protagonista (foto → disegno)",
+              "Storia scritta insieme a Dante in 20 secondi",
+              "Copertina in stile fumetto vero, con VOL. #01 e SFX!",
+              "PDF stampabile pronto per il regalo",
+            ].map((line) => (
+              <li
+                key={line}
+                style={{
+                  fontSize: "14px",
+                  color: "#CBD5E1",
+                  display: "flex",
+                  gap: "8px",
+                  alignItems: "flex-start",
+                }}
+              >
+                <span style={{ color: "#F59E0B", marginTop: "2px" }}>✓</span>
+                <span>{line}</span>
+              </li>
+            ))}
+          </ul>
+          <a
+            href="/kids"
+            className="btn btn-primary"
+            style={{ padding: "14px 28px", fontSize: "15px" }}
+          >
+            Scopri KIDS <ArrowRight size={18} />
+          </a>
         </div>
       </div>
     </section>
   );
 }
 
+// ============================================================
+// Esplora — community
+// ============================================================
+
+function EsploraSection({
+  src,
+}: {
+  src: (slot: string, fallback: string) => string;
+}) {
+  return (
+    <section
+      className="section"
+      style={{
+        background: "#0A0E17",
+        borderTop: "1px solid #1E2436",
+        borderBottom: "1px solid #1E2436",
+      }}
+    >
+      <div
+        className="lp-container"
+        style={{ textAlign: "center", maxWidth: "980px", margin: "0 auto" }}
+      >
+        <span className="eyebrow">🌐 Community</span>
+        <h2
+          style={{
+            fontSize: "clamp(1.75rem, 3vw, 2.5rem)",
+            fontWeight: 800,
+            color: "#F1F5F9",
+            letterSpacing: "-0.02em",
+            lineHeight: 1.1,
+            margin: "20px 0",
+          }}
+        >
+          Guarda le creazioni della community.
+        </h2>
+        <p
+          style={{
+            fontSize: "1.0625rem",
+            color: "#94A3B8",
+            lineHeight: 1.6,
+            maxWidth: "680px",
+            margin: "0 auto 32px auto",
+          }}
+        >
+          Copertine, tavole e personaggi condivisi da autori e famiglie di
+          tutta Italia. Un&apos;anteprima di quello che potrai creare tu.
+        </p>
+        <div style={{ maxWidth: "820px", margin: "0 auto 32px auto" }}>
+          <MediaFrame
+            src={src("home-esplora", "/images/home/esplora.png")}
+            label="Bea & Dante presentano la community"
+            aspect="16 / 9"
+            rounded={16}
+          />
+          <BeaDanteSignature />
+        </div>
+        <a
+          href="/esplora"
+          className="btn btn-secondary"
+          style={{ padding: "12px 24px", fontSize: "14px" }}
+        >
+          Vai a Esplora <ArrowRight size={16} />
+        </a>
+      </div>
+    </section>
+  );
+}
+
+// ============================================================
+// Bookshop — marketplace
+// ============================================================
+
+function BookshopSection({
+  src,
+}: {
+  src: (slot: string, fallback: string) => string;
+}) {
+  return (
+    <section className="section">
+      <div
+        className="lp-container"
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fit, minmax(360px, 1fr))",
+          gap: "48px",
+          alignItems: "center",
+        }}
+      >
+        <div>
+          <MediaFrame
+            src={src("home-bookshop", "/images/home/bookshop.png")}
+            label="Dante — il tuo posto in libreria"
+            aspect="4 / 3"
+            rounded={16}
+          />
+          <BeaDanteSignature />
+        </div>
+        <div>
+          <span className="eyebrow">📚 BookShop</span>
+          <h2
+            style={{
+              fontSize: "clamp(1.75rem, 3vw, 2.5rem)",
+              fontWeight: 800,
+              color: "#F1F5F9",
+              letterSpacing: "-0.02em",
+              lineHeight: 1.1,
+              margin: "20px 0",
+            }}
+          >
+            Il tuo fumetto in libreria.
+          </h2>
+          <p
+            style={{
+              fontSize: "1.0625rem",
+              color: "#94A3B8",
+              lineHeight: 1.7,
+              marginBottom: "16px",
+            }}
+          >
+            Pubblica i tuoi fumetti nel BookShop di SnapToon: scegli tu se
+            renderli <strong>gratuiti</strong> o metterli in{" "}
+            <strong>vendita</strong>. Altri autori e famiglie potranno
+            scoprirli, leggerli, sostenerli.
+          </p>
+          <p
+            style={{
+              fontSize: "14px",
+              color: "#F59E0B",
+              fontStyle: "italic",
+              marginBottom: "24px",
+            }}
+          >
+            🚀 Funzionalità in arrivo — prenota il tuo posto.
+          </p>
+          <a
+            href="/bookshop"
+            className="btn btn-secondary"
+            style={{ padding: "12px 24px", fontSize: "14px" }}
+          >
+            Scopri BookShop <ArrowRight size={16} />
+          </a>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+// ============================================================
+// CTA finale — piani + prova gratis
+// ============================================================
+
+function FinalCtaSection({
+  src,
+}: {
+  src: (slot: string, fallback: string) => string;
+}) {
+  return (
+    <section
+      className="section"
+      style={{
+        background:
+          "linear-gradient(180deg, rgba(245,158,11,0.06) 0%, rgba(13,16,23,0) 100%)",
+        borderTop: "1px solid rgba(245,158,11,0.2)",
+      }}
+    >
+      <div
+        className="lp-container"
+        style={{ textAlign: "center", maxWidth: "820px", margin: "0 auto" }}
+      >
+        <div style={{ maxWidth: "540px", margin: "0 auto 32px auto" }}>
+          <MediaFrame
+            src={src("home-cta", "/images/home/cta.png")}
+            label="Bea & Dante — Iniziamo?"
+            aspect="4 / 3"
+            rounded={16}
+          />
+          <BeaDanteSignature />
+        </div>
+        <h2
+          style={{
+            fontSize: "clamp(1.75rem, 3vw, 2.75rem)",
+            fontWeight: 800,
+            color: "#F1F5F9",
+            letterSpacing: "-0.02em",
+            lineHeight: 1.1,
+            margin: "16px 0",
+          }}
+        >
+          Pronto a raccontare la tua storia?
+        </h2>
+        <p
+          style={{
+            fontSize: "1.0625rem",
+            color: "#94A3B8",
+            lineHeight: 1.6,
+            marginBottom: "32px",
+            maxWidth: "560px",
+            margin: "0 auto 32px auto",
+          }}
+        >
+          Provala gratis. 30 crediti di prova, nessuna carta richiesta.
+          Passa a un piano quando vuoi.
+        </p>
+        <div
+          style={{
+            display: "flex",
+            gap: "16px",
+            justifyContent: "center",
+            flexWrap: "wrap",
+          }}
+        >
+          <a
+            href="/login"
+            className="btn btn-primary"
+            style={{ padding: "14px 28px", fontSize: "15px" }}
+          >
+            Inizia gratis <ArrowRight size={18} />
+          </a>
+          <a
+            href="/abbonamenti"
+            className="btn btn-secondary"
+            style={{ padding: "14px 28px", fontSize: "15px" }}
+          >
+            Vedi tutti i piani
+          </a>
+        </div>
+      </div>
+    </section>
+  );
+}
