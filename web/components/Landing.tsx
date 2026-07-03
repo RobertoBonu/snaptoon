@@ -5,24 +5,6 @@ import { useEffect, useState } from "react";
 import { SiteShell, MediaFrame } from "@/components/site";
 import { apiFetch, type CreaImagesOut } from "@/lib/api";
 
-// Firma discreta sotto ogni illustrazione (guide del sito).
-function BeaDanteSignature() {
-  return (
-    <div
-      style={{
-        marginTop: 10,
-        fontSize: 12,
-        color: "#64748B",
-        letterSpacing: "0.06em",
-        textAlign: "center",
-        fontStyle: "italic",
-      }}
-    >
-      con Bea &amp; Dante — le tue guide
-    </div>
-  );
-}
-
 export default function Landing() {
   const [overrides, setOverrides] = useState<Record<string, string>>({});
 
@@ -162,10 +144,15 @@ function HeroSection({
               margin: "0 auto 40px auto",
             }}
           >
-            SnapToon ha due anime: la <strong>modalità Autori</strong> per
-            scrittori e illustratori professionisti, e la{" "}
-            <strong>modalità KIDS</strong> per bambini, genitori e
-            insegnanti. Bea &amp; Dante ti guidano in entrambe.
+            SnapToon ha due anime:
+            <br />
+            la <strong>modalità Autori</strong> per scrittori e illustratori
+            professionisti,
+            <br />
+            e la <strong>modalità KIDS</strong> per bambini, genitori e
+            insegnanti.
+            <br />
+            Bea &amp; Dante ti guidano in entrambe.
           </p>
 
           <div
@@ -204,7 +191,6 @@ function HeroSection({
             aspect="16 / 9"
             rounded={20}
           />
-          <BeaDanteSignature />
         </div>
       </div>
     </section>
@@ -312,7 +298,6 @@ function AutoriSection({
             aspect="4 / 3"
             rounded={16}
           />
-          <BeaDanteSignature />
         </div>
       </div>
     </section>
@@ -368,7 +353,6 @@ function KidsSection({
             aspect="4 / 3"
             rounded={16}
           />
-          <BeaDanteSignature />
         </div>
         <div style={{ order: 1 }}>
           <span className="eyebrow">⭐ Per Bambini, Genitori, Insegnanti</span>
@@ -496,7 +480,6 @@ function EsploraSection({
             aspect="16 / 9"
             rounded={16}
           />
-          <BeaDanteSignature />
         </div>
         <a
           href="/esplora"
@@ -537,7 +520,6 @@ function BookshopSection({
             aspect="4 / 3"
             rounded={16}
           />
-          <BeaDanteSignature />
         </div>
         <div>
           <span className="eyebrow">📚 BookShop</span>
@@ -618,7 +600,6 @@ function FinalCtaSection({
             aspect="4 / 3"
             rounded={16}
           />
-          <BeaDanteSignature />
         </div>
         <h2
           style={{
