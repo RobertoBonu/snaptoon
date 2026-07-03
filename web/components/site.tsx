@@ -5,7 +5,8 @@ import { ReactNode } from "react";
 /** Voci del menu pubblico — collegate alle pagine reali. */
 export const NAV: { label: string; href: string }[] = [
   { label: "Esplora", href: "/esplora" },
-  { label: "Crea", href: "/crea" },
+  { label: "Autori", href: "/crea" },
+  { label: "Kids", href: "/kids" },
   { label: "BookShop", href: "/bookshop" },
   { label: "Abbonamenti", href: "/abbonamenti" },
 ];
@@ -113,7 +114,8 @@ export function SiteFooter() {
       title: "Prodotto",
       links: [
         { label: "Esplora", href: "/esplora" },
-        { label: "Crea", href: "/crea" },
+        { label: "Autori", href: "/crea" },
+        { label: "Kids", href: "/kids" },
         { label: "BookShop", href: "/bookshop" },
         { label: "Abbonamenti", href: "/abbonamenti" },
       ],

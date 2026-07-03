@@ -74,12 +74,14 @@ export default function CreaPage() {
       <section className="section" style={{ paddingTop: "100px", paddingBottom: "60px" }}>
         <div className="lp-container" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(360px, 1fr))", gap: "48px", alignItems: "center" }}>
           <div>
-            <span className="eyebrow">Workflow Pro</span>
+            <span className="eyebrow">Per gli Autori</span>
             <h1 style={{ fontSize: "clamp(2.25rem, 4vw, 3.25rem)", fontWeight: 800, color: "#F1F5F9", lineHeight: 1.1, letterSpacing: "-0.03em", margin: "20px 0" }}>
               5 passi. Dal foglio bianco al fumetto stampabile.
             </h1>
             <p style={{ fontSize: "1.125rem", color: "#94A3B8", lineHeight: 1.6, marginBottom: "32px" }}>
-              SnapToon ti accompagna passo passo. Tu scrivi l&apos;idea, l&apos;AI fa il resto — sempre sotto il tuo controllo.
+              SnapToon accompagna sceneggiatori, illustratori e autori
+              indipendenti in tutta la pipeline. Tu scrivi la scintilla,
+              l&apos;AI fa il resto — sempre sotto il tuo controllo creativo.
             </p>
             <a href="/login" className="btn btn-primary" style={{ padding: "14px 28px", fontSize: "15px" }}>Inizia gratis →</a>
           </div>
@@ -118,7 +120,7 @@ export default function CreaPage() {
             <p style={{ fontSize: "1.0625rem", color: "#CBD5E1", lineHeight: 1.7, marginBottom: "24px", maxWidth: "760px" }}>
               Wizard semplificato in 6 step. Template pre-fissati. Storia, copertina e illustrazioni generate in 3 minuti. Perfetto per genitori, insegnanti, biblioteche.
             </p>
-            <a href="/esplora" className="btn btn-secondary" style={{ padding: "12px 22px" }}>Scopri KIDS →</a>
+            <a href="/kids" className="btn btn-secondary" style={{ padding: "12px 22px" }}>Scopri KIDS →</a>
           </div>
         </div>
       </section>
