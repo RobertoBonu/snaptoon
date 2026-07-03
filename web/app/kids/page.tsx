@@ -123,7 +123,7 @@ export default function KidsShowcasePage() {
                 margin: "20px 0",
               }}
             >
-              Fumetti per bambini in 5 minuti. Con TE come protagonista.
+              Il fumetto sei TU. In 5 minuti.
             </h1>
             <p
               style={{
