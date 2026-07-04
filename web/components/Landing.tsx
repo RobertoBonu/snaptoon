@@ -151,11 +151,11 @@ function HeroSection({
           >
             SnapToon ha due anime:
             <br />
-            la <strong>modalità Autori</strong> per scrittori e illustratori
-            professionisti,
+            <strong style={{ color: "#F59E0B" }}>Autori</strong> per scrittori e
+            illustratori,
             <br />
-            e la <strong>modalità KIDS</strong> per bambini, genitori e
-            insegnanti.
+            e <strong style={{ color: "#F59E0B" }}>KIDS</strong> per bambini,
+            genitori e insegnanti.
             <br />
             Bea &amp; Dante ti guidano in entrambe.
           </p>
