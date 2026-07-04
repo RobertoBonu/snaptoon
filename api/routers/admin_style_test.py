@@ -221,19 +221,55 @@ async def generate_test_image(
         if len(ref_bytes) == 0:
             ref_bytes = None
 
-    # Costruisci il prompt: stile + scene + soggetto
-    parts = ["=== RENDER MODE ===", "Single comic vignette illustration for a style test."]
+    # Costruisci il prompt seguendo lo stesso pattern di build_panel_prompt
+    # (kids_pipeline.py): mappa le KEY delle scene params → prompt_en (le
+    # frasi inglesi pronte all'uso definite in snaptoon_core.scene).
+    # Se passassimo le key crude (es. "eye_level"), gpt-image le
+    # interpreterebbe come stringhe generiche → resa scadente.
+    from snaptoon_core.scene import (
+        ASPECT_RATIOS,
+        MOODS,
+        SHOT_ANGLES,
+        SHOT_DISTANCES,
+    )
+
+    # Descrizione aspect ratio nel prompt (aiuta il modello a comporre
+    # correttamente all'interno del frame)
+    ar_option = next((o for o in ASPECT_RATIOS if o.key == aspect_ratio), None)
+    ar_hint = ar_option.prompt_en if ar_option else "square 1:1 aspect ratio"
+
+    parts = [
+        f"=== RENDER MODE ===\n"
+        f"Full-bleed single comic vignette in {ar_hint}. Edge-to-edge, no "
+        f"external frame or page border. Compose the scene to fill the "
+        f"entire frame."
+    ]
     parts.append(f"=== STYLE ===\n{preset.expansion.strip()}")
-    if any([shot_distance, shot_angle, mood]):
-        scene_lines = ["=== SCENE PARAMS ==="]
-        if shot_distance:
-            scene_lines.append(f"Shot distance: {shot_distance}")
-        if shot_angle:
-            scene_lines.append(f"Shot angle: {shot_angle}")
-        if mood:
-            scene_lines.append(f"Mood: {mood}")
-        parts.append("\n".join(scene_lines))
+
+    # DIRECTING: mappa le key delle scene params sulle frasi in inglese
+    clauses: list[str] = []
+    if shot_distance:
+        o = next((o for o in SHOT_DISTANCES if o.key == shot_distance), None)
+        if o:
+            clauses.append(f"SHOT DISTANCE: {o.prompt_en}.")
+    if shot_angle:
+        o = next((o for o in SHOT_ANGLES if o.key == shot_angle), None)
+        if o:
+            clauses.append(f"CAMERA ANGLE: {o.prompt_en}.")
+    if mood:
+        o = next((o for o in MOODS if o.key == mood), None)
+        if o:
+            clauses.append(f"MOOD: {o.prompt_en}.")
+    if clauses:
+        parts.append("=== DIRECTING ===\n" + " ".join(clauses))
+
     parts.append(f"=== SUBJECT ===\n{prompt.strip()}")
+    parts.append(
+        "=== CHARACTER CONSISTENCY ===\n"
+        "If a reference image is provided, the character in the output MUST "
+        "look IDENTICAL to the reference: same face, same hair, same "
+        "clothes. Visual ground truth."
+    )
     if preset.extra_negative_terms:
         neg = ", ".join(preset.extra_negative_terms)
         parts.append(f"=== AVOID ===\n{neg}")
