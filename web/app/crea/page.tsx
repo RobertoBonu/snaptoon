@@ -49,8 +49,11 @@ const STEPS = [
 
 export default function CreaPage() {
   // Override immagini gestite dall'admin: slot → URL. Se assente si usa il
-  // default statico definito qui sotto (SSR-safe: parte dai default).
+  // default statico. `ready` evita il flash del placeholder prima della
+  // risposta API (non tentiamo di caricare fallback statici che potrebbero
+  // non esistere).
   const [overrides, setOverrides] = useState<Record<string, string>>({});
+  const [ready, setReady] = useState(false);
 
   useEffect(() => {
     apiFetch<CreaImagesOut>("/api/crea/images", { cache: "no-store" })
@@ -63,10 +66,12 @@ export default function CreaPage() {
       })
       .catch(() => {
         /* fallback ai default statici */
-      });
+      })
+      .finally(() => setReady(true));
   }, []);
 
-  const srcFor = (slot: string, fallback: string) => overrides[slot] || fallback;
+  const srcFor = (slot: string, fallback: string) =>
+    ready ? overrides[slot] || fallback : "";
 
   return (
     <SiteShell active="/crea">

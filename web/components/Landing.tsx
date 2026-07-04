@@ -7,6 +7,10 @@ import { apiFetch, type CreaImagesOut } from "@/lib/api";
 
 export default function Landing() {
   const [overrides, setOverrides] = useState<Record<string, string>>({});
+  // Finché l'API non ha risposto, NON tentiamo di caricare le fallback
+  // statiche (che non esistono in /public/images/home/): questo evita il
+  // flash del placeholder di errore prima che arrivino le URL admin.
+  const [ready, setReady] = useState(false);
 
   useEffect(() => {
     apiFetch<CreaImagesOut>("/api/crea/images", { cache: "no-store" })
@@ -19,11 +23,12 @@ export default function Landing() {
       })
       .catch(() => {
         /* fallback statici */
-      });
+      })
+      .finally(() => setReady(true));
   }, []);
 
   const src = (slot: string, fallback: string) =>
-    overrides[slot] || fallback;
+    ready ? overrides[slot] || fallback : "";
 
   return (
     <SiteShell active="/">

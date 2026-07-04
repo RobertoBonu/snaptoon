@@ -74,9 +74,11 @@ const KIDS_STEPS = [
 export default function KidsShowcasePage() {
   // Come per /crea: consenti override immagini dall'admin. L'endpoint
   // /api/crea/images restituisce SIA gli slot Autori sia i "kids-*"
-  // (gestiti in /app/admin/crea con sezione dedicata). Se un slot non è
-  // ancora stato caricato, ricade sul path statico sotto /public/images/kids.
+  // (gestiti in /app/admin/crea con sezione dedicata). `ready` evita il
+  // flash del placeholder di errore prima che arrivino le URL admin
+  // (le fallback statiche potrebbero non esistere in /public).
   const [overrides, setOverrides] = useState<Record<string, string>>({});
+  const [ready, setReady] = useState(false);
 
   useEffect(() => {
     apiFetch<CreaImagesOut>("/api/crea/images", { cache: "no-store" })
@@ -89,11 +91,12 @@ export default function KidsShowcasePage() {
       })
       .catch(() => {
         /* fallback statici */
-      });
+      })
+      .finally(() => setReady(true));
   }, []);
 
   const srcFor = (slot: string, fallback: string) =>
-    overrides[slot] || fallback;
+    ready ? overrides[slot] || fallback : "";
 
   return (
     <SiteShell active="/kids">
