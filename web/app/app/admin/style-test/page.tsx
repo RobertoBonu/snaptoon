@@ -2,7 +2,88 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 import { apiFetch } from "@/lib/api";
+
+/** Lightbox fullscreen: mostra l'immagine a dimensione reale (max 96vw x 92vh).
+ *  Click sullo sfondo o Escape per chiudere. */
+function Lightbox({
+  src,
+  alt,
+  onClose,
+}: {
+  src: string;
+  alt: string;
+  onClose: () => void;
+}) {
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => {
+    setMounted(true);
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    document.addEventListener("keydown", onKey);
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      document.body.style.overflow = prev;
+    };
+  }, [onClose]);
+  if (!mounted) return null;
+  return createPortal(
+    <div
+      onClick={onClose}
+      style={{
+        position: "fixed",
+        inset: 0,
+        zIndex: 1000,
+        background: "rgba(3, 6, 12, 0.92)",
+        backdropFilter: "blur(8px)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: 24,
+        cursor: "zoom-out",
+      }}
+    >
+      <button
+        onClick={onClose}
+        aria-label="Chiudi"
+        style={{
+          position: "absolute",
+          top: 20,
+          right: 24,
+          width: 44,
+          height: 44,
+          borderRadius: 999,
+          border: "1px solid rgba(255,255,255,0.18)",
+          background: "rgba(15,20,32,0.7)",
+          color: "#F1F5F9",
+          fontSize: 22,
+          cursor: "pointer",
+        }}
+      >
+        ✕
+      </button>
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={src}
+        alt={alt}
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          maxWidth: "min(96vw, 1600px)",
+          maxHeight: "92vh",
+          objectFit: "contain",
+          borderRadius: 12,
+          boxShadow: "0 24px 80px rgba(0,0,0,0.6)",
+          cursor: "default",
+        }}
+      />
+    </div>,
+    document.body,
+  );
+}
 
 interface Preset {
   id: string;
@@ -52,6 +133,10 @@ export default function AdminStyleTestPage() {
 
   // Filter
   const [filterPreset, setFilterPreset] = useState<string>("");
+  // Lightbox: URL immagine attualmente ingrandita
+  const [zoomed, setZoomed] = useState<{ src: string; alt: string } | null>(
+    null,
+  );
 
   // Form state
   const [selectedPreset, setSelectedPreset] = useState<string>("");
@@ -428,12 +513,58 @@ export default function AdminStyleTestPage() {
                     key={img.id}
                     className="bg-[var(--color-bg-elev)] border border-[var(--color-border)] rounded-lg overflow-hidden"
                   >
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      src={img.image_url}
-                      alt={img.prompt}
-                      className="w-full aspect-square object-cover"
-                    />
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setZoomed({ src: img.image_url, alt: img.prompt })
+                      }
+                      title="Zoom a dimensione reale"
+                      style={{
+                        display: "block",
+                        width: "100%",
+                        padding: 0,
+                        border: "none",
+                        background: "#0D1017",
+                        cursor: "zoom-in",
+                        position: "relative",
+                      }}
+                    >
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={img.image_url}
+                        alt={img.prompt}
+                        loading="lazy"
+                        // object-contain + max-height mantiene la griglia
+                        // ordinata ma NON crop l'immagine: portrait 2:3,
+                        // landscape 3:2 ecc. si vedono intere.
+                        style={{
+                          width: "100%",
+                          maxHeight: 360,
+                          objectFit: "contain",
+                          display: "block",
+                        }}
+                      />
+                      <span
+                        aria-hidden
+                        style={{
+                          position: "absolute",
+                          bottom: 8,
+                          right: 8,
+                          width: 28,
+                          height: 28,
+                          borderRadius: 999,
+                          background: "rgba(3,6,12,0.75)",
+                          border: "1px solid rgba(255,255,255,0.15)",
+                          color: "#F1F5F9",
+                          fontSize: 13,
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                        }}
+                      >
+                        🔍
+                      </span>
+                    </button>
                     <div className="p-3">
                       <div className="flex items-center gap-1 mb-2 flex-wrap">
                         <span className="text-[10px] font-bold uppercase tracking-wide text-[var(--color-fg-muted)]">
@@ -510,6 +641,14 @@ export default function AdminStyleTestPage() {
           )}
         </div>
       </div>
+
+      {zoomed && (
+        <Lightbox
+          src={zoomed.src}
+          alt={zoomed.alt}
+          onClose={() => setZoomed(null)}
+        />
+      )}
     </div>
   );
 }
