@@ -32,6 +32,8 @@ export default function NewKidsPage() {
   // Scelte utente
   const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null);
   const [selectedStyleSlug, setSelectedStyleSlug] = useState<string | null>(null);
+  // Mappa preset_id → URL sample (dall'admin Test-Style, flow=kids)
+  const [styleSamples, setStyleSamples] = useState<Record<string, string>>({});
   const [title, setTitle] = useState("");
   const [subtitle, setSubtitle] = useState("");
   const [author, setAuthor] = useState("");
@@ -40,7 +42,7 @@ export default function NewKidsPage() {
   const [characters, setCharacters] = useState<KidsCharacterIn[]>([]);
   const [creating, setCreating] = useState(false);
 
-  // Init: load templates + styles
+  // Init: load templates + styles + sample thumbnails
   useEffect(() => {
     (async () => {
       try {
@@ -56,6 +58,16 @@ export default function NewKidsPage() {
         setLoadingData(false);
       }
     })();
+
+    fetch("/api/styles/samples?flow=kids")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d: { samples: { style_preset_id: string; image_url: string }[] } | null) => {
+        if (!d) return;
+        const map: Record<string, string> = {};
+        for (const s of d.samples) map[s.style_preset_id] = s.image_url;
+        setStyleSamples(map);
+      })
+      .catch(() => {});
   }, []);
 
   const selectedTemplate = templates.find((t) => t.id === selectedTemplateId);
@@ -204,19 +216,33 @@ export default function NewKidsPage() {
           <section>
             <h2 className="text-lg font-semibold mb-4">Scegli lo stile</h2>
             <div className="grid grid-cols-3 gap-3">
-              {styles.map((s) => (
-                <button
-                  key={s.slug}
-                  onClick={() => setSelectedStyleSlug(s.slug)}
-                  className={`p-4 rounded-xl border text-center transition-all ${
-                    selectedStyleSlug === s.slug
-                      ? "border-[var(--color-accent)] bg-[var(--color-accent)]/5"
-                      : "border-[var(--color-border)] bg-[var(--color-bg-elev)] hover:border-[var(--color-accent)]/50"
-                  }`}
-                >
-                  <div className="font-medium">{s.label}</div>
-                </button>
-              ))}
+              {styles.map((s) => {
+                const sample = styleSamples[s.preset_id];
+                return (
+                  <button
+                    key={s.slug}
+                    onClick={() => setSelectedStyleSlug(s.slug)}
+                    className={`p-2 rounded-xl border text-center transition-all overflow-hidden ${
+                      selectedStyleSlug === s.slug
+                        ? "border-[var(--color-accent)] bg-[var(--color-accent)]/5"
+                        : "border-[var(--color-border)] bg-[var(--color-bg-elev)] hover:border-[var(--color-accent)]/50"
+                    }`}
+                  >
+                    {sample && (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={sample}
+                        alt={`Anteprima ${s.label}`}
+                        loading="lazy"
+                        className="w-full aspect-square object-cover rounded-md border border-[var(--color-border)] mb-2"
+                      />
+                    )}
+                    <div className="font-medium text-sm px-2 pb-1">
+                      {s.label}
+                    </div>
+                  </button>
+                );
+              })}
             </div>
           </section>
 

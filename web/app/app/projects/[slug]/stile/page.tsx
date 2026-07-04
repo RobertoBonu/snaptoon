@@ -17,6 +17,9 @@ export default function StilePage({
   const [query, setQuery] = useState<string>("");
   const [saving, setSaving] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // Mappa preset_id → URL sample (dall'admin Test-Style). Se preset non
+  // ha ancora un sample, il box mostra solo il testo (come prima).
+  const [samples, setSamples] = useState<Record<string, string>>({});
 
   async function load() {
     try {
@@ -45,6 +48,19 @@ export default function StilePage({
   useEffect(() => {
     load();
   }, [category]);
+
+  useEffect(() => {
+    // Carica una volta la lista dei sample (indipendente dai filtri)
+    fetch("/api/styles/samples?flow=pro")
+      .then((r) => r.ok ? r.json() : null)
+      .then((d: { samples: { style_preset_id: string; image_url: string }[] } | null) => {
+        if (!d) return;
+        const map: Record<string, string> = {};
+        for (const s of d.samples) map[s.style_preset_id] = s.image_url;
+        setSamples(map);
+      })
+      .catch(() => {});
+  }, []);
 
   async function selectStyle(styleId: string) {
     setSaving(styleId);
@@ -148,6 +164,15 @@ export default function StilePage({
               <div className="text-xs text-[var(--color-fg-muted)] mb-2 uppercase tracking-wider">
                 {s.category}
               </div>
+              {samples[s.id] && (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={samples[s.id]}
+                  alt={`Anteprima ${s.label}`}
+                  loading="lazy"
+                  className="w-full aspect-square object-cover rounded-md border border-[var(--color-border)] mb-2"
+                />
+              )}
               <p className="text-xs text-[var(--color-fg-muted)] line-clamp-3">
                 {s.expansion.slice(0, 200)}
                 {s.expansion.length > 200 ? "..." : ""}
