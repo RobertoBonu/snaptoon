@@ -132,7 +132,10 @@ def list_presets_for_admin(
 ) -> StylePresetsListOut:
     from snaptoon_core.styles_library import list_presets
 
-    presets = list_presets(include_custom=True)
+    # list_presets(category=None) ritorna TUTTI i preset (fumetto,
+    # illustrazione, fotografia, cinema, kids, ...). Passargli argomenti
+    # sbagliati causava un TypeError → 500.
+    presets = list_presets()
 
     with session_scope() as s:
         # Fetch existing samples in one pass
