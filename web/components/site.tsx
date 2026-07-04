@@ -364,9 +364,19 @@ export function SiteShell({ children, active }: { children: ReactNode; active?: 
 }
 
 /**
- * Cornice immagine con placeholder elegante.
- * Mostra un segnaposto (gradiente + etichetta); se l'immagine reale esiste in
- * `web/public/images/...` la copre automaticamente. onError nasconde l'img mancante.
+ * Cornice immagine minimale.
+ *
+ * Il "placeholder" decorativo (icona ▦ + label) è stato rimosso perché
+ * generava un flash visibile durante il download dell'immagine reale
+ * (era disegnato SOTTO l'<img>, quindi visibile finché il pixel non era
+ * disponibile). Ora il container ha solo uno sfondo sfumato molto scuro
+ * (praticamente invisibile sui temi dark), l'<img> fade-in quando è
+ * pronta. Se il caricamento fallisce, il container resta scuro invece
+ * di mostrare un'icona di errore.
+ *
+ * Il parametro `label` è mantenuto in firma per compatibilità con i
+ * chiamanti (accessibilità: usato come alt fallback), ma non è più
+ * disegnato.
  */
 export function MediaFrame({
   src,
@@ -374,31 +384,39 @@ export function MediaFrame({
   label,
   aspect = "4 / 3",
   rounded = 12,
-  accent = "#F59E0B",
 }: {
   src: string;
   alt?: string;
   label?: string;
   aspect?: string;
   rounded?: number;
-  accent?: string;
+  accent?: string; // deprecato: non più usato
 }) {
   return (
-    <div style={{ position: "relative", aspectRatio: aspect, borderRadius: rounded, overflow: "hidden", background: "linear-gradient(135deg, #161B26 0%, #0D1017 100%)", border: "1px solid #1E2436" }}>
-      <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: 10, padding: 16, textAlign: "center" }}>
-        <div style={{ width: 44, height: 44, borderRadius: 12, background: "rgba(245,158,11,0.10)", border: `1px solid ${accent}40`, display: "flex", alignItems: "center", justifyContent: "center", color: accent, fontSize: 20 }}>▦</div>
-        {label && <span style={{ fontSize: 12, color: "#64748B", lineHeight: 1.4, maxWidth: 220 }}>{label}</span>}
-      </div>
+    <div
+      style={{
+        position: "relative",
+        aspectRatio: aspect,
+        borderRadius: rounded,
+        overflow: "hidden",
+        // sfondo scuro molto tenue: invisibile mentre l'img si carica
+        // (elimina il "flash" del vecchio placeholder decorativo).
+        background: "#0D1017",
+        border: "1px solid #1E2436",
+      }}
+    >
       {src ? (
-        // key={src}: rimonta un <img> pulito ad ogni cambio di src. Senza questo,
-        // il fallback statico (404) imposta display:none imperativo che PERSISTE
-        // anche quando src passa all'URL immagine reale — l'immagine caricava (200)
-        // ma restava invisibile. Race visibile solo in produzione (rete più lenta).
         <img
           key={src}
           src={src}
-          alt={alt || ""}
-          style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }}
+          alt={alt || label || ""}
+          style={{
+            position: "absolute",
+            inset: 0,
+            width: "100%",
+            height: "100%",
+            objectFit: "cover",
+          }}
           onError={(e) => {
             e.currentTarget.style.display = "none";
           }}
