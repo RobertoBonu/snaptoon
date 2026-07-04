@@ -59,7 +59,7 @@ export default function AdminStyleTestPage() {
   const [shotDistance, setShotDistance] = useState("");
   const [shotAngle, setShotAngle] = useState("");
   const [mood, setMood] = useState("");
-  const [aspectRatio, setAspectRatio] = useState("1:1");
+  const [aspectRatio, setAspectRatio] = useState("1_1");
   const [quality, setQuality] = useState("medium");
   const [reference, setReference] = useState<File | null>(null);
 
@@ -125,26 +125,23 @@ export default function AdminStyleTestPage() {
     setBusy(true);
     setError(null);
     try {
-      const params = new URLSearchParams();
-      params.set("style_preset_id", selectedPreset);
-      params.set("prompt", prompt);
-      if (shotDistance) params.set("shot_distance", shotDistance);
-      if (shotAngle) params.set("shot_angle", shotAngle);
-      if (mood) params.set("mood", mood);
-      params.set("aspect_ratio", aspectRatio);
-      params.set("quality", quality);
-
+      // Tutti i campi vanno nel multipart body (insieme al reference),
+      // altrimenti l'endpoint FastAPI li ignora e usa i default.
       const formData = new FormData();
+      formData.append("style_preset_id", selectedPreset);
+      formData.append("prompt", prompt);
+      formData.append("shot_distance", shotDistance || "");
+      formData.append("shot_angle", shotAngle || "");
+      formData.append("mood", mood || "");
+      formData.append("aspect_ratio", aspectRatio);
+      formData.append("quality", quality);
       if (reference) formData.append("reference", reference);
 
-      const res = await fetch(
-        `/api/admin/style-test/generate?${params.toString()}`,
-        {
-          method: "POST",
-          body: formData,
-          credentials: "include",
-        },
-      );
+      const res = await fetch("/api/admin/style-test/generate", {
+        method: "POST",
+        body: formData,
+        credentials: "include",
+      });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
         throw new Error(data.detail || `HTTP ${res.status}`);

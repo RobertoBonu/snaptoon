@@ -23,7 +23,16 @@ import uuid
 from pathlib import Path
 from typing import Optional
 
-from fastapi import APIRouter, Depends, File, HTTPException, Response, UploadFile, status
+from fastapi import (
+    APIRouter,
+    Depends,
+    File,
+    Form,
+    HTTPException,
+    Response,
+    UploadFile,
+    status,
+)
 from pydantic import BaseModel, Field
 
 from api.routers.admin import require_admin
@@ -110,15 +119,15 @@ def _to_out(img) -> StyleTestImageOut:
 
 
 def _aspect_to_size(ar: str) -> str:
-    """Mappa aspect ratio → size accettata da gpt-image (1024/1536/1024x1024 ecc).
+    """Mappa aspect ratio key → size supportata da gpt-image-1.
 
-    gpt-image-1 accetta: 1024x1024, 1024x1536, 1536x1024.
+    Riusa il helper canonico in snaptoon_core.scene per rimanere coerente
+    con il resto del codice (le key sono nella forma '1_1', '2_3', '9_16'
+    ecc — con underscore, non colon).
     """
-    if ar in ("2:3", "3:4", "9:16"):
-        return "1024x1536"
-    if ar in ("3:2", "4:3", "16:9"):
-        return "1536x1024"
-    return "1024x1024"
+    from snaptoon_core.scene import aspect_ratio_to_provider_size
+
+    return aspect_ratio_to_provider_size(ar)
 
 
 # ============================================================
@@ -167,13 +176,18 @@ def list_presets_for_admin(
 
 @router.post("/generate", response_model=StyleTestImageOut, status_code=status.HTTP_201_CREATED)
 async def generate_test_image(
-    style_preset_id: str,
-    prompt: str,
-    shot_distance: str = "",
-    shot_angle: str = "",
-    mood: str = "",
-    aspect_ratio: str = "1:1",
-    quality: str = "medium",
+    # NB: tutti i campi arrivano nel multipart form (insieme al file
+    # reference). Se questi fossero parametri semplici FastAPI li
+    # cercherebbe in query string e li ignorerebbe quando c'è
+    # UploadFile → default value silente = i valori scelti dall'admin
+    # non venivano applicati.
+    style_preset_id: str = Form(...),
+    prompt: str = Form(...),
+    shot_distance: str = Form(default=""),
+    shot_angle: str = Form(default=""),
+    mood: str = Form(default=""),
+    aspect_ratio: str = Form(default="1_1"),
+    quality: str = Form(default="medium"),
     reference: Optional[UploadFile] = File(default=None),
     admin: dict = Depends(require_admin),
 ) -> StyleTestImageOut:
