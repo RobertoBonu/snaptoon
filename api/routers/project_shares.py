@@ -291,6 +291,59 @@ def share_cover(
 
 
 @router.post(
+    "/webtoon/{project_key}",
+    response_model=ProjectShareOut,
+    status_code=201,
+)
+def share_webtoon(
+    project_key: str,
+    payload: ShareCoverIn,
+    user: dict = Depends(require_user),
+) -> ProjectShareOut:
+    """Pubblica il progetto come WebToon (fumetto verticale scrollabile).
+
+    A differenza di share_cover/share_tavola non compone una nuova
+    immagine: il lettore pubblico (/w/{share_id}) assembla al volo
+    cover + vignette in un layout verticale.
+
+    storage_key del record punta alla cover (thumbnail per admin +
+    BookShop). Se la cover non esiste ancora, l'endpoint restituisce 400.
+    """
+    user_id = uuid.UUID(user["id"])
+    with session_scope() as s:
+        u = users_repo.get_by_id(s, user_id)
+        if u is None:
+            raise HTTPException(status_code=404, detail="User not found")
+        project = _load_project_by_id_or_slug(s, user_id, project_key)
+        ck = cover_illustration_key(project.id)
+        if not object_exists(ck):
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    "Genera prima la copertina, poi pubblica il webtoon. "
+                    "La cover viene usata come miniatura nel BookShop."
+                ),
+            )
+        if project.script is None:
+            raise HTTPException(
+                status_code=400,
+                detail="Genera prima la storia, poi pubblica il webtoon.",
+            )
+        share = shares_repo.submit(
+            s,
+            project=project,
+            user=u,
+            asset_kind="webtoon",
+            page_number=None,
+            storage_key=ck,
+            project_flow=_detect_flow(project),
+            caption=payload.caption,
+            author_role=payload.author_role,
+        )
+        return _to_out(share)
+
+
+@router.post(
     "/tavola/{project_key}/{page_number}",
     response_model=ProjectShareOut,
     status_code=201,

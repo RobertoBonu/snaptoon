@@ -23,7 +23,7 @@ interface ShareAdminItem {
 }
 
 type Filter = "pending" | "published" | "rejected" | "all";
-type KindTab = "all" | "cover" | "tavola";
+type KindTab = "all" | "cover" | "tavola" | "webtoon";
 
 export default function AdminCommunitySharesPage() {
   const [items, setItems] = useState<ShareAdminItem[] | null>(null);
@@ -136,7 +136,7 @@ export default function AdminCommunitySharesPage() {
 
       {/* Tab kind: tutte / cover / tavola */}
       <div className="flex gap-1 mb-4 flex-wrap">
-        {(["all", "cover", "tavola"] as KindTab[]).map((k) => (
+        {(["all", "cover", "tavola", "webtoon"] as KindTab[]).map((k) => (
           <button
             key={k}
             onClick={() => setKindTab(k)}
@@ -149,6 +149,7 @@ export default function AdminCommunitySharesPage() {
             {k === "all" && "Tutti i tipi"}
             {k === "cover" && "📕 Copertine"}
             {k === "tavola" && "🖼 Tavole"}
+            {k === "webtoon" && "🌐 WebToon"}
           </button>
         ))}
       </div>
@@ -192,8 +193,21 @@ export default function AdminCommunitySharesPage() {
                     <span className="text-xs font-bold uppercase tracking-wide px-2 py-0.5 rounded-full bg-[var(--color-bg)] border border-[var(--color-border)]">
                       {c.asset_kind === "cover"
                         ? "📕 Cover"
-                        : `🖼 Tavola P${c.page_number}`}
+                        : c.asset_kind === "webtoon"
+                          ? "🌐 WebToon"
+                          : `🖼 Tavola P${c.page_number}`}
                     </span>
+                    {c.asset_kind === "webtoon" &&
+                      c.share_status === "published" && (
+                        <a
+                          href={`/w/${c.id}`}
+                          target="_blank"
+                          rel="noopener"
+                          className="text-xs text-[var(--color-accent)] hover:underline"
+                        >
+                          Apri reader →
+                        </a>
+                      )}
                     <span
                       className={`text-xs font-bold uppercase tracking-wide px-2 py-0.5 rounded-full ${
                         c.share_status === "pending"

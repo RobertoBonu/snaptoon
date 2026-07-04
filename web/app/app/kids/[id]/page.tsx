@@ -49,8 +49,14 @@ export default function KidsPreviewPage({
 
   // === Community share (cover + tavole) ===
   const [shareModal, setShareModal] = useState<
-    | { kind: "cover" } | { kind: "tavola"; page: number } | null
+    | { kind: "cover" }
+    | { kind: "tavola"; page: number }
+    | { kind: "webtoon" }
+    | null
   >(null);
+  const [publishedWebtoonId, setPublishedWebtoonId] = useState<string | null>(
+    null,
+  );
   const [shareCaption, setShareCaption] = useState("");
   const [shareAuthorRole, setShareAuthorRole] = useState("");
   const [sharing, setSharing] = useState(false);
@@ -60,22 +66,33 @@ export default function KidsPreviewPage({
     setSharing(true);
     setError(null);
     try {
-      const url =
-        shareModal.kind === "cover"
-          ? `/api/project-shares/cover/${id}`
-          : `/api/project-shares/tavola/${id}/${shareModal.page}`;
-      await apiFetch(url, {
+      let url: string;
+      if (shareModal.kind === "cover") url = `/api/project-shares/cover/${id}`;
+      else if (shareModal.kind === "webtoon")
+        url = `/api/project-shares/webtoon/${id}`;
+      else url = `/api/project-shares/tavola/${id}/${shareModal.page}`;
+      const res = await apiFetch<{ id: string }>(url, {
         method: "POST",
         body: JSON.stringify({
           caption: shareCaption,
           author_role: shareAuthorRole,
         }),
       });
+      const kindLabel =
+        shareModal.kind === "webtoon"
+          ? "webtoon"
+          : shareModal.kind === "cover"
+            ? "copertina"
+            : "tavola";
+      // Per il webtoon salvo l'id share per mostrare subito il link al lettore
+      if (shareModal.kind === "webtoon") {
+        setPublishedWebtoonId(res.id);
+      }
       setShareModal(null);
       setShareCaption("");
       setShareAuthorRole("");
       alert(
-        "Richiesta inviata! Un admin la esaminerà a breve. Se approvata, apparirà nella pagina Esplora.",
+        `Richiesta di condivisione ${kindLabel} inviata! Un admin la esaminerà a breve.`,
       );
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
@@ -276,6 +293,24 @@ export default function KidsPreviewPage({
           >
             {downloadingPdf ? "Genero PDF..." : "📥 Scarica PDF"}
           </button>
+          <button
+            onClick={() => {
+              setShareCaption("");
+              setShareAuthorRole("");
+              setShareModal({ kind: "webtoon" });
+            }}
+            disabled={!details.has_cover || details.vignettes.length === 0}
+            className="border border-[var(--color-border)] hover:border-[var(--color-accent)] hover:text-[var(--color-accent)] text-[var(--color-fg-muted)] px-5 py-2.5 rounded-lg disabled:opacity-40 disabled:cursor-not-allowed whitespace-nowrap"
+            title={
+              !details.has_cover
+                ? "Genera prima la copertina"
+                : details.vignettes.length === 0
+                  ? "Genera almeno una vignetta"
+                  : "Pubblica come WebToon verticale scrollabile"
+            }
+          >
+            🌐 Pubblica WebToon
+          </button>
         </div>
       </header>
 
@@ -457,14 +492,32 @@ export default function KidsPreviewPage({
             onClick={(e) => e.stopPropagation()}
           >
             <h2 className="text-lg font-semibold mb-2">
-              🌐 Condividi{" "}
-              {shareModal.kind === "cover"
-                ? "la copertina"
-                : `la tavola (pagina ${shareModal.page})`}
+              {shareModal.kind === "webtoon" ? (
+                <>🌐 Pubblica come WebToon</>
+              ) : (
+                <>
+                  🌐 Condividi{" "}
+                  {shareModal.kind === "cover"
+                    ? "la copertina"
+                    : `la tavola (pagina ${shareModal.page})`}
+                </>
+              )}
             </h2>
             <p className="text-sm text-[var(--color-fg-muted)] mb-4">
-              Un admin dovrà approvare prima che appaia su Esplora. Potrai
-              ritirare la richiesta dalla lista delle tue condivisioni.
+              {shareModal.kind === "webtoon" ? (
+                <>
+                  Il tuo libretto diventa un WebToon: le vignette impilate
+                  verticalmente, scrollabili come un fumetto in stile Naver.
+                  Un admin dovrà approvare prima della pubblicazione. Dopo
+                  potrai condividere il link pubblico.
+                </>
+              ) : (
+                <>
+                  Un admin dovrà approvare prima che appaia su Esplora.
+                  Potrai ritirare la richiesta dalla lista delle tue
+                  condivisioni.
+                </>
+              )}
             </p>
             <div className="space-y-3">
               <div>

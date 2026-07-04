@@ -172,13 +172,48 @@ export default function ImpaginaPage({
             quando sei pronto.
           </p>
         </div>
-        <button
-          onClick={downloadPdf}
-          disabled={downloading}
-          className="bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] text-[var(--color-bg)] font-semibold px-5 py-2.5 rounded-lg disabled:opacity-50"
-        >
-          {downloading ? "Genero PDF..." : "📥 Scarica PDF"}
-        </button>
+        <div className="flex gap-2 flex-wrap">
+          <button
+            onClick={downloadPdf}
+            disabled={downloading}
+            className="bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] text-[var(--color-bg)] font-semibold px-5 py-2.5 rounded-lg disabled:opacity-50"
+          >
+            {downloading ? "Genero PDF..." : "📥 Scarica PDF"}
+          </button>
+          <button
+            onClick={async () => {
+              const caption = prompt(
+                "Didascalia breve per il webtoon (facoltativa):",
+                "",
+              );
+              if (caption === null) return; // cancel
+              const role = prompt(
+                "Il tuo ruolo (es. Illustratore, facoltativo):",
+                "",
+              );
+              if (role === null) return;
+              setError(null);
+              try {
+                await apiFetch(`/api/project-shares/webtoon/${slug}`, {
+                  method: "POST",
+                  body: JSON.stringify({
+                    caption: caption || "",
+                    author_role: role || "",
+                  }),
+                });
+                alert(
+                  "Richiesta inviata! Un admin la esaminerà a breve. Se approvata, il webtoon sarà pubblico su /w/<id>.",
+                );
+              } catch (e) {
+                setError(e instanceof Error ? e.message : String(e));
+              }
+            }}
+            className="border border-[var(--color-border)] hover:border-[var(--color-accent)] hover:text-[var(--color-accent)] text-[var(--color-fg-muted)] px-5 py-2.5 rounded-lg"
+            title="Pubblica il fumetto come WebToon verticale scrollabile"
+          >
+            🌐 Pubblica WebToon
+          </button>
+        </div>
       </header>
 
       {error && (
