@@ -77,10 +77,10 @@ export default function CreaPage() {
     <SiteShell active="/crea">
       {/* Hero */}
       <section className="section" style={{ paddingTop: "100px", paddingBottom: "60px" }}>
-        <div className="lp-container" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(360px, 1fr))", gap: "48px", alignItems: "center" }}>
+        <div className="lp-container" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: "48px", alignItems: "center" }}>
           <div>
             <span className="eyebrow">Per gli Autori</span>
-            <h1 style={{ fontSize: "clamp(2.25rem, 4vw, 3.25rem)", fontWeight: 800, color: "#F1F5F9", lineHeight: 1.1, letterSpacing: "-0.03em", margin: "20px 0" }}>
+            <h1 style={{ fontSize: "clamp(1.75rem, 5.5vw, 3.25rem)", fontWeight: 800, color: "#F1F5F9", lineHeight: 1.1, letterSpacing: "-0.03em", margin: "20px 0" }}>
               5 passi. Dal foglio bianco al fumetto stampabile.
             </h1>
             <p style={{ fontSize: "1.125rem", color: "#94A3B8", lineHeight: 1.6, marginBottom: "32px" }}>

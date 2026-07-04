@@ -90,7 +90,7 @@ export default function BookshopPage() {
       {/* Hero */}
       <section className="section" style={{ paddingTop: "100px", paddingBottom: "40px", textAlign: "center" }}>
         <div className="lp-container">
-          <h1 style={{ fontSize: "clamp(2.5rem, 5vw, 3.75rem)", fontWeight: 800, color: "#F1F5F9", lineHeight: 1.1, letterSpacing: "-0.03em", marginBottom: "20px" }}>Bookshop SnapToon</h1>
+          <h1 style={{ fontSize: "clamp(1.75rem, 6vw, 3.75rem)", fontWeight: 800, color: "#F1F5F9", lineHeight: 1.1, letterSpacing: "-0.03em", marginBottom: "20px" }}>Bookshop SnapToon</h1>
           <p style={{ fontSize: "1.125rem", color: "#94A3B8", lineHeight: 1.6, maxWidth: "720px", margin: "0 auto" }}>
             Fumetti, graphic novel, libri illustrati e libretti KIDS firmati da autori e editori indipendenti. Tutto creato con SnapToon.
           </p>

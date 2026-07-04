@@ -109,7 +109,7 @@ export default function KidsShowcasePage() {
           className="lp-container"
           style={{
             display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(360px, 1fr))",
+            gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
             gap: "48px",
             alignItems: "center",
           }}
@@ -118,7 +118,7 @@ export default function KidsShowcasePage() {
             <span className="eyebrow">Per genitori, insegnanti e bambini</span>
             <h1
               style={{
-                fontSize: "clamp(2.25rem, 4vw, 3.25rem)",
+                fontSize: "clamp(1.75rem, 5.5vw, 3.25rem)",
                 fontWeight: 800,
                 color: "#F1F5F9",
                 lineHeight: 1.1,

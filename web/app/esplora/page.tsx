@@ -271,7 +271,7 @@ export default function EsploraPage() {
       {/* Hero */}
       <section className="section" style={{ paddingTop: "100px", paddingBottom: "60px", textAlign: "center" }}>
         <div className="lp-container">
-          <h1 style={{ fontSize: "clamp(2.5rem, 5vw, 4rem)", fontWeight: 800, color: "#F1F5F9", lineHeight: 1.1, letterSpacing: "-0.03em", marginBottom: "20px", maxWidth: "820px", margin: "0 auto 20px auto" }}>
+          <h1 style={{ fontSize: "clamp(1.75rem, 6vw, 4rem)", fontWeight: 800, color: "#F1F5F9", lineHeight: 1.1, letterSpacing: "-0.03em", marginBottom: "20px", maxWidth: "820px", margin: "0 auto 20px auto" }}>
             Dai un&apos;occhiata a cosa si può creare
           </h1>
           <p style={{ fontSize: "1.125rem", color: "#94A3B8", lineHeight: 1.6, maxWidth: "680px", margin: "0 auto" }}>

@@ -123,7 +123,7 @@ function HeroSection({
           <h1
             className="animate-fade-in"
             style={{
-              fontSize: "clamp(3rem, 5vw, 4.5rem)",
+              fontSize: "clamp(2.25rem, 7vw, 4.5rem)",
               fontWeight: 800,
               color: "#F1F5F9",
               lineHeight: 1.05,
@@ -224,7 +224,7 @@ function AutoriSection({
         className="lp-container"
         style={{
           display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(360px, 1fr))",
+          gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
           gap: "48px",
           alignItems: "center",
         }}
@@ -346,7 +346,7 @@ function KidsSection({
           position: "relative",
           zIndex: 1,
           display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(360px, 1fr))",
+          gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
           gap: "48px",
           alignItems: "center",
         }}
@@ -513,7 +513,7 @@ function BookshopSection({
         className="lp-container"
         style={{
           display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(360px, 1fr))",
+          gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
           gap: "48px",
           alignItems: "center",
         }}

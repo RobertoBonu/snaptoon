@@ -1,6 +1,6 @@
 "use client";
 
-import { ReactNode } from "react";
+import { ReactNode, useEffect, useState } from "react";
 
 /** Voci del menu pubblico — collegate alle pagine reali. */
 export const NAV: { label: string; href: string }[] = [
@@ -57,9 +57,27 @@ export function SiteStyles() {
       .md-flex { display: none; }
       @media (min-width: 768px) { .md-flex { display: flex !important; } }
 
+      /* Hamburger visibile solo sotto 768px */
+      .mobile-only { display: inline-flex; }
+      @media (min-width: 768px) { .mobile-only { display: none !important; } }
+
+      /* CTA "Prova SnapToon" nell'header: label piena sopra 640, "Prova" sotto */
+      .btn-cta-full { display: inline; }
+      .btn-cta-short { display: none; }
+      @media (max-width: 640px) {
+        .btn-cta-full { display: none; }
+        .btn-cta-short { display: inline; }
+      }
+
       .footer-grid { display: grid; grid-template-columns: 1fr; gap: 40px; }
       @media (min-width: 640px) { .footer-grid { grid-template-columns: 1fr 1fr; } }
       @media (min-width: 960px) { .footer-grid { grid-template-columns: 2fr 1fr 1fr 1fr; gap: 64px; } }
+
+      /* === Responsive globale (mobile-first tweaks) === */
+      @media (max-width: 640px) {
+        .lp-container { padding-left: 16px; padding-right: 16px; }
+        .section { padding: 60px 0; }
+      }
     `}</style>
   );
 }
@@ -74,36 +92,198 @@ function Logo() {
   );
 }
 
-/** Header sticky con menu collegato alle 4 pagine pubbliche. */
+/** Header sticky con menu collegato alle pagine pubbliche.
+ *
+ * Sopra 768px: menu inline classico.
+ * Sotto 768px: hamburger che apre un drawer laterale.
+ */
 export function SiteHeader({ active }: { active?: string }) {
+  const [menuOpen, setMenuOpen] = useState(false);
+
+  // Blocca lo scroll del body quando il drawer è aperto (evita rimbalzi).
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = menuOpen ? "hidden" : prev || "";
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, [menuOpen]);
+
+  // Chiudi con Escape.
+  useEffect(() => {
+    if (!menuOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setMenuOpen(false);
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [menuOpen]);
+
   return (
-    <header style={{ position: "sticky", top: 0, zIndex: 100, background: "rgba(13, 16, 23, 0.85)", backdropFilter: "blur(12px)", borderBottom: "1px solid #1E2436" }}>
-      <div className="lp-container" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", height: "72px" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: "48px" }}>
-          <Logo />
-          <nav style={{ alignItems: "center", gap: "8px" }} className="md-flex">
-            {NAV.map((item) => {
-              const isActive = active === item.href;
-              return (
-                <a
-                  key={item.href}
-                  href={item.href}
-                  style={{ fontSize: "14px", fontWeight: 500, color: isActive ? "#F1F5F9" : "#94A3B8", padding: "8px 16px", borderRadius: "6px", cursor: "pointer", transition: "color 0.2s", textDecoration: "none", background: isActive ? "rgba(255,255,255,0.05)" : "transparent" }}
-                  onMouseOver={(e) => (e.currentTarget.style.color = "#F1F5F9")}
-                  onMouseOut={(e) => (e.currentTarget.style.color = isActive ? "#F1F5F9" : "#94A3B8")}
+    <>
+      <header style={{ position: "sticky", top: 0, zIndex: 100, background: "rgba(13, 16, 23, 0.85)", backdropFilter: "blur(12px)", borderBottom: "1px solid #1E2436" }}>
+        <div className="lp-container" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", height: "72px" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "48px" }}>
+            <Logo />
+            <nav style={{ alignItems: "center", gap: "8px" }} className="md-flex">
+              {NAV.map((item) => {
+                const isActive = active === item.href;
+                return (
+                  <a
+                    key={item.href}
+                    href={item.href}
+                    style={{ fontSize: "14px", fontWeight: 500, color: isActive ? "#F1F5F9" : "#94A3B8", padding: "8px 16px", borderRadius: "6px", cursor: "pointer", transition: "color 0.2s", textDecoration: "none", background: isActive ? "rgba(255,255,255,0.05)" : "transparent" }}
+                    onMouseOver={(e) => (e.currentTarget.style.color = "#F1F5F9")}
+                    onMouseOut={(e) => (e.currentTarget.style.color = isActive ? "#F1F5F9" : "#94A3B8")}
+                  >
+                    {item.label}
+                  </a>
+                );
+              })}
+            </nav>
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+            <a href="/login" className="btn btn-secondary" style={{ padding: "8px 16px" }}>Accedi</a>
+            <a href="/login" className="btn btn-primary" style={{ padding: "8px 16px" }}>
+              <span className="btn-cta-full">Prova SnapToon</span>
+              <span className="btn-cta-short">Prova</span>
+            </a>
+            {/* Hamburger — visibile solo sotto 768px */}
+            <button
+              type="button"
+              aria-label={menuOpen ? "Chiudi menu" : "Apri menu"}
+              onClick={() => setMenuOpen((v) => !v)}
+              className="mobile-only"
+              style={{
+                background: "transparent",
+                border: "1px solid #2D3748",
+                borderRadius: 8,
+                width: 40,
+                height: 40,
+                cursor: "pointer",
+                padding: 0,
+                alignItems: "center",
+                justifyContent: "center",
+                color: "#F1F5F9",
+              }}
+            >
+              {/* icona hamburger / X */}
+              {menuOpen ? (
+                <span style={{ fontSize: 22, lineHeight: 1 }}>✕</span>
+              ) : (
+                <span
+                  style={{
+                    display: "inline-flex",
+                    flexDirection: "column",
+                    gap: 4,
+                  }}
                 >
-                  {item.label}
-                </a>
-              );
-            })}
-          </nav>
+                  <span style={{ width: 18, height: 2, background: "#F1F5F9", display: "block" }} />
+                  <span style={{ width: 18, height: 2, background: "#F1F5F9", display: "block" }} />
+                  <span style={{ width: 18, height: 2, background: "#F1F5F9", display: "block" }} />
+                </span>
+              )}
+            </button>
+          </div>
         </div>
-        <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-          <a href="/login" className="btn btn-secondary" style={{ padding: "8px 16px" }}>Accedi</a>
-          <a href="/login" className="btn btn-primary" style={{ padding: "8px 16px" }}>Prova SnapToon</a>
+      </header>
+
+      {/* Drawer mobile */}
+      {menuOpen && (
+        <div
+          onClick={() => setMenuOpen(false)}
+          style={{
+            position: "fixed",
+            inset: 0,
+            zIndex: 200,
+            background: "rgba(3, 6, 12, 0.6)",
+            backdropFilter: "blur(4px)",
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              position: "absolute",
+              top: 0,
+              right: 0,
+              bottom: 0,
+              width: "min(320px, 85vw)",
+              background: "#0D1017",
+              borderLeft: "1px solid #1E2436",
+              padding: "24px 20px",
+              display: "flex",
+              flexDirection: "column",
+              gap: 24,
+              overflowY: "auto",
+            }}
+          >
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <Logo />
+              <button
+                type="button"
+                aria-label="Chiudi menu"
+                onClick={() => setMenuOpen(false)}
+                style={{
+                  background: "transparent",
+                  border: "1px solid #2D3748",
+                  borderRadius: 8,
+                  width: 40,
+                  height: 40,
+                  cursor: "pointer",
+                  color: "#F1F5F9",
+                  fontSize: 22,
+                  lineHeight: 1,
+                }}
+              >
+                ✕
+              </button>
+            </div>
+            <nav style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+              {NAV.map((item) => {
+                const isActive = active === item.href;
+                return (
+                  <a
+                    key={item.href}
+                    href={item.href}
+                    onClick={() => setMenuOpen(false)}
+                    style={{
+                      fontSize: 16,
+                      fontWeight: 600,
+                      color: isActive ? "#F59E0B" : "#F1F5F9",
+                      padding: "12px 14px",
+                      borderRadius: 8,
+                      textDecoration: "none",
+                      background: isActive ? "rgba(245,158,11,0.08)" : "transparent",
+                    }}
+                  >
+                    {item.label}
+                  </a>
+                );
+              })}
+            </nav>
+            <div style={{ marginTop: "auto", display: "flex", flexDirection: "column", gap: 10 }}>
+              <a
+                href="/login"
+                className="btn btn-secondary"
+                style={{ padding: "12px 16px", width: "100%", justifyContent: "center" }}
+                onClick={() => setMenuOpen(false)}
+              >
+                Accedi
+              </a>
+              <a
+                href="/login"
+                className="btn btn-primary"
+                style={{ padding: "12px 16px", width: "100%", justifyContent: "center" }}
+                onClick={() => setMenuOpen(false)}
+              >
+                Prova SnapToon
+              </a>
+            </div>
+          </div>
         </div>
-      </div>
-    </header>
+      )}
+    </>
   );
 }
 
