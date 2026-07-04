@@ -61,6 +61,11 @@ def my_character_reference_key(
     return f"my-characters/{_stringify(user_id)}/{_stringify(entry_id)}.png"
 
 
+def style_test_image_key(image_id: uuid.UUID | str) -> str:
+    """PNG di test di uno stile (Admin Test-Style)."""
+    return f"admin/style-tests/{_stringify(image_id)}.png"
+
+
 def pdf_export_key(project_id: uuid.UUID | str, ts: datetime | None = None) -> str:
     if ts is None:
         ts = datetime.now(timezone.utc)

@@ -574,6 +574,50 @@ class EsploraAsset(UUIDPrimaryKeyMixin, TimestampMixin, UpdatedAtMixin, Base):
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
 
 
+class StyleTestImage(UUIDPrimaryKeyMixin, TimestampMixin, UpdatedAtMixin, Base):
+    """Immagine di test di uno stile preset, generata dall'admin.
+
+    Doppio scopo:
+      1. QA visivo degli stili (galleria admin per verificarne la qualità)
+      2. Sample rappresentativo mostrato sotto il "box" degli stili nei
+         wizard di scelta stile — separatamente per Pro e KIDS
+         (is_sample_pro / is_sample_kids).
+
+    Solo UNA StyleTestImage può avere is_sample_pro=True per un dato
+    style_preset_id (idem per KIDS): quando l'admin marca un nuovo
+    sample, gli altri per lo stesso stile vengono resettati.
+    """
+
+    __tablename__ = "style_test_images"
+    __table_args__ = (
+        Index("ix_style_test_preset", "style_preset_id"),
+        Index("ix_style_test_sample_pro", "style_preset_id", "is_sample_pro"),
+        Index("ix_style_test_sample_kids", "style_preset_id", "is_sample_kids"),
+    )
+
+    # ID del preset in snaptoon_core.styles_library (es. "bold_toddler_graphic")
+    style_preset_id: Mapped[str] = mapped_column(String(120), nullable=False)
+    storage_key: Mapped[str] = mapped_column(String(512), nullable=False)
+    prompt: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    # Parametri di scena JSON: {shot_distance, shot_angle, mood}
+    scene_params: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
+    quality: Mapped[str] = mapped_column(String(10), nullable=False, default="medium")
+    aspect_ratio: Mapped[str] = mapped_column(String(10), nullable=False, default="1:1")
+    # Flag "assegnato come sample" nel wizard
+    is_sample_pro: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    is_sample_kids: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    notes: Mapped[str] = mapped_column(Text, default="", nullable=False)
+    # Chi ha generato (facoltativo, ma utile per audit)
+    created_by_user_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    deleted_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+
+
 class ProjectAssetShare(UUIDPrimaryKeyMixin, TimestampMixin, UpdatedAtMixin, Base):
     """Condivisione community di copertine e tavole di progetti KIDS o Pro.
 

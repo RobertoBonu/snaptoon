@@ -18,6 +18,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from api.routers import account as account_router
 from api.routers import admin as admin_router
+from api.routers import admin_style_test as admin_style_test_router
 from api.routers import auth as auth_router
 from api.routers import characters as characters_router
 from api.routers import crea as crea_router
@@ -65,6 +66,16 @@ app.include_router(
     tags=["project-shares-admin"],
 )
 app.include_router(webtoons_router.router, prefix="/api/webtoons", tags=["webtoons"])
+app.include_router(
+    admin_style_test_router.router,
+    prefix="/api/admin/style-test",
+    tags=["admin-style-test"],
+)
+app.include_router(
+    admin_style_test_router.public_router,
+    prefix="/api/styles",
+    tags=["styles-samples"],
+)
 app.include_router(script_router.router, prefix="/api", tags=["script"])
 app.include_router(styles_router.router, prefix="/api/styles", tags=["styles"])
 app.include_router(characters_router.router, prefix="/api", tags=["characters"])
