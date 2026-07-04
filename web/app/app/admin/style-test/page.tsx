@@ -31,7 +31,7 @@ interface TestImage {
 }
 
 interface SceneOption {
-  value: string;
+  key: string;
   label: string;
 }
 interface SceneOptions {
@@ -293,7 +293,7 @@ export default function AdminStyleTestPage() {
                   >
                     <option value="">— libera —</option>
                     {scene.shot_distances.map((o) => (
-                      <option key={o.value} value={o.value}>
+                      <option key={o.key} value={o.key}>
                         {o.label}
                       </option>
                     ))}
@@ -310,7 +310,7 @@ export default function AdminStyleTestPage() {
                   >
                     <option value="">— libero —</option>
                     {scene.shot_angles.map((o) => (
-                      <option key={o.value} value={o.value}>
+                      <option key={o.key} value={o.key}>
                         {o.label}
                       </option>
                     ))}
@@ -325,7 +325,7 @@ export default function AdminStyleTestPage() {
                   >
                     <option value="">— libero —</option>
                     {scene.moods.map((o) => (
-                      <option key={o.value} value={o.value}>
+                      <option key={o.key} value={o.key}>
                         {o.label}
                       </option>
                     ))}
@@ -341,7 +341,7 @@ export default function AdminStyleTestPage() {
                     className="w-full px-2 py-1.5 bg-[var(--color-bg)] border border-[var(--color-border)] rounded text-sm"
                   >
                     {scene.aspect_ratios.map((o) => (
-                      <option key={o.value} value={o.value}>
+                      <option key={o.key} value={o.key}>
                         {o.label}
                       </option>
                     ))}
