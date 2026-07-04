@@ -51,6 +51,81 @@ class WebtoonReaderOut(BaseModel):
     panels: list[WebtoonPanelOut]
 
 
+class WebtoonCardOut(BaseModel):
+    """Card compatta per la griglia BookShop / community."""
+
+    id: str
+    title: str
+    subtitle: str
+    author_name: str
+    author_role: str
+    caption: str
+    cover_url: str
+    read_url: str
+    panels_count: int
+    published_at: Optional[str] = None
+
+
+class WebtoonListOut(BaseModel):
+    webtoons: list[WebtoonCardOut]
+
+
+@router.get("", response_model=WebtoonListOut)
+def list_public_webtoons(limit: int = 60) -> WebtoonListOut:
+    """Elenco pubblico dei WebToon approvati, ordinati per data pubblicazione.
+
+    limit: max cards restituite (default 60, safety cap 200).
+    Nessuna autenticazione. Usato dal BookShop /bookshop e potenzialmente
+    da altri consumer (esplora, dashboard).
+    """
+    from api.utils.user_display import public_author_name
+
+    cap = max(1, min(limit, 200))
+
+    with session_scope() as s:
+        shares = shares_repo.list_published_by_kind(s, "webtoon")
+        out: list[WebtoonCardOut] = []
+        for share in shares[:cap]:
+            project = projects_repo.get_by_id(s, share.project_id)
+            if project is None or project.script is None:
+                continue
+            # Metadata da Cover se disponibili
+            cover_orm = project.cover
+            title = (cover_orm.title if cover_orm else "") or project.name
+            subtitle = (cover_orm.subtitle if cover_orm else "") or ""
+            cover_author = (cover_orm.author if cover_orm else "") or ""
+            owner = users_repo.get_by_id(s, share.user_id)
+            display_author = cover_author or public_author_name(owner)
+
+            # Conta le vignette effettivamente generate
+            pyd_script = scripts_repo.load_pydantic(project.script)
+            panels_count = 0
+            for page in pyd_script.pages:
+                for panel in page.panels:
+                    if object_exists(vignette_key(project.id, page.number, panel.number)):
+                        panels_count += 1
+
+            out.append(
+                WebtoonCardOut(
+                    id=str(share.id),
+                    title=title,
+                    subtitle=subtitle,
+                    author_name=display_author,
+                    author_role=share.share_author_role or "",
+                    caption=share.share_caption or "",
+                    cover_url=f"/api/webtoons/{share.id}/cover",
+                    read_url=f"/w/{share.id}",
+                    panels_count=panels_count,
+                    published_at=(
+                        share.share_moderated_at.isoformat()
+                        if share.share_moderated_at
+                        else None
+                    ),
+                )
+            )
+        return WebtoonListOut(webtoons=out)
+
+
 def _get_published_webtoon_or_404(share_id: str):
     """Ritorna il ProjectAssetShare se è un webtoon pubblicato, altrimenti 404."""
     try:

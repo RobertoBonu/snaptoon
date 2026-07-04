@@ -1,8 +1,146 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { SiteShell, MediaFrame } from "@/components/site";
 import { books, formatPrice, type Book, type BookCategory } from "@/data/bookshop";
+
+// Card dinamica per i webtoon della community (dati reali via API)
+interface WebtoonCard {
+  id: string;
+  title: string;
+  subtitle: string;
+  author_name: string;
+  author_role: string;
+  caption: string;
+  cover_url: string;
+  read_url: string;
+  panels_count: number;
+  published_at: string | null;
+}
+
+function WebtoonSection() {
+  const [items, setItems] = useState<WebtoonCard[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetch("/api/webtoons?limit=24")
+      .then(async (res) => {
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return res.json() as Promise<{ webtoons: WebtoonCard[] }>;
+      })
+      .then((d) => setItems(d.webtoons))
+      .catch((e) =>
+        setError(e instanceof Error ? e.message : String(e)),
+      );
+  }, []);
+
+  return (
+    <section className="section" style={{ paddingTop: "40px", paddingBottom: "20px", background: "linear-gradient(180deg, rgba(124,58,237,0.05) 0%, rgba(13,16,23,0) 100%)", borderTop: "1px solid rgba(124,58,237,0.15)" }}>
+      <div className="lp-container">
+        <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 16, flexWrap: "wrap", marginBottom: 16 }}>
+          <div>
+            <div style={{ display: "inline-flex", alignItems: "center", gap: 8, background: "rgba(124,58,237,0.12)", border: "1px solid rgba(124,58,237,0.3)", padding: "4px 10px", borderRadius: 100, color: "#A78BFA", fontSize: 12, fontWeight: 700, marginBottom: 10 }}>
+              🌐 Novità
+            </div>
+            <h2 style={{ fontSize: "1.5rem", fontWeight: 700, color: "#F1F5F9", marginBottom: 6 }}>
+              WebToon della community
+            </h2>
+            <p style={{ fontSize: "0.95rem", color: "#94A3B8", maxWidth: 620 }}>
+              Fumetti verticali scrollabili, pensati per la lettura mobile.
+              Creati dagli utenti SnapToon, approvati dalla redazione.
+              Gratuiti per tutti.
+            </p>
+          </div>
+          {items && items.length > 0 && (
+            <span style={{ fontSize: 13, color: "#64748B" }}>
+              {items.length} webtoon{items.length !== 1 ? "s" : ""}
+            </span>
+          )}
+        </div>
+
+        {error && (
+          <p style={{ color: "#FCA5A5", fontSize: 13, textAlign: "center", padding: "40px 0" }}>
+            Errore caricamento webtoon: {error}
+          </p>
+        )}
+
+        {!error && items === null && (
+          <p style={{ color: "#64748B", textAlign: "center", padding: "40px 0" }}>
+            Caricamento webtoon...
+          </p>
+        )}
+
+        {!error && items !== null && items.length === 0 && (
+          <div style={{ background: "#161B26", border: "1px solid #1E2436", borderRadius: 16, padding: "48px 24px", textAlign: "center" }}>
+            <div style={{ fontSize: 48, marginBottom: 12, opacity: 0.4 }}>📭</div>
+            <p style={{ color: "#94A3B8", fontSize: 14, marginBottom: 20 }}>
+              Nessun webtoon pubblicato ancora. Sii il primo!
+            </p>
+            <a href="/login" className="btn btn-primary" style={{ padding: "10px 20px", fontSize: 13 }}>
+              Crea il tuo webtoon →
+            </a>
+          </div>
+        )}
+
+        {items && items.length > 0 && (
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 20 }}>
+            {items.map((w) => (
+              <a
+                key={w.id}
+                href={w.read_url}
+                className="lift"
+                style={{
+                  background: "#161B26",
+                  border: "1px solid #1E2436",
+                  borderRadius: 16,
+                  overflow: "hidden",
+                  display: "flex",
+                  flexDirection: "column",
+                  textDecoration: "none",
+                }}
+              >
+                <div style={{ position: "relative", aspectRatio: "2 / 3", background: "#0D1017", overflow: "hidden" }}>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={w.cover_url}
+                    alt={w.title}
+                    loading="lazy"
+                    style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
+                  />
+                  <span style={{ position: "absolute", top: 10, left: 10, background: "rgba(13,16,23,0.85)", border: "1px solid rgba(124,58,237,0.5)", borderRadius: 100, color: "#A78BFA", fontSize: 10, fontWeight: 700, padding: "3px 8px", letterSpacing: "0.06em", textTransform: "uppercase" }}>
+                    🌐 WebToon
+                  </span>
+                  <span style={{ position: "absolute", bottom: 10, right: 10, background: "rgba(13,16,23,0.85)", border: "1px solid #1E2436", borderRadius: 100, color: "#CBD5E1", fontSize: 11, fontWeight: 600, padding: "3px 8px" }}>
+                    {w.panels_count} vignette
+                  </span>
+                </div>
+                <div style={{ padding: 14, display: "flex", flexDirection: "column", flex: 1 }}>
+                  <div style={{ fontSize: 15, fontWeight: 700, color: "#F1F5F9", lineHeight: 1.3, marginBottom: 4, overflow: "hidden", textOverflow: "ellipsis", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>
+                    {w.title}
+                  </div>
+                  <div style={{ fontSize: 12, color: "#94A3B8", marginBottom: 10, display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+                    <span>di {w.author_name}</span>
+                    {w.author_role && (
+                      <span style={{ fontSize: 10, color: "#A78BFA", border: "1px solid rgba(124,58,237,0.4)", borderRadius: 100, padding: "1px 6px" }}>
+                        {w.author_role}
+                      </span>
+                    )}
+                  </div>
+                  <div style={{ marginTop: "auto", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+                    <span style={{ fontSize: 13, fontWeight: 700, color: "#10B981" }}>Gratis</span>
+                    <span className="btn btn-primary" style={{ padding: "6px 12px", fontSize: 12 }}>
+                      Leggi →
+                    </span>
+                  </div>
+                </div>
+              </a>
+            ))}
+          </div>
+        )}
+      </div>
+    </section>
+  );
+}
 
 type CategoryFilter = "Tutti" | BookCategory;
 type PriceFilter = "Tutti" | "Gratuiti" | "A pagamento";
@@ -131,6 +269,9 @@ export default function BookshopPage() {
       </section>
 
       {/* Sezioni tematiche */}
+      {/* WebToon della community — dati reali via /api/webtoons */}
+      <WebtoonSection />
+
       <ThemedSection title="⭐ KIDSToons — Per i più piccoli" caption="Libretti illustrati 5-8 anni, formato 16 pagine + copertina" items={books.filter((b) => b.category === "KIDSToons")} onBuy={openToast} />
       <ThemedSection title="📕 Graphic Novel" caption="Storie lunghe, narrazione adulta, stile cinematografico" items={books.filter((b) => b.category === "Graphic Novel")} onBuy={openToast} />
       <ThemedSection title="📚 Fumetti" caption="Episodi 6-16 pagine, perfetti per il binge reading" items={books.filter((b) => b.category === "Fumetti")} onBuy={openToast} />
