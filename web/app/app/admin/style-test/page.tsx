@@ -122,7 +122,10 @@ interface SceneOptions {
   aspect_ratios: SceneOption[];
 }
 
-const QUALITIES = ["low", "medium", "high"];
+// Valori accettati dall'API OpenAI gpt-image-1: "low" | "medium" | "high" | "auto".
+// "auto" = il modello decide il compromesso migliore. High = migliore qualità
+// ma più costoso (4 crediti vs 1).
+const QUALITIES = ["auto", "high", "medium", "low"];
 
 export default function AdminStyleTestPage() {
   const [presets, setPresets] = useState<Preset[]>([]);
@@ -145,7 +148,7 @@ export default function AdminStyleTestPage() {
   const [shotAngle, setShotAngle] = useState("");
   const [mood, setMood] = useState("");
   const [aspectRatio, setAspectRatio] = useState("1_1");
-  const [quality, setQuality] = useState("medium");
+  const [quality, setQuality] = useState("high");
   const [reference, setReference] = useState<File | null>(null);
 
   async function loadPresets() {
