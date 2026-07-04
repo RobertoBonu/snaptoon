@@ -234,7 +234,7 @@ export default function NewKidsPage() {
                         src={sample}
                         alt={`Anteprima ${s.label}`}
                         loading="lazy"
-                        className="w-full aspect-square object-cover rounded-md border border-[var(--color-border)] mb-2"
+                        className="w-full aspect-video object-cover rounded-md border border-[var(--color-border)] mb-2"
                       />
                     )}
                     <div className="font-medium text-sm px-2 pb-1">

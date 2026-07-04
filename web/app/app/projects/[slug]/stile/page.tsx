@@ -170,7 +170,7 @@ export default function StilePage({
                   src={samples[s.id]}
                   alt={`Anteprima ${s.label}`}
                   loading="lazy"
-                  className="w-full aspect-square object-cover rounded-md border border-[var(--color-border)] mb-2"
+                  className="w-full aspect-video object-cover rounded-md border border-[var(--color-border)] mb-2"
                 />
               )}
               <p className="text-xs text-[var(--color-fg-muted)] line-clamp-3">
