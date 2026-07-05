@@ -28,6 +28,12 @@ interface MacroGroup {
   categories: { id: string; label: string }[];
 }
 
+interface KidsStyle {
+  slug: string;
+  label: string;
+  preset_id: string;
+}
+
 const STATUS_STYLE: Record<
   string,
   { bg: string; border: string; color: string; label: string }
@@ -71,6 +77,12 @@ export default function MyCardsPage() {
   const [caption, setCaption] = useState("");
   const [reference, setReference] = useState<File | null>(null);
   const [creating, setCreating] = useState(false);
+  const [dragging, setDragging] = useState(false);
+
+  // Stili KIDS + sample thumbnail (dallo stesso endpoint del wizard KIDS)
+  const [kidsStyles, setKidsStyles] = useState<KidsStyle[]>([]);
+  const [styleSamples, setStyleSamples] = useState<Record<string, string>>({});
+  const [selectedStyleSlug, setSelectedStyleSlug] = useState<string>("");
 
   // Publish modal
   const [publishingId, setPublishingId] = useState<string | null>(null);
@@ -98,6 +110,27 @@ export default function MyCardsPage() {
         if (d) setCategories(d.macros);
       })
       .catch(() => {});
+
+    // Stili KIDS (stesso endpoint usato dal wizard KIDS)
+    fetch("/api/kids/styles")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d: KidsStyle[] | null) => {
+        if (d) setKidsStyles(d);
+      })
+      .catch(() => {});
+
+    // Sample thumbnail per stile (dallo stesso endpoint del wizard KIDS)
+    fetch("/api/styles/samples?flow=kids")
+      .then((r) => (r.ok ? r.json() : null))
+      .then(
+        (d: { samples: { style_preset_id: string; image_url: string }[] } | null) => {
+          if (!d) return;
+          const map: Record<string, string> = {};
+          for (const s of d.samples) map[s.style_preset_id] = s.image_url;
+          setStyleSamples(map);
+        },
+      )
+      .catch(() => {});
   }, []);
 
   function mark(id: string, on: boolean) {
@@ -111,14 +144,16 @@ export default function MyCardsPage() {
 
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault();
-    if (!name.trim() || !ctype.trim()) return;
+    if (!name.trim() || !ctype.trim() || !selectedStyleSlug) return;
     setCreating(true);
     setError(null);
     try {
+      const preset = kidsStyles.find((s) => s.slug === selectedStyleSlug);
       const fd = new FormData();
       fd.append("name", name);
       fd.append("character_type", ctype);
       fd.append("caption", caption);
+      if (preset) fd.append("style_preset_id", preset.preset_id);
       if (reference) fd.append("reference", reference);
       const res = await fetch("/api/cards", {
         method: "POST",
@@ -133,6 +168,7 @@ export default function MyCardsPage() {
       setCtype("");
       setCaption("");
       setReference(null);
+      setSelectedStyleSlug("");
       setShowCreate(false);
       setRefreshTag(Date.now());
       await load();
@@ -141,6 +177,25 @@ export default function MyCardsPage() {
     } finally {
       setCreating(false);
     }
+  }
+
+  // Validazione + assegnazione file (usata sia da drag&drop sia da click)
+  function acceptFile(file: File | null) {
+    if (!file) {
+      setReference(null);
+      return;
+    }
+    const okMimes = ["image/png", "image/jpeg", "image/jpg", "image/webp"];
+    if (!okMimes.includes(file.type)) {
+      setError("Formato non supportato. Usa PNG, JPEG o WEBP.");
+      return;
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      setError("File troppo grande (max 10 MB).");
+      return;
+    }
+    setError(null);
+    setReference(file);
   }
 
   async function regenerate(c: Card) {
@@ -283,25 +338,135 @@ export default function MyCardsPage() {
             />
           </div>
           <div>
+            <label className="block text-sm font-semibold mb-2">
+              Stile visivo *
+            </label>
+            <p className="text-xs text-[var(--color-fg-muted)] mb-2">
+              Come sarà disegnato il personaggio. Il layout della card
+              (banner, badge, numero) resta identico per tutte.
+            </p>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+              {kidsStyles.map((s) => {
+                const sample = styleSamples[s.preset_id];
+                const active = selectedStyleSlug === s.slug;
+                return (
+                  <button
+                    key={s.slug}
+                    type="button"
+                    onClick={() => setSelectedStyleSlug(s.slug)}
+                    className={`p-1.5 rounded-lg border text-center transition-all overflow-hidden ${
+                      active
+                        ? "border-[var(--color-accent)] bg-[var(--color-accent)]/5"
+                        : "border-[var(--color-border)] bg-[var(--color-bg)] hover:border-[var(--color-accent)]/50"
+                    }`}
+                  >
+                    {sample ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={sample}
+                        alt={s.label}
+                        loading="lazy"
+                        className="w-full aspect-video object-cover rounded mb-1 border border-[var(--color-border)]"
+                      />
+                    ) : (
+                      <div
+                        className="w-full aspect-video rounded mb-1 flex items-center justify-center bg-[var(--color-bg-elev)] text-[var(--color-fg-muted)]"
+                        style={{ fontSize: 11 }}
+                      >
+                        (no preview)
+                      </div>
+                    )}
+                    <div className="text-xs font-medium">{s.label}</div>
+                  </button>
+                );
+              })}
+            </div>
+            {kidsStyles.length === 0 && (
+              <p className="text-xs text-yellow-400 mt-1">
+                Nessuno stile disponibile.
+              </p>
+            )}
+          </div>
+
+          <div>
             <label className="block text-sm font-semibold mb-1">
               Reference personaggio (facoltativa)
             </label>
-            <input
-              type="file"
-              accept="image/png,image/jpeg,image/jpg,image/webp"
-              onChange={(e) => setReference(e.target.files?.[0] || null)}
-              className="w-full text-sm"
-            />
-            {reference && (
-              <p className="text-xs text-[var(--color-fg-muted)] mt-1">
-                {reference.name} ({Math.round(reference.size / 1024)} KB)
-              </p>
-            )}
+            <p className="text-xs text-[var(--color-fg-muted)] mb-2">
+              Se carichi una foto (o un&apos;illustrazione), l&apos;AI cercherà
+              di replicare il soggetto sulla card.
+            </p>
+            <label
+              onDragOver={(e) => {
+                e.preventDefault();
+                setDragging(true);
+              }}
+              onDragLeave={() => setDragging(false)}
+              onDrop={(e) => {
+                e.preventDefault();
+                setDragging(false);
+                acceptFile(e.dataTransfer.files?.[0] || null);
+              }}
+              className={`block w-full cursor-pointer rounded-lg border-2 border-dashed transition-colors ${
+                dragging
+                  ? "border-[var(--color-accent)] bg-[var(--color-accent)]/10"
+                  : "border-[var(--color-border)] bg-[var(--color-bg)] hover:border-[var(--color-accent)]/60 hover:bg-[var(--color-bg-elev)]"
+              } px-4 py-6 text-center`}
+            >
+              <input
+                type="file"
+                accept="image/png,image/jpeg,image/jpg,image/webp"
+                onChange={(e) => acceptFile(e.target.files?.[0] || null)}
+                className="hidden"
+              />
+              {reference ? (
+                <div className="flex items-center justify-center gap-3 flex-wrap">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={URL.createObjectURL(reference)}
+                    alt="preview"
+                    className="w-16 h-16 object-cover rounded border border-[var(--color-border)]"
+                  />
+                  <div className="text-left">
+                    <p className="text-sm font-medium">{reference.name}</p>
+                    <p className="text-xs text-[var(--color-fg-muted)]">
+                      {Math.round(reference.size / 1024)} KB · click o
+                      trascina per sostituire
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      setReference(null);
+                    }}
+                    className="text-xs text-[var(--color-fg-muted)] hover:text-red-400 underline"
+                  >
+                    rimuovi
+                  </button>
+                </div>
+              ) : (
+                <div>
+                  <div className="text-3xl mb-1">📁</div>
+                  <p className="text-sm font-medium mb-0.5">
+                    Trascina qui la foto del personaggio
+                  </p>
+                  <p className="text-xs text-[var(--color-fg-muted)]">
+                    o clicca per selezionarla (PNG · JPEG · WEBP, max 10 MB)
+                  </p>
+                </div>
+              )}
+            </label>
           </div>
           <div className="flex gap-2 pt-2">
             <button
               type="submit"
-              disabled={creating || !name.trim() || !ctype.trim()}
+              disabled={
+                creating ||
+                !name.trim() ||
+                !ctype.trim() ||
+                !selectedStyleSlug
+              }
               className="bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] text-[var(--color-bg)] font-semibold px-5 py-2 rounded disabled:opacity-50"
             >
               {creating ? "Genero..." : "✨ Crea figurina (1 cr)"}

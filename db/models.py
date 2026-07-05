@@ -602,6 +602,12 @@ class UserCard(UUIDPrimaryKeyMixin, TimestampMixin, UpdatedAtMixin, Base):
     name: Mapped[str] = mapped_column(String(120), nullable=False)
     character_type: Mapped[str] = mapped_column(String(120), nullable=False)
     caption: Mapped[str] = mapped_column(String(500), nullable=False, default="")
+    # Stile visivo KIDS scelto dall'utente (preset_id da styles_library).
+    # Nullable per retrocompat con card create prima dell'introduzione dello
+    # style picker — quelle usano lo stile di default nel prompt.
+    style_preset_id: Mapped[str | None] = mapped_column(
+        String(120), nullable=True
+    )
     # Snapshot pseudonimo/email dell'autore al momento della creazione
     author_display: Mapped[str] = mapped_column(
         String(120), nullable=False, default=""

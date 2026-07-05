@@ -82,6 +82,7 @@ class CardOut(BaseModel):
     bookshop_category_id: Optional[str] = None
     bookshop_category_label: Optional[str] = None
     bookshop_category_macro: Optional[str] = None
+    style_preset_id: Optional[str] = None
     image_url: str
     read_url: str
     created_at: str
@@ -127,6 +128,7 @@ def _to_out(card, cat=None) -> CardOut:
         ),
         bookshop_category_label=cat.label if cat else None,
         bookshop_category_macro=cat.macro if cat else None,
+        style_preset_id=card.style_preset_id or None,
         image_url=f"/api/cards/{card.id}/image",
         read_url=f"/c/{card.id}",
         created_at=card.created_at.isoformat() if card.created_at else "",
@@ -138,13 +140,35 @@ def _card_number_display(n: int) -> str:
 
 
 def _build_card_prompt(
-    *, name: str, character_type: str, caption: str, author: str, number: str
+    *,
+    name: str,
+    character_type: str,
+    caption: str,
+    author: str,
+    number: str,
+    style_preset_id: Optional[str] = None,
 ) -> str:
-    """Prompt strutturato per la generazione della card 9:16 con testi bake-in.
+    """Prompt strutturato per la card 9:16 con testi bake-in.
 
     Layout ricalca la card di riferimento inviata da Rob (Neo GATTO CURIOSO).
-    Tutti i testi devono essere renderizzati LEGGIBILI dal modello.
+    Se style_preset_id è fornito, la sua expansion viene inserita nel
+    blocco STYLE per condizionare la resa artistica.
     """
+    from snaptoon_core.styles_library import get_preset
+
+    style_block = ""
+    if style_preset_id:
+        preset = get_preset(style_preset_id)
+        if preset:
+            style_block = (
+                f"\n=== ART STYLE ===\n{preset.expansion.strip()}\n"
+                "Apply this art style to the CENTRAL character illustration. "
+                "Keep the card frame (border, banners, badges, stars, "
+                "caption panel, number tag) in a friendly comic-book design "
+                "regardless of the character style, so the card feels "
+                "consistent with other collectibles.\n"
+            )
+
     return (
         "=== RENDER MODE ===\n"
         "Vertical collectible trading card illustration, tall portrait "
@@ -189,7 +213,8 @@ def _build_card_prompt(
         "as written above. Use recognizable readable fonts. Do NOT invent "
         "random text or scrambled letters. Keep the layout balanced and "
         "the character clearly the focal point.\n\n"
-        "=== AVOID ===\n"
+        + style_block
+        + "\n=== AVOID ===\n"
         "misspelled or scrambled text, extra badges beyond those "
         "described, real brand logos, watermarks, panel borders like a "
         "comic page, more than one character on the card, dark or scary "
@@ -222,6 +247,7 @@ def _generate_card_image(
     author: str,
     progressive_number: int,
     reference_bytes: Optional[bytes],
+    style_preset_id: Optional[str] = None,
 ) -> tuple[str, Optional[str]]:
     """Genera l'immagine AI + salva. Ritorna (rendered_key, reference_key).
 
@@ -237,6 +263,7 @@ def _generate_card_image(
         caption=caption,
         author=author,
         number=_card_number_display(progressive_number),
+        style_preset_id=style_preset_id,
     )
 
     tmp_ref_path: Optional[Path] = None
@@ -281,19 +308,31 @@ async def create_card(
     name: str = Form(...),
     character_type: str = Form(...),
     caption: str = Form(default=""),
+    style_preset_id: str = Form(default=""),
     reference: Optional[UploadFile] = File(default=None),
     user: dict = Depends(require_user),
 ) -> CardOut:
-    """Crea una nuova figurina. Costo: 1 credito."""
+    """Crea una nuova figurina. Costo: 1 credito.
+
+    style_preset_id: opzionale ma raccomandato — se non fornito, l'AI
+    userà uno stile generico. Deve essere un preset di stile valido
+    (verifica silenziosa: se non trovato, si continua senza).
+    """
     from api.utils.user_display import public_author_name
+    from snaptoon_core.styles_library import get_preset
 
     name = name.strip()
     character_type = character_type.strip()
     caption = caption.strip()
+    style_preset_id = style_preset_id.strip()
     if not name or not character_type:
         raise HTTPException(
             status_code=400, detail="Nome e tipo del personaggio obbligatori"
         )
+    if style_preset_id and get_preset(style_preset_id) is None:
+        # non-fatal: procedi senza stile ma logga
+        logger.warning("style_preset_id sconosciuto ignorato: %s", style_preset_id)
+        style_preset_id = ""
 
     ref_bytes = await _read_reference(reference)
 
@@ -354,6 +393,7 @@ async def create_card(
             author=author_display,
             progressive_number=card_number,
             reference_bytes=ref_bytes,
+            style_preset_id=style_preset_id or None,
         )
     except Exception as e:
         # Refund + cancella
@@ -370,7 +410,7 @@ async def create_card(
             status_code=502, detail=f"Errore generazione card: {str(e)[:200]}"
         )
 
-    # 4. Aggiorna record con storage keys
+    # 4. Aggiorna record con storage keys + style
     with session_scope() as s:
         u = users_repo.get_by_id(s, user_id)
         card = cards_repo.get_by_user_and_id(s, u, card_id)
@@ -379,6 +419,8 @@ async def create_card(
         cards_repo.set_rendered_key(s, card, rendered_key)
         if reference_key:
             cards_repo.set_reference_key(s, card, reference_key)
+        if style_preset_id:
+            card.style_preset_id = style_preset_id
         return _to_out(card)
 
 
@@ -475,6 +517,7 @@ def regenerate_card(
         author = card.author_display
         number = card.progressive_number
         ref_key = card.reference_image_key
+        style_id = card.style_preset_id
         # Blocca rigenerazione se pubblicata (per evitare cambi post approval)
         if card.moderation_status == "published":
             raise HTTPException(
@@ -516,6 +559,7 @@ def regenerate_card(
             author=author,
             progressive_number=number,
             reference_bytes=ref_bytes,
+            style_preset_id=style_id,
         )
     except Exception as e:
         with session_scope() as s:
