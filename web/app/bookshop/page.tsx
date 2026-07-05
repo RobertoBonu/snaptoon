@@ -3,6 +3,20 @@
 import { useEffect, useMemo, useState } from "react";
 import { SiteShell } from "@/components/site";
 
+interface UserCard {
+  id: string;
+  name: string;
+  character_type: string;
+  caption: string;
+  author_display: string;
+  progressive_number: number;
+  image_url: string;
+  category_id: string | null;
+  category_label: string | null;
+  category_macro: string | null;
+  published_at: string | null;
+}
+
 interface WebtoonCard {
   id: string;
   title: string;
@@ -47,6 +61,7 @@ type MacroFilter = "all" | "kids" | "young" | "kidult";
 
 export default function BookshopPage() {
   const [webtoons, setWebtoons] = useState<WebtoonCard[] | null>(null);
+  const [userCards, setUserCards] = useState<UserCard[] | null>(null);
   const [categories, setCategories] = useState<CategoriesData | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [macroFilter, setMacroFilter] = useState<MacroFilter>("all");
@@ -63,11 +78,30 @@ export default function BookshopPage() {
         setError(e instanceof Error ? e.message : String(e)),
       );
 
+    fetch("/api/bookshop/cards?limit=120")
+      .then(async (r) => (r.ok ? r.json() : null))
+      .then((d: { cards: UserCard[] } | null) => {
+        if (d) setUserCards(d.cards);
+        else setUserCards([]);
+      })
+      .catch(() => setUserCards([]));
+
     fetch("/api/bookshop/categories")
       .then(async (r) => (r.ok ? r.json() : null))
       .then((d: CategoriesData | null) => setCategories(d))
       .catch(() => {});
   }, []);
+
+  // Filtro figurine
+  const filteredCards = useMemo(() => {
+    if (!userCards) return null;
+    let list = userCards;
+    if (macroFilter !== "all")
+      list = list.filter((c) => c.category_macro === macroFilter);
+    if (categoryFilter)
+      list = list.filter((c) => c.category_id === categoryFilter);
+    return list;
+  }, [userCards, macroFilter, categoryFilter]);
 
   // Filtro
   const filtered = useMemo(() => {
@@ -346,6 +380,171 @@ export default function BookshopPage() {
           )}
         </div>
       </section>
+
+      {/* Sezione Figurine */}
+      {filteredCards && filteredCards.length > 0 && (
+        <section
+          style={{
+            paddingTop: 20,
+            paddingBottom: 80,
+            borderTop: "1px solid #1E2436",
+            background: "linear-gradient(180deg, rgba(245,158,11,0.03) 0%, rgba(13,16,23,0) 100%)",
+          }}
+        >
+          <div className="lp-container">
+            <div style={{ marginBottom: 24 }}>
+              <div
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 8,
+                  background: "rgba(245,158,11,0.12)",
+                  border: "1px solid rgba(245,158,11,0.3)",
+                  padding: "4px 10px",
+                  borderRadius: 100,
+                  color: "#F59E0B",
+                  fontSize: 12,
+                  fontWeight: 700,
+                  marginBottom: 12,
+                }}
+              >
+                🎴 Collezionabili
+              </div>
+              <h2
+                style={{
+                  fontSize: "1.5rem",
+                  fontWeight: 700,
+                  color: "#F1F5F9",
+                  marginBottom: 6,
+                }}
+              >
+                Figurine della community
+              </h2>
+              <p
+                style={{
+                  fontSize: "0.95rem",
+                  color: "#94A3B8",
+                  maxWidth: 620,
+                }}
+              >
+                Card 9:16 con banner nome, stelline di apprezzamento e numero
+                progressivo. Ogni card è unica — il numero è progressivo su
+                tutte le figurine SnapToon.
+              </p>
+            </div>
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))",
+                gap: 20,
+              }}
+            >
+              {filteredCards.map((c) => (
+                <div
+                  key={c.id}
+                  className="lift"
+                  style={{
+                    background: "#0F1420",
+                    border: "1px solid #1E2436",
+                    borderRadius: 14,
+                    overflow: "hidden",
+                  }}
+                >
+                  <div
+                    style={{
+                      position: "relative",
+                      aspectRatio: "9 / 16",
+                      background: "#0D1017",
+                    }}
+                  >
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={c.image_url}
+                      alt={c.name}
+                      loading="lazy"
+                      style={{
+                        width: "100%",
+                        height: "100%",
+                        objectFit: "contain",
+                        display: "block",
+                      }}
+                    />
+                    <span
+                      style={{
+                        position: "absolute",
+                        top: 8,
+                        right: 8,
+                        background: "rgba(13,16,23,0.85)",
+                        border: "1px solid #1E2436",
+                        color: "#CBD5E1",
+                        fontSize: 10,
+                        fontWeight: 700,
+                        padding: "2px 6px",
+                        borderRadius: 6,
+                        fontFamily: "monospace",
+                      }}
+                    >
+                      #{String(c.progressive_number).padStart(4, "0")}
+                    </span>
+                    {c.category_label && (
+                      <span
+                        style={{
+                          position: "absolute",
+                          top: 8,
+                          left: 8,
+                          background: "rgba(13,16,23,0.85)",
+                          border: "1px solid rgba(124,58,237,0.5)",
+                          color: "#A78BFA",
+                          fontSize: 9,
+                          fontWeight: 700,
+                          padding: "2px 6px",
+                          borderRadius: 100,
+                          textTransform: "uppercase",
+                          letterSpacing: "0.06em",
+                        }}
+                      >
+                        {c.category_label}
+                      </span>
+                    )}
+                  </div>
+                  <div style={{ padding: 10 }}>
+                    <div
+                      style={{
+                        fontSize: 13,
+                        fontWeight: 700,
+                        color: "#F1F5F9",
+                        lineHeight: 1.3,
+                        marginBottom: 2,
+                      }}
+                    >
+                      {c.name}
+                    </div>
+                    <div
+                      style={{
+                        fontSize: 11,
+                        color: "#94A3B8",
+                        textTransform: "uppercase",
+                        letterSpacing: "0.06em",
+                      }}
+                    >
+                      {c.character_type}
+                    </div>
+                    <div
+                      style={{
+                        fontSize: 11,
+                        color: "#64748B",
+                        marginTop: 4,
+                      }}
+                    >
+                      di {c.author_display}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
     </SiteShell>
   );
 }

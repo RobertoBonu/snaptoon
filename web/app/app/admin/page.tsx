@@ -193,6 +193,12 @@ export default function AdminPage() {
           >
             📚 Categorie BookShop
           </a>
+          <a
+            href="/app/admin/bookshop-cards"
+            className="border border-[var(--color-border)] hover:bg-[var(--color-bg-elev)] text-[var(--color-fg)] font-semibold px-5 py-2.5 rounded-lg"
+          >
+            🎴 Figurine BookShop
+          </a>
           <button
             onClick={() => setShowCreate(!showCreate)}
             className="bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] text-[var(--color-bg)] font-semibold px-5 py-2.5 rounded-lg"

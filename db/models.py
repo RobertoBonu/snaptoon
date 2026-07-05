@@ -574,6 +574,74 @@ class EsploraAsset(UUIDPrimaryKeyMixin, TimestampMixin, UpdatedAtMixin, Base):
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
 
 
+class UserCard(UUIDPrimaryKeyMixin, TimestampMixin, UpdatedAtMixin, Base):
+    """Figurina/card collezionabile creata da un utente.
+
+    Formato 9:16 verticale (renderizzata a 1024x1536 dall'AI e mostrata in
+    9:16 lato client). Contiene:
+      - top: banner nome + sub-banner tipo + badge autore
+      - center: illustrazione personaggio (generata da testo o da foto)
+      - bottom: 3 stelle + caption + numero progressivo (#0001+)
+
+    Numero progressivo GLOBALE (uniqueness): assegnato dal server come
+    max+1 alla creazione.
+    """
+
+    __tablename__ = "user_cards"
+    __table_args__ = (
+        UniqueConstraint("progressive_number", name="uq_user_card_number"),
+        Index("ix_user_card_owner", "user_id"),
+        Index("ix_user_card_moderation", "moderation_status"),
+    )
+
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    name: Mapped[str] = mapped_column(String(120), nullable=False)
+    character_type: Mapped[str] = mapped_column(String(120), nullable=False)
+    caption: Mapped[str] = mapped_column(String(500), nullable=False, default="")
+    # Snapshot pseudonimo/email dell'autore al momento della creazione
+    author_display: Mapped[str] = mapped_column(
+        String(120), nullable=False, default=""
+    )
+    progressive_number: Mapped[int] = mapped_column(Integer, nullable=False)
+    # PNG finale renderizzata dall'AI (con testi già dentro)
+    rendered_image_key: Mapped[str | None] = mapped_column(
+        String(512), nullable=True
+    )
+    # Reference caricata dall'utente (foto reale del personaggio, opzionale).
+    # Cancellata dopo la generazione per privacy? No, la conserviamo per
+    # consentire la rigenerazione — l'utente può cancellare la card se
+    # vuole rimuoverla completamente.
+    reference_image_key: Mapped[str | None] = mapped_column(
+        String(512), nullable=True
+    )
+    # Moderazione: "draft" | "pending" | "published" | "rejected"
+    moderation_status: Mapped[str] = mapped_column(
+        String(20), nullable=False, default="draft", server_default="draft"
+    )
+    submitted_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    moderated_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    rejection_reason: Mapped[str] = mapped_column(
+        Text, nullable=False, default="", server_default=""
+    )
+    # Categoria BookShop (obbligatoria per pubblicare)
+    bookshop_category_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("bookshop_categories.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    deleted_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+
+
 class BookshopCategory(UUIDPrimaryKeyMixin, TimestampMixin, UpdatedAtMixin, Base):
     """Categoria del BookShop (libreria pubblica dei webtoon degli utenti).
 

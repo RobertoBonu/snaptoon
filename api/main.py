@@ -20,6 +20,7 @@ from api.routers import account as account_router
 from api.routers import admin as admin_router
 from api.routers import admin_style_test as admin_style_test_router
 from api.routers import bookshop as bookshop_router
+from api.routers import user_cards as user_cards_router
 from api.routers import auth as auth_router
 from api.routers import characters as characters_router
 from api.routers import crea as crea_router
@@ -82,6 +83,15 @@ app.include_router(
     bookshop_router.admin_router,
     prefix="/api/admin/bookshop",
     tags=["bookshop-admin"],
+)
+app.include_router(user_cards_router.router, prefix="/api/cards", tags=["cards"])
+app.include_router(
+    user_cards_router.public_router, prefix="/api/bookshop", tags=["cards-public"]
+)
+app.include_router(
+    user_cards_router.admin_router,
+    prefix="/api/admin/bookshop",
+    tags=["cards-admin"],
 )
 app.include_router(script_router.router, prefix="/api", tags=["script"])
 app.include_router(styles_router.router, prefix="/api/styles", tags=["styles"])

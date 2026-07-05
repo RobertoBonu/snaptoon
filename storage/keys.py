@@ -66,6 +66,16 @@ def style_test_image_key(image_id: uuid.UUID | str) -> str:
     return f"admin/style-tests/{_stringify(image_id)}.png"
 
 
+def user_card_rendered_key(card_id: uuid.UUID | str) -> str:
+    """PNG finale della card figurina (renderizzata dall'AI)."""
+    return f"user-cards/{_stringify(card_id)}/rendered.png"
+
+
+def user_card_reference_key(card_id: uuid.UUID | str) -> str:
+    """Foto di riferimento caricata dall'utente (opzionale)."""
+    return f"user-cards/{_stringify(card_id)}/reference.png"
+
+
 def pdf_export_key(project_id: uuid.UUID | str, ts: datetime | None = None) -> str:
     if ts is None:
         ts = datetime.now(timezone.utc)
