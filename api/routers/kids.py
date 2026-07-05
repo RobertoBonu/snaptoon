@@ -259,7 +259,9 @@ def create_kids_project(
             # crediti normali, non consuma quota libretti mensili)
         else:
             # Libretto (breve/lungo): serve quota_libretti_kids
-            if is_free_to_play(u):
+            # Admin bypassa qualsiasi limite
+            from db.models import Role
+            if is_free_to_play(u) and u.role != Role.admin:
                 raise HTTPException(
                     status_code=402,
                     detail={

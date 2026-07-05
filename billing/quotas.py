@@ -97,8 +97,19 @@ def get_available(user, quota_type: str) -> tuple[int, int]:
     )
 
 
+def _is_admin(user) -> bool:
+    """L'admin bypassa TUTTE le quote (mensili, extra, FTP)."""
+    from db.models import Role
+    return user.role == Role.admin
+
+
 def check_quota(user, quota_type: str) -> None:
-    """Solleva QuotaExhaustedError se non c'è quota disponibile."""
+    """Solleva QuotaExhaustedError se non c'è quota disponibile.
+
+    Gli admin NON hanno mai limiti — ritorna subito.
+    """
+    if _is_admin(user):
+        return
     m, e = get_available(user, quota_type)
     if m + e <= 0:
         raise QuotaExhaustedError(quota_type)
@@ -107,9 +118,12 @@ def check_quota(user, quota_type: str) -> None:
 def consume_quota(user, quota_type: str) -> None:
     """Decrementa 1 unità dalla quota. Mensile PRIMA, extra POI.
 
-    Solleva QuotaExhaustedError se non disponibile. Il chiamante DEVE
-    tenere l'user attaccato alla session per persistere il decremento.
+    Gli admin NON consumano quota (no-op). Solleva QuotaExhaustedError
+    se non disponibile per utenti non-admin. Il chiamante DEVE tenere
+    l'user attaccato alla session per persistere il decremento.
     """
+    if _is_admin(user):
+        return
     month_field, extra_field = _field_names(quota_type)
     m = int(getattr(user, month_field, 0) or 0)
     e = int(getattr(user, extra_field, 0) or 0)

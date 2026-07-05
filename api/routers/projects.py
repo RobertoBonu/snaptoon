@@ -113,10 +113,11 @@ def create_project(
             raise HTTPException(status_code=404, detail="User not found")
 
         # Quota progetti_pro (mensile + extra). Piani free_to_play e kids_plan
-        # NON possono creare progetti Pro.
+        # NON possono creare progetti Pro — tranne l'admin.
         from billing.quotas import QuotaExhaustedError, check_quota, consume_quota
+        from db.models import Role
         plan_val = u.plan.value if hasattr(u.plan, "value") else str(u.plan)
-        if plan_val in ("free_to_play", "kids_plan"):
+        if plan_val in ("free_to_play", "kids_plan") and u.role != Role.admin:
             raise HTTPException(
                 status_code=402,
                 detail={

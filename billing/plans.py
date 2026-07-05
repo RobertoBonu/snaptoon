@@ -180,12 +180,19 @@ def is_free_to_play(user) -> bool:
     return user.plan == Plan.free_to_play
 
 
+def _is_admin(user) -> bool:
+    """L'admin bypassa TUTTE le quote (mensili, extra, FTP)."""
+    return user.role == Role.admin
+
+
 def check_free_to_play_quota(user, action: str) -> None:
     """Solleva FreeToPlayLimitError se l'utente FTP ha già usato l'azione.
 
-    Chiamare PRIMA di fare la generazione. Se l'utente NON è FTP,
-    è un no-op.
+    Chiamare PRIMA di fare la generazione. Admin e utenti non-FTP:
+    no-op.
     """
+    if _is_admin(user):
+        return
     if not is_free_to_play(user):
         return
     field = FTP_ACTIONS.get(action)
@@ -199,8 +206,10 @@ def check_free_to_play_quota(user, action: str) -> None:
 def consume_free_to_play(user, action: str) -> None:
     """Incrementa il contatore per l'azione. Chiamare DOPO successo generazione.
 
-    No-op per utenti non FTP.
+    Admin e utenti non-FTP: no-op.
     """
+    if _is_admin(user):
+        return
     if not is_free_to_play(user):
         return
     field = FTP_ACTIONS.get(action)
