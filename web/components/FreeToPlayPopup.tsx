@@ -5,8 +5,26 @@ import Link from "next/link";
 
 type Detail = {
   code?: string;
-  action?: string;
+  quota_type?: string;
   message?: string;
+  // Legacy (retrocompat)
+  action?: string;
+};
+
+const QUOTA_LABEL: Record<string, string> = {
+  libretti_kids: "libretti KIDS",
+  progetti_pro: "progetti Pro",
+  cover: "cover",
+  card: "figurine",
+  striscia: "striscia gratuita",
+};
+
+const UPSELL_HINT: Record<string, string> = {
+  libretti_kids: "Compra un pacchetto libretti (da €4,99) o passa al piano PRO.",
+  progetti_pro: "Compra un pacchetto progetti (da €9,99) o passa al piano PRO.",
+  cover: "Compra un pacchetto cover (da €5,99 x3) o attendi il rinnovo mensile.",
+  card: "Compra un pacchetto figurine (da €4,99 x3) o attendi il rinnovo mensile.",
+  striscia: "Con Free-To-Play hai 1 striscia inclusa. Passa a KIDS (€6,99/mese) o PRO (€19/mese).",
 };
 
 export default function FreeToPlayPopup() {
@@ -35,7 +53,11 @@ export default function FreeToPlayPopup() {
 
   if (!open) return null;
 
-  const isPlanLock = detail?.code === "free_to_play_plan_locked";
+  const quotaType = detail?.quota_type || detail?.action || "";
+  const quotaLabel = QUOTA_LABEL[quotaType] || "crediti";
+  const hint = UPSELL_HINT[quotaType] || "Passa a un piano superiore o acquista un pacchetto extra.";
+  const message = detail?.message ||
+    `Hai finito i ${quotaLabel}. Aggiungi un pacchetto extra per continuare.`;
 
   return (
     <div
@@ -57,29 +79,35 @@ export default function FreeToPlayPopup() {
         <div className="text-6xl mb-4">🎨</div>
 
         <h2 className="text-2xl font-bold mb-2">
-          {isPlanLock ? "Piano gratuito limitato" : "Hai utilizzato i crediti gratuiti"}
+          Quota {quotaLabel} esaurita
         </h2>
 
         <p className="text-lg font-semibold text-[var(--color-accent)] mb-4">
           TI È PIACIUTO SNAPTOON?
         </p>
 
-        <p className="text-sm text-[var(--color-fg-muted)] mb-6">
-          {isPlanLock
-            ? "Il piano Free-To-Play consente solo la Striscia (1 tavola). Per libretti Brevi e Lunghi passa a un piano superiore."
-            : "Il tuo piano Free-To-Play include 1 striscia, 1 figurina e 1 cover. Passa a un abbonamento per continuare a creare senza limiti."}
-        </p>
+        <p className="text-sm text-[var(--color-fg-muted)] mb-2">{message}</p>
+        <p className="text-xs text-[var(--color-fg-muted)] mb-6 italic">{hint}</p>
 
-        <Link
-          href="/abbonamenti"
-          className="inline-block bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] text-[var(--color-bg)] font-bold px-8 py-3 rounded-lg text-lg"
-          onClick={() => setOpen(false)}
-        >
-          Abbonati →
-        </Link>
+        <div className="flex flex-col gap-2">
+          <Link
+            href="/app/pacchetti"
+            className="bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] text-[var(--color-bg)] font-bold py-3 rounded-lg text-base"
+            onClick={() => setOpen(false)}
+          >
+            📦 Aggiungi pacchetto extra
+          </Link>
+          <Link
+            href="/abbonamenti"
+            className="border border-[var(--color-border)] hover:border-[var(--color-accent)] text-[var(--color-fg)] font-semibold py-2.5 rounded-lg text-sm"
+            onClick={() => setOpen(false)}
+          >
+            Confronta piani →
+          </Link>
+        </div>
 
         <p className="text-xs text-[var(--color-fg-muted)] mt-4">
-          Piani da €19/mese, disdetta in qualsiasi momento.
+          Disdetta possibile in qualsiasi momento.
         </p>
       </div>
     </div>

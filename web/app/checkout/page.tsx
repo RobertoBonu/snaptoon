@@ -6,8 +6,9 @@ import { useSearchParams } from "next/navigation";
 
 const PLAN_INFO: Record<string, { label: string; price: string }> = {
   free_to_play: { label: "Free-To-Play", price: "GRATIS" },
-  base: { label: "Base", price: "€19/mese" },
-  premium: { label: "Premium", price: "€49/mese" },
+  kids_plan: { label: "KIDS", price: "€6,99/mese" },
+  base: { label: "PRO", price: "€19/mese" },
+  premium: { label: "PRO (Premium legacy)", price: "€49/mese" },
 };
 
 function CheckoutInner() {

@@ -360,19 +360,35 @@ async def create_card(
         u = users_repo.get_by_id(s, user_id)
         if u is None:
             raise HTTPException(status_code=404, detail="User not found")
-        # Free-To-Play: verifica quota (solleva 402 con codice speciale
-        # così il frontend può mostrare il popup upgrade)
-        try:
-            check_free_to_play_quota(u, "card")
-        except FreeToPlayLimitError:
-            raise HTTPException(
-                status_code=402,
-                detail={
-                    "code": "free_to_play_exhausted",
-                    "action": "card",
-                    "message": "Hai usato la tua figurina gratuita.",
-                },
-            )
+        # Verifica quota figurina (mensile + extra). Solleva 402 con
+        # codice specifico così il frontend apre popup upsell con
+        # pacchetto suggerito.
+        from billing.quotas import QuotaExhaustedError, check_quota
+        # Free-to-play: usa vecchia logica (una tantum, tramite counter FTP)
+        if u.plan.value == "free_to_play":
+            try:
+                check_free_to_play_quota(u, "card")
+            except FreeToPlayLimitError:
+                raise HTTPException(
+                    status_code=402,
+                    detail={
+                        "code": "quota_exhausted",
+                        "quota_type": "card",
+                        "message": "Hai usato la tua figurina gratuita.",
+                    },
+                )
+        else:
+            try:
+                check_quota(u, "card")
+            except QuotaExhaustedError:
+                raise HTTPException(
+                    status_code=402,
+                    detail={
+                        "code": "quota_exhausted",
+                        "quota_type": "card",
+                        "message": "Hai finito le figurine di questo mese. Acquista un pacchetto extra o attendi il rinnovo.",
+                    },
+                )
         author_display = public_author_name(u)
         try:
             card = cards_repo.create(
@@ -457,8 +473,15 @@ async def create_card(
             cards_repo.set_reference_key(s, card, reference_key)
         if style_preset_id:
             card.style_preset_id = style_preset_id
-        # Free-To-Play: consuma il counter DOPO successo
-        consume_free_to_play(u, "card")
+        # Consume quota: FTP counter per free_to_play, quota_card per gli altri
+        if u.plan.value == "free_to_play":
+            consume_free_to_play(u, "card")
+        else:
+            from billing.quotas import consume_quota, QuotaExhaustedError
+            try:
+                consume_quota(u, "card")
+            except QuotaExhaustedError:
+                pass  # improbabile (già checkato prima), ma safe
         return _to_out(card)
 
 

@@ -145,7 +145,7 @@ def require_user(snaptoon_token: str | None = Cookie(default=None, alias=COOKIE_
         }
 
 
-_ALLOWED_REGISTRATION_PLANS = {"free_to_play", "base", "premium"}
+_ALLOWED_REGISTRATION_PLANS = {"free_to_play", "kids_plan", "base"}
 
 
 @router.post("/register", response_model=RegisterResponse, status_code=status.HTTP_201_CREATED)

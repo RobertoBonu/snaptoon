@@ -31,55 +31,79 @@ class PlanConfig:
     monthly_price_eur: int | None = None  # None per Free Trial
 
 
+@dataclass(frozen=True)
+class PlanQuotas:
+    """Quote MENSILI per tipo di contenuto (2026-07: nuovo modello).
+
+    Ogni piano definisce quante unità di ciascun tipo l'utente può creare
+    OGNI MESE (reset al rinnovo). I pacchetti Extra si sommano DOPO,
+    con consumo month-first, extra-second.
+    """
+    libretti_kids: int = 0
+    progetti_pro: int = 0
+    cover: int = 0
+    card: int = 0
+
+
 PLAN_CONFIG: dict[Plan, PlanConfig] = {
     Plan.free_to_play: PlanConfig(
         plan=Plan.free_to_play,
         label="Free-To-Play",
-        # Budget crediti dimensionato per 1 striscia + 1 figurina +
-        # 1 cover (con margine). Il vero enforcement è però nei counter
-        # ftp_*_used: NON si può creare una 2a striscia/figurina/cover
-        # anche se i crediti sarebbero teoricamente sufficienti.
-        # 1 striscia ~= 5 pannelli+3 ref+5 adapt = ~13cr, +1 figurina +
-        # 1 cover = ~15cr. Diamo 25 di margine.
-        monthly_credits=25,
-        max_projects=1,  # 1 striscia
+        monthly_credits=25,  # legacy: budget per striscia+fig+cover una tantum
+        max_projects=1,
         allowed_qualities=("medium",),
         monthly_price_eur=0,
         features=(
-            "1 libretto striscia (1 tavola)",
+            "1 striscia KIDS (1 tavola)",
             "1 figurina collezionabile",
             "1 cover standalone",
             "Qualità Media",
-            "Provalo gratis, senza carta di credito",
+            "Prova gratis, senza carta di credito",
+        ),
+    ),
+    Plan.kids_plan: PlanConfig(
+        plan=Plan.kids_plan,
+        label="KIDS",
+        monthly_credits=100,  # legacy budget crediti
+        max_projects=6,  # 1 libretto/mese ma con cast_archive posso avere fino a 6 char
+        allowed_qualities=("medium",),
+        monthly_price_eur=7,  # €6,99 arrotondato
+        features=(
+            "1 libretto KIDS al mese (breve o lungo)",
+            "5 cover al mese",
+            "5 figurine al mese",
+            "Qualità Media",
+            "Modalità KIDS guidata",
+            "Export PDF",
         ),
     ),
     Plan.base: PlanConfig(
+        # Il "Base" storico ora si chiama PRO ma il valore enum resta
+        # 'base' per non rompere gli utenti esistenti già registrati.
         plan=Plan.base,
-        label="Base",
+        label="PRO",
         monthly_credits=200,
         max_projects=5,
-        allowed_qualities=("low", "medium"),
+        allowed_qualities=("low", "medium", "high"),
         monthly_price_eur=19,
         features=(
-            "200 crediti al mese",
-            "5 progetti",
-            "Qualità Bassa + Media",
+            "5 progetti Pro al mese",
+            "1 libretto KIDS al mese",
+            "5 cover al mese",
+            "5 figurine al mese",
+            "Qualità Bassa + Media + Alta",
             "Export PDF",
         ),
     ),
     Plan.premium: PlanConfig(
         plan=Plan.premium,
-        label="Premium",
+        label="PRO (legacy Premium)",
         monthly_credits=600,
         max_projects=0,
         allowed_qualities=("low", "medium", "high"),
         monthly_price_eur=49,
         features=(
-            "600 crediti al mese",
-            "Progetti illimitati",
-            "Qualità Bassa + Media + Alta",
-            "Export PDF",
-            "Priorità di generazione",
+            "Legacy premium (mantenuto per utenti esistenti)",
         ),
     ),
     # === Legacy (mantenuti per utenti esistenti) ===

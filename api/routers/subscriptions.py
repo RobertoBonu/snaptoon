@@ -73,7 +73,7 @@ class CheckoutIn(BaseModel):
     'pending_approval'. L'admin approva manualmente per ora.
     """
 
-    plan: str = Field(..., pattern="^(free_to_play|base|premium)$")
+    plan: str = Field(..., pattern="^(free_to_play|kids_plan|base|premium)$")
     # Campi mock Stripe (opzionali, salvati solo per traccia)
     mock_stripe_token: str = Field(default="mock_test_token")
 
@@ -236,13 +236,16 @@ def admin_approve_subscription(
             raise HTTPException(status_code=404, detail="Utente non trovato")
         req = u.subscription_plan_requested or u.plan
         cfg = plan_config(req)
-        # Applica il piano richiesto e riparte periodo crediti
+        # Applica il piano richiesto e riparte periodo crediti + quote
         u.plan = req
         u.credits_total_this_period = cfg.monthly_credits
         u.credits_used_this_period = 0
         u.subscription_status = "active"
         u.subscription_activated_at = datetime.now(timezone.utc)
         u.subscription_rejection_reason = ""
+        # Reset quote mensili al valore del piano
+        from billing.quotas import reset_monthly_quotas
+        reset_monthly_quotas(u)
         # Se il nuovo piano non è free_to_play, i contatori FTP si
         # azzerano (l'utente ha già "consumato" la sua prova gratis)
         if req != Plan.free_to_play:

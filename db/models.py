@@ -61,6 +61,8 @@ class Plan(str, enum.Enum):
     free_to_play = "free_to_play"
     base = "base"
     premium = "premium"
+    # 2026-07-05: nuovo listino "KIDS" (piano dedicato famiglie/scuole)
+    kids_plan = "kids_plan"
 
 
 class Role(str, enum.Enum):
@@ -172,6 +174,48 @@ class User(UUIDPrimaryKeyMixin, TimestampMixin, Base):
         Integer, default=0, nullable=False, server_default="0"
     )
     ftp_cover_used: Mapped[int] = mapped_column(
+        Integer, default=0, nullable=False, server_default="0"
+    )
+
+    # === Quote per-tipo (2026-07-05: nuovo modello economico) ===
+    # 4 tipi di contenuto, ciascuno con 2 counter:
+    #   *_month = quota mensile del piano (si RESETTA al rinnovo)
+    #   *_extra = quota accumulata dai Pacchetti Extra (NON scade)
+    #
+    # Ordine di consumo: prima *_month, poi *_extra, poi 402 upsell.
+    #
+    # Tipi:
+    #   - libretti_kids : libretto KIDS (breve/lungo, non striscia)
+    #   - progetti_pro  : progetto Pro (fumetto/webtoon/graphic novel)
+    #   - cover         : cover standalone
+    #   - card          : figurina collezionabile
+    #
+    # Nota: la STRISCIA KIDS (1 tavola) resta trattata come Free-To-Play
+    # (counter ftp_striscia_used) — è un caso a parte perché è la porta
+    # d'ingresso gratuita.
+
+    quota_libretti_kids_month: Mapped[int] = mapped_column(
+        Integer, default=0, nullable=False, server_default="0"
+    )
+    quota_libretti_kids_extra: Mapped[int] = mapped_column(
+        Integer, default=0, nullable=False, server_default="0"
+    )
+    quota_progetti_pro_month: Mapped[int] = mapped_column(
+        Integer, default=0, nullable=False, server_default="0"
+    )
+    quota_progetti_pro_extra: Mapped[int] = mapped_column(
+        Integer, default=0, nullable=False, server_default="0"
+    )
+    quota_cover_month: Mapped[int] = mapped_column(
+        Integer, default=0, nullable=False, server_default="0"
+    )
+    quota_cover_extra: Mapped[int] = mapped_column(
+        Integer, default=0, nullable=False, server_default="0"
+    )
+    quota_card_month: Mapped[int] = mapped_column(
+        Integer, default=0, nullable=False, server_default="0"
+    )
+    quota_card_extra: Mapped[int] = mapped_column(
         Integer, default=0, nullable=False, server_default="0"
     )
 
@@ -937,3 +981,123 @@ class CreaImage(UUIDPrimaryKeyMixin, TimestampMixin, UpdatedAtMixin, Base):
     slot: Mapped[str] = mapped_column(String(64), nullable=False, unique=True, index=True)
     # ^ dashboard | step-testo | step-stile | step-personaggi | step-genera | step-impagina
     storage_key: Mapped[str | None] = mapped_column(String(512), nullable=True)
+
+
+# ============================================================
+# Pacchetti extra + Ordini stampa/export
+# ============================================================
+
+
+class ExtraPackagePurchase(UUIDPrimaryKeyMixin, TimestampMixin, Base):
+    """Acquisto di un Pacchetto Extra (crediti aggiuntivi per tipo).
+
+    Al momento dell'acquisto viene incrementato il counter user.quota_<tipo>_extra.
+    Per ora il pagamento è MOCK Stripe (nessun addebito reale). Il record
+    resta come traccia storica anche dopo che il pacchetto è stato consumato.
+    """
+
+    __tablename__ = "extra_package_purchases"
+    __table_args__ = (
+        Index("ix_extra_pkg_user", "user_id"),
+        Index("ix_extra_pkg_type", "package_type"),
+    )
+
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    # Tipo pacchetto: "libretti_kids" | "progetti_pro" | "cover" | "card"
+    package_type: Mapped[str] = mapped_column(String(30), nullable=False)
+    # Quantità inclusa nel pacchetto (es. 3 libretti)
+    quantity: Mapped[int] = mapped_column(Integer, nullable=False)
+    # Prezzo pagato in centesimi (€19.00 → 1900)
+    price_eur_cents: Mapped[int] = mapped_column(Integer, nullable=False)
+    # ID mock Stripe payment (poi diventerà quello reale)
+    stripe_payment_id: Mapped[str] = mapped_column(
+        String(120), nullable=False, default="", server_default=""
+    )
+    # Stato: "pending" (creato) | "paid" (mock: subito) | "refunded"
+    status: Mapped[str] = mapped_column(
+        String(20), nullable=False, default="paid", server_default="paid"
+    )
+
+
+class PrintOrder(UUIDPrimaryKeyMixin, TimestampMixin, UpdatedAtMixin, Base):
+    """Ordine di stampa fisica di un libretto/fumetto.
+
+    Il flusso è manuale per ora: l'utente ordina, l'admin vede in dashboard,
+    manda a tipografia, aggiorna lo status. In futuro integreremo API tipografia.
+    """
+
+    __tablename__ = "print_orders"
+    __table_args__ = (
+        Index("ix_print_order_user", "user_id"),
+        Index("ix_print_order_status", "status"),
+    )
+
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    # Il progetto stampato (kids o pro) — riferito via id, non FK stretta
+    # perché supportiamo entrambi i tipi.
+    project_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), nullable=False
+    )
+    project_kind: Mapped[str] = mapped_column(
+        String(20), nullable=False, default="kids"
+    )
+    # ^ "kids" | "pro"
+    copies: Mapped[int] = mapped_column(Integer, nullable=False)
+    price_eur_cents: Mapped[int] = mapped_column(Integer, nullable=False)
+    # Indirizzo di spedizione — JSONB con nome/via/cap/città/paese/telefono
+    shipping_address: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
+    # Stato: pending → paid → printing → shipped → delivered → cancelled
+    status: Mapped[str] = mapped_column(
+        String(20), nullable=False, default="pending", server_default="pending"
+    )
+    tracking_number: Mapped[str] = mapped_column(
+        String(120), nullable=False, default="", server_default=""
+    )
+    admin_notes: Mapped[str] = mapped_column(
+        Text, nullable=False, default="", server_default=""
+    )
+    stripe_payment_id: Mapped[str] = mapped_column(
+        String(120), nullable=False, default="", server_default=""
+    )
+
+
+class ExportOrder(UUIDPrimaryKeyMixin, TimestampMixin, Base):
+    """Esportazione di un progetto in formato professionale (ePub/Kindle/IDML).
+
+    L'export è generato on-demand dopo il pagamento (per ora mock).
+    """
+
+    __tablename__ = "export_orders"
+    __table_args__ = (
+        Index("ix_export_order_user", "user_id"),
+    )
+
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    project_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), nullable=False
+    )
+    project_kind: Mapped[str] = mapped_column(String(20), nullable=False)
+    # Formato: "epub" | "mobi" | "idml" | "bundle_multi" | "bundle_pro"
+    format_type: Mapped[str] = mapped_column(String(30), nullable=False)
+    price_eur_cents: Mapped[int] = mapped_column(Integer, nullable=False)
+    # Storage key del file esportato (se già generato)
+    export_storage_key: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    status: Mapped[str] = mapped_column(
+        String(20), nullable=False, default="pending", server_default="pending"
+    )
+    # ^ pending → generating → ready → failed
+    stripe_payment_id: Mapped[str] = mapped_column(
+        String(120), nullable=False, default="", server_default=""
+    )

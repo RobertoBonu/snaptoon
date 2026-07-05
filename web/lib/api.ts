@@ -452,7 +452,11 @@ export async function apiFetch<T = unknown>(
       typeof window !== "undefined"
     ) {
       const code = (detailObj as { code?: string }).code;
-      if (code === "free_to_play_exhausted" || code === "free_to_play_plan_locked") {
+      if (
+        code === "quota_exhausted" ||
+        code === "free_to_play_exhausted" ||
+        code === "free_to_play_plan_locked"
+      ) {
         const evt = new CustomEvent("snaptoon:ftp_exhausted", { detail: detailObj });
         window.dispatchEvent(evt);
       }

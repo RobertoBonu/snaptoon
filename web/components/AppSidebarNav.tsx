@@ -46,6 +46,12 @@ const ITEMS_COMUNI: Item[] = [
     isActive: (p) => p.startsWith("/app/covers"),
   },
   {
+    href: "/app/pacchetti",
+    icon: "account",
+    label: "PACCHETTI EXTRA",
+    isActive: (p) => p.startsWith("/app/pacchetti"),
+  },
+  {
     href: "/app/account",
     icon: "account",
     label: "Account",

@@ -112,15 +112,32 @@ def create_project(
         if u is None:
             raise HTTPException(status_code=404, detail="User not found")
 
-        count = projects_repo.count_by_owner(s, user_id)
-        if project_limit_reached(u.plan, count):
-            cfg = plan_config(u.plan)
+        # Quota progetti_pro (mensile + extra). Piani free_to_play e kids_plan
+        # NON possono creare progetti Pro.
+        from billing.quotas import QuotaExhaustedError, check_quota, consume_quota
+        plan_val = u.plan.value if hasattr(u.plan, "value") else str(u.plan)
+        if plan_val in ("free_to_play", "kids_plan"):
             raise HTTPException(
-                status_code=403,
-                detail=(
-                    f"Hai raggiunto il limite del tuo piano ({cfg.max_projects} progetti). "
-                    "Elimina un progetto o passa a un piano superiore."
-                ),
+                status_code=402,
+                detail={
+                    "code": "quota_exhausted",
+                    "quota_type": "progetti_pro",
+                    "message": (
+                        "Il tuo piano non include progetti Pro. Passa al piano "
+                        "PRO (€19/mese) o acquista un pacchetto progetti."
+                    ),
+                },
+            )
+        try:
+            check_quota(u, "progetti_pro")
+        except QuotaExhaustedError:
+            raise HTTPException(
+                status_code=402,
+                detail={
+                    "code": "quota_exhausted",
+                    "quota_type": "progetti_pro",
+                    "message": "Hai finito i progetti Pro di questo mese. Acquista un pacchetto extra o attendi il rinnovo.",
+                },
             )
 
         try:
@@ -134,6 +151,12 @@ def create_project(
             )
         except ValueError as e:
             raise HTTPException(status_code=400, detail=str(e))
+
+        # Consuma quota progetti_pro (mensile → extra)
+        try:
+            consume_quota(u, "progetti_pro")
+        except QuotaExhaustedError:
+            pass
 
         # Salva metadati cover + copyright come nel flusso KIDS
         from db.models import Cover as CoverORM

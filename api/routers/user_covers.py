@@ -233,18 +233,33 @@ def create_cover(
         user_quality = resolve_user_quality(u)
         author_display = (u.pseudonym or u.email.split("@")[0] or "").strip()
 
-        # Free-To-Play: verifica quota cover
-        try:
-            check_free_to_play_quota(u, "cover")
-        except FreeToPlayLimitError:
-            raise HTTPException(
-                status_code=402,
-                detail={
-                    "code": "free_to_play_exhausted",
-                    "action": "cover",
-                    "message": "Hai usato la tua cover gratuita.",
-                },
-            )
+        # Verifica quota cover (mensile + extra). Free-To-Play usa counter
+        # FTP, gli altri piani usano le quote per-tipo.
+        from billing.quotas import QuotaExhaustedError, check_quota
+        if u.plan.value == "free_to_play":
+            try:
+                check_free_to_play_quota(u, "cover")
+            except FreeToPlayLimitError:
+                raise HTTPException(
+                    status_code=402,
+                    detail={
+                        "code": "quota_exhausted",
+                        "quota_type": "cover",
+                        "message": "Hai usato la tua cover gratuita.",
+                    },
+                )
+        else:
+            try:
+                check_quota(u, "cover")
+            except QuotaExhaustedError:
+                raise HTTPException(
+                    status_code=402,
+                    detail={
+                        "code": "quota_exhausted",
+                        "quota_type": "cover",
+                        "message": "Hai finito le cover di questo mese. Acquista un pacchetto extra o attendi il rinnovo.",
+                    },
+                )
 
         # 1. Charge
         cost = cost_for_generation("generate_panel", user_quality)
@@ -313,12 +328,19 @@ def create_cover(
             except OSError:
                 pass
 
-    # 5. Salva lo storage_key + consuma FTP se applicabile
+    # 5. Salva lo storage_key + consuma quota
     with session_scope() as s:
         cov = s.get(UserCover, cover_id)
         cov.rendered_image_key = storage_key
         u = users_repo.get_by_id(s, user_id)
-        consume_free_to_play(u, "cover")
+        if u.plan.value == "free_to_play":
+            consume_free_to_play(u, "cover")
+        else:
+            from billing.quotas import consume_quota, QuotaExhaustedError
+            try:
+                consume_quota(u, "cover")
+            except QuotaExhaustedError:
+                pass
         return _to_out(cov)
 
 

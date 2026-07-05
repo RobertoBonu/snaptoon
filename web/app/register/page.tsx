@@ -5,7 +5,7 @@ import { useState, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 
 const PLANS: {
-  key: "free_to_play" | "base" | "premium";
+  key: "free_to_play" | "kids_plan" | "base";
   label: string;
   price: string;
   tagline: string;
@@ -19,7 +19,7 @@ const PLANS: {
     price: "GRATIS",
     tagline: "Prova SnapToon senza carta di credito",
     features: [
-      "1 libretto Striscia (1 tavola)",
+      "1 striscia KIDS (1 tavola)",
       "1 figurina collezionabile",
       "1 cover standalone",
       "Qualità Media",
@@ -28,39 +28,41 @@ const PLANS: {
     highlight: true,
   },
   {
-    key: "base",
-    label: "Base",
-    price: "€19/mese",
-    tagline: "Per autori indie e hobbisti",
+    key: "kids_plan",
+    label: "KIDS",
+    price: "€6,99/mese",
+    tagline: "Per famiglie, insegnanti, biblioteche",
     features: [
-      "200 crediti al mese",
-      "5 progetti",
-      "Qualità Bassa + Media",
-      "Export PDF",
+      "1 libretto KIDS/mese",
+      "5 cover/mese",
+      "5 figurine/mese",
+      "Qualità Media",
+      "Modalità KIDS guidata",
     ],
-    cta: "Scegli Base",
+    cta: "Scegli KIDS",
   },
   {
-    key: "premium",
-    label: "Premium",
-    price: "€49/mese",
-    tagline: "Per autori prolifici",
+    key: "base",
+    label: "PRO",
+    price: "€19/mese",
+    tagline: "Per autori indie e professionisti",
     features: [
-      "600 crediti al mese",
-      "Progetti illimitati",
+      "5 progetti Pro/mese",
+      "1 libretto KIDS/mese",
+      "5 cover + 5 figurine/mese",
       "Qualità Bassa + Media + Alta",
-      "Priorità di generazione",
+      "Export PDF stampabile",
     ],
-    cta: "Scegli Premium",
+    cta: "Scegli PRO",
   },
 ];
 
 function RegisterInner() {
   const params = useSearchParams();
-  const initialPlan = (params?.get("plan") as "free_to_play" | "base" | "premium") || "free_to_play";
+  const initialPlan = (params?.get("plan") as "free_to_play" | "kids_plan" | "base") || "free_to_play";
 
   const [step, setStep] = useState<1 | 2 | 3>(1);
-  const [plan, setPlan] = useState<"free_to_play" | "base" | "premium">(initialPlan);
+  const [plan, setPlan] = useState<"free_to_play" | "kids_plan" | "base">(initialPlan);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [pseudonym, setPseudonym] = useState("");

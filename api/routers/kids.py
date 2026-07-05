@@ -232,38 +232,55 @@ def create_kids_project(
         except ValueError:
             length_target = LengthTarget.breve
 
-        # Free-To-Play: solo la striscia è consentita. Se l'utente FTP
-        # sceglie un template non-striscia (breve/lungo), blocca subito.
-        # Se sceglie striscia, verifica di non aver già usato la quota.
+        # Enforcement quote:
+        #   - striscia (1 tavola)      → free_to_play counter una-tantum
+        #   - breve/lungo (libretto)   → quota_libretti_kids (mensile+extra)
         from billing.plans import (
             FreeToPlayLimitError,
             check_free_to_play_quota,
             consume_free_to_play,
             is_free_to_play,
         )
-        if is_free_to_play(u):
-            if length_target != LengthTarget.striscia:
+        from billing.quotas import QuotaExhaustedError, check_quota
+        if length_target == LengthTarget.striscia:
+            if is_free_to_play(u):
+                try:
+                    check_free_to_play_quota(u, "striscia")
+                except FreeToPlayLimitError:
+                    raise HTTPException(
+                        status_code=402,
+                        detail={
+                            "code": "quota_exhausted",
+                            "quota_type": "striscia",
+                            "message": "Hai già usato la tua striscia gratuita.",
+                        },
+                    )
+            # Piani a pagamento: la striscia è consentita sempre (usa
+            # crediti normali, non consuma quota libretti mensili)
+        else:
+            # Libretto (breve/lungo): serve quota_libretti_kids
+            if is_free_to_play(u):
                 raise HTTPException(
                     status_code=402,
                     detail={
-                        "code": "free_to_play_plan_locked",
-                        "action": "kids_project",
+                        "code": "quota_exhausted",
+                        "quota_type": "libretti_kids",
                         "message": (
                             "Con il piano gratuito Free-To-Play puoi creare "
-                            "solo la 'Striscia (1 tavola)'. Passa a un piano "
+                            "solo la Striscia (1 tavola). Passa a un piano "
                             "superiore per libretti Brevi o Lunghi."
                         ),
                     },
                 )
             try:
-                check_free_to_play_quota(u, "striscia")
-            except FreeToPlayLimitError:
+                check_quota(u, "libretti_kids")
+            except QuotaExhaustedError:
                 raise HTTPException(
                     status_code=402,
                     detail={
-                        "code": "free_to_play_exhausted",
-                        "action": "striscia",
-                        "message": "Hai già usato la tua striscia gratuita.",
+                        "code": "quota_exhausted",
+                        "quota_type": "libretti_kids",
+                        "message": "Hai finito i libretti KIDS di questo mese. Acquista un pacchetto extra o attendi il rinnovo.",
                     },
                 )
 
@@ -322,9 +339,18 @@ def create_kids_project(
                 # Personaggio già esistente con quel nome → skip
                 pass
 
-        # Free-To-Play: consuma il counter striscia (la quota è ora usata)
+        # Consuma quota all'atto della creazione:
+        # - striscia FTP → counter FTP; striscia piani pagamento → gratis
+        # - libretto → decrementa quota_libretti_kids (month → extra)
         if length_target == LengthTarget.striscia:
-            consume_free_to_play(u, "striscia")
+            if is_free_to_play(u):
+                consume_free_to_play(u, "striscia")
+        else:
+            from billing.quotas import consume_quota, QuotaExhaustedError
+            try:
+                consume_quota(u, "libretti_kids")
+            except QuotaExhaustedError:
+                pass
 
         return _proj_to_out(project)
 
