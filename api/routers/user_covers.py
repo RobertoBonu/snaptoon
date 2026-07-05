@@ -62,12 +62,15 @@ class CoverCharacterIn(BaseModel):
     """Personaggio inserito nella cover.
 
     Se my_character_id è fornito → uso la reference AI già generata di
-    quel personaggio del Cast Archive (coerenza visiva).
-    Altrimenti uso nome+descrizione grezzi (nessun reference).
+    quel personaggio del Cast Archive. In questo caso name/description
+    possono essere vuoti: li recupero io dal Cast Archive.
+
+    Altrimenti (nessun my_character_id) uso name/description grezzi.
+    In questo caso name è OBBLIGATORIO.
     """
 
-    name: str = Field(..., min_length=1, max_length=120)
-    description: str = Field(..., min_length=1, max_length=1000)
+    name: str = Field(default="", max_length=120)
+    description: str = Field(default="", max_length=1000)
     my_character_id: Optional[str] = None
 
 
@@ -151,6 +154,7 @@ def _resolve_cast(session, u, characters_in: list[CoverCharacterIn]) -> tuple[li
             "description": ch.description.strip(),
         }
         # Se my_character_id è dato, cerchiamo la reference del Cast Archive
+        # e usiamo i suoi dati per riempire name/description se vuoti.
         if ch.my_character_id:
             try:
                 mc_uuid = uuid.UUID(ch.my_character_id)
@@ -158,20 +162,24 @@ def _resolve_cast(session, u, characters_in: list[CoverCharacterIn]) -> tuple[li
                 mc_uuid = None
             if mc_uuid is not None:
                 entry = cast_archive_repo.get_by_id(session, u, mc_uuid)
-                if (
-                    entry is not None
-                    and entry.reference_storage_key
-                    and object_exists(entry.reference_storage_key)
-                ):
-                    tmp = tempfile.NamedTemporaryFile(suffix=".png", delete=False)
-                    tmp.write(download_bytes(entry.reference_storage_key))
-                    tmp.close()
-                    tmp_refs.append(Path(tmp.name))
-                    item["id"] = str(entry.id)
-                    # Uso la description AI curata del Cast Archive se
-                    # l'utente non ne ha inserita una diversa
+                if entry is not None:
+                    # Riempi campi mancanti dal Cast Archive
+                    if not item["name"]:
+                        item["name"] = entry.name
                     if not item["description"]:
                         item["description"] = entry.visual_description
+                    if (
+                        entry.reference_storage_key
+                        and object_exists(entry.reference_storage_key)
+                    ):
+                        tmp = tempfile.NamedTemporaryFile(suffix=".png", delete=False)
+                        tmp.write(download_bytes(entry.reference_storage_key))
+                        tmp.close()
+                        tmp_refs.append(Path(tmp.name))
+                        item["id"] = str(entry.id)
+        # Skippa se dopo tutto non abbiamo nemmeno un nome
+        if not item["name"]:
+            continue
         snapshot.append(item)
     return snapshot, tmp_refs
 
