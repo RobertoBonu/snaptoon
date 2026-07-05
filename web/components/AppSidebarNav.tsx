@@ -40,6 +40,12 @@ const ITEMS_COMUNI: Item[] = [
     isActive: (p) => p.startsWith("/app/my-cards"),
   },
   {
+    href: "/app/covers",
+    icon: "personaggi",
+    label: "LE MIE COVER",
+    isActive: (p) => p.startsWith("/app/covers"),
+  },
+  {
     href: "/app/account",
     icon: "account",
     label: "Account",

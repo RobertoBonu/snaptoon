@@ -76,6 +76,11 @@ def user_card_reference_key(card_id: uuid.UUID | str) -> str:
     return f"user-cards/{_stringify(card_id)}/reference.png"
 
 
+def user_cover_rendered_key(cover_id: uuid.UUID | str) -> str:
+    """PNG finale della cover standalone (Le mie Cover)."""
+    return f"user-covers/{_stringify(cover_id)}/rendered.png"
+
+
 def pdf_export_key(project_id: uuid.UUID | str, ts: datetime | None = None) -> str:
     if ts is None:
         ts = datetime.now(timezone.utc)

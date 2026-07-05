@@ -4,15 +4,22 @@ from __future__ import annotations
 
 import uuid
 
-from sqlalchemy import select
+from sqlalchemy import case, select
 from sqlalchemy.orm import Session
 
 from ..models import KidsTemplate, LengthTarget
 
 
 def list_all(session: Session, *, only_active: bool = True) -> list[KidsTemplate]:
+    # Ordino la lunghezza in modo semantico (striscia < breve < lungo)
+    length_order = case(
+        (KidsTemplate.length_target == "striscia", 0),
+        (KidsTemplate.length_target == "breve", 1),
+        (KidsTemplate.length_target == "lungo", 2),
+        else_=99,
+    )
     stmt = select(KidsTemplate).order_by(
-        KidsTemplate.n_characters, KidsTemplate.length_target,
+        KidsTemplate.n_characters, length_order,
     )
     if only_active:
         stmt = stmt.where(KidsTemplate.is_active.is_(True))

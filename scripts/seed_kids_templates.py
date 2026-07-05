@@ -34,6 +34,10 @@ from db.session import session_scope
 # Distribuzione gabbie + scene
 # ============================================================
 
+# 1 sola tavola: title card + 4 vignette (5 pannelli totali)
+# La 1a vignetta ospita titolo/sottotitolo/autore integrati (no cover separata)
+GRIDS_STRISCIA = ["1+2+2"]
+
 # 4 pagine interne — sequenza grid_id (cover e quarta sono esterne)
 # 1 + 3 + 4 + 1 = 9 vignette
 GRIDS_BREVE = ["splash", "1+2", "2x2", "splash"]
@@ -55,7 +59,7 @@ GRIDS_LUNGO = [
 
 
 # Numero di vignette per ogni grid_id (capienza)
-GRID_CAPACITY = {"splash": 1, "1+2": 3, "2x2": 4}
+GRID_CAPACITY = {"splash": 1, "1+2": 3, "2x2": 4, "1+2+2": 5}
 
 
 def _scene_for_grid(grid_id: str, page_index: int, total_pages: int) -> list[dict]:
@@ -98,6 +102,17 @@ def _scene_for_grid(grid_id: str, page_index: int, total_pages: int) -> list[dic
             {"shot_distance": "medium", "shot_angle": "eye_level", "mood": "poetico"},
         ]
 
+    if grid_id == "1+2+2":
+        # Striscia 1 tavola: la prima è title card (poster con eroe),
+        # le 4 sotto raccontano la mini-storia (setup, sviluppo, gag, finale)
+        return [
+            {"shot_distance": "establishing", "shot_angle": "eye_level", "mood": "epico"},
+            {"shot_distance": "medium", "shot_angle": "eye_level", "mood": "allegro"},
+            {"shot_distance": "closeup", "shot_angle": "eye_level", "mood": "sospeso"},
+            {"shot_distance": "medium", "shot_angle": "eye_level", "mood": "drammatico"},
+            {"shot_distance": "closeup", "shot_angle": "eye_level", "mood": "allegro"},
+        ]
+
     # default fallback
     return [{"shot_distance": None, "shot_angle": None, "mood": None}
             for _ in range(GRID_CAPACITY.get(grid_id, 1))]
@@ -117,6 +132,31 @@ def _build_scene_distribution(grids: list[str]) -> list[dict]:
 # ============================================================
 
 TEMPLATES = [
+    # Striscia 1 tavola (nuovo, per tutti i numeri di personaggi)
+    {
+        "slug": "kids_1p_striscia",
+        "label": "1 personaggio · Striscia (1 tavola)",
+        "n_characters": 1,
+        "length_target": LengthTarget.striscia,
+        "grid_distribution": GRIDS_STRISCIA,
+        "notes": "Striscia brevissima: 1 tavola con 5 vignette. La 1a vignetta grande è la title card (titolo integrato). Ideale per gag rapide.",
+    },
+    {
+        "slug": "kids_2p_striscia",
+        "label": "2 personaggi · Striscia (1 tavola)",
+        "n_characters": 2,
+        "length_target": LengthTarget.striscia,
+        "grid_distribution": GRIDS_STRISCIA,
+        "notes": "Duo in striscia 1 tavola. Title card + 4 vignette di gag.",
+    },
+    {
+        "slug": "kids_3p_striscia",
+        "label": "3 personaggi · Striscia (1 tavola)",
+        "n_characters": 3,
+        "length_target": LengthTarget.striscia,
+        "grid_distribution": GRIDS_STRISCIA,
+        "notes": "Trio in striscia 1 tavola. Title card + 4 vignette.",
+    },
     # 1 personaggio
     {
         "slug": "kids_1p_breve",

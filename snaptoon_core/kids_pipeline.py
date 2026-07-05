@@ -7,6 +7,7 @@ api/routers/kids_generation.py.
 from __future__ import annotations
 
 import json
+from typing import Optional
 
 from snaptoon_core.models import Character, Dialogue, Page, Panel
 from snaptoon_core.models import Script as PydScript
@@ -34,7 +35,7 @@ KIDS_STYLE_MAP = {
 }
 KIDS_STYLE_PRESET_IDS = {pid for _, pid in KIDS_STYLE_MAP.values()}
 
-GRID_CAPACITY = {"splash": 1, "1+2": 3, "2x2": 4}
+GRID_CAPACITY = {"splash": 1, "1+2": 3, "2x2": 4, "1+2+2": 5}
 
 
 # ============================================================
@@ -277,6 +278,12 @@ def panel_size_for(grid_id: str, panel_number: int) -> tuple[str, str, str]:
         return ("1024x1536", "2_3", "vertical portrait, tall format")
     if grid_id == "2x2":
         return ("1024x1536", "2_3", "vertical portrait, tall format")
+    if grid_id == "1+2+2":
+        # Striscia 1 tavola: pannello 1 = title card orizzontale grande,
+        # pannelli 2-5 = 2:3 verticali disposti su 2 righe da 2.
+        if panel_number == 1:
+            return ("1536x1024", "3_2", "horizontal panoramic, wide format")
+        return ("1024x1536", "2_3", "vertical portrait, tall format")
     return ("1024x1024", "1_1", "square format")
 
 
@@ -313,8 +320,14 @@ def build_panel_prompt(
     style_preset_id: str,
     scene_params: dict,
     panel_format: str = "square format",
+    title_overlay: Optional[dict] = None,  # {title, subtitle, author}
 ) -> str:
-    """Prompt per generare una singola vignetta con balloon AI-bake."""
+    """Prompt per generare una singola vignetta con balloon AI-bake.
+
+    Se title_overlay è fornito (es. prima vignetta di una striscia 1-tavola),
+    il prompt istruisce l'AI a integrare titolo + sottotitolo + autore
+    NELL'illustrazione come una title card / poster comic.
+    """
     preset = get_preset(style_preset_id)
     parts = []
     parts.append(
@@ -360,6 +373,43 @@ def build_panel_prompt(
             "Same face, hair, clothes. Visual ground truth."
         )
         parts.append("\n".join(cast_block))
+
+    # Title-card overlay (usato per la prima vignetta di una striscia
+    # 1-tavola: incorpora titolo/sottotitolo/autore nell'illustrazione
+    # invece di generare una cover separata).
+    if title_overlay:
+        title = (title_overlay.get("title") or "").strip()
+        subtitle = (title_overlay.get("subtitle") or "").strip()
+        author = (title_overlay.get("author") or "").strip()
+        overlay_block = [
+            "=== TITLE CARD OVERLAY (DRAW IN THE IMAGE) ==="
+        ]
+        if title:
+            overlay_block.append(
+                f"Draw the main title '{title.upper()}' in a BIG bold "
+                f"playful children's-comic-book font in the UPPER portion "
+                f"of the illustration (chunky yellow letters with red "
+                f"outline is a classic comic look). Make it clearly "
+                f"readable, strong contrast against the background."
+            )
+        if subtitle:
+            overlay_block.append(
+                f"Below the title, draw the subtitle '{subtitle}' in a "
+                f"smaller, thinner but still readable font."
+            )
+        if author:
+            overlay_block.append(
+                f"In a smaller badge (typically bottom-right corner), "
+                f"draw '{author}' as the author credit."
+            )
+        overlay_block.append(
+            "This panel functions as a mini-poster / title card for a "
+            "1-page comic strip. Compose the scene so the title area at "
+            "the top has visual space (sky, wall, empty area) that fits "
+            "big letters without covering characters' faces. Spell each "
+            "letter exactly as written above. No extra words."
+        )
+        parts.append("\n".join(overlay_block))
 
     # Balloon AI-bake
     if panel.dialogues:

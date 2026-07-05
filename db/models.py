@@ -656,6 +656,67 @@ class UserCard(UUIDPrimaryKeyMixin, TimestampMixin, UpdatedAtMixin, Base):
     )
 
 
+class UserCover(UUIDPrimaryKeyMixin, TimestampMixin, UpdatedAtMixin, Base):
+    """Cover standalone creata dall'utente (senza libretto associato).
+
+    Riusa lo STESSO prompt delle copertine dei libretti KIDS
+    (kids_pipeline.build_cover_prompt) ma vive come entità autonoma:
+    l'utente digita titolo/sottotitolo/autore, sceglie stile e cast
+    (dal Cast Archive), genera e vede il risultato in una galleria "Le
+    mie Cover". Può opzionalmente pubblicare la cover sul BookShop.
+    """
+
+    __tablename__ = "user_covers"
+    __table_args__ = (
+        Index("ix_user_cover_owner", "user_id"),
+        Index("ix_user_cover_moderation", "moderation_status"),
+    )
+
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    title: Mapped[str] = mapped_column(String(120), nullable=False)
+    subtitle: Mapped[str] = mapped_column(String(200), nullable=False, default="")
+    author: Mapped[str] = mapped_column(String(120), nullable=False, default="")
+    description: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    style_preset_id: Mapped[str] = mapped_column(String(120), nullable=False)
+    # Snapshot pseudonimo dell'utente al momento della creazione
+    author_display: Mapped[str] = mapped_column(
+        String(120), nullable=False, default=""
+    )
+    # Snapshot del cast usato per la generazione (id + nome + descrizione)
+    # — congelato al momento della creazione, così anche se poi l'utente
+    # cancella un personaggio dal Cast Archive la cover resta rigenerabile.
+    cast_snapshot: Mapped[list] = mapped_column(JSONB, nullable=False, default=list)
+    # PNG finale renderizzata dall'AI (con testi già dentro)
+    rendered_image_key: Mapped[str | None] = mapped_column(
+        String(512), nullable=True
+    )
+    # Moderazione: "draft" | "pending" | "published" | "rejected"
+    moderation_status: Mapped[str] = mapped_column(
+        String(20), nullable=False, default="draft", server_default="draft"
+    )
+    submitted_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    moderated_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    rejection_reason: Mapped[str] = mapped_column(
+        Text, nullable=False, default="", server_default=""
+    )
+    bookshop_category_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("bookshop_categories.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    deleted_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+
+
 class BookshopCategory(UUIDPrimaryKeyMixin, TimestampMixin, UpdatedAtMixin, Base):
     """Categoria del BookShop (libreria pubblica dei webtoon degli utenti).
 

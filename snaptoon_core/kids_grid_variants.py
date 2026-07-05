@@ -185,7 +185,25 @@ LUNGO_VARIANTS: dict[str, GridVariant] = {
 }
 
 
+# ============================================================
+# STRISCIA (1 tavola singola, no cover separata)
+# ============================================================
+
+STRISCIA_VARIANTS: dict[str, GridVariant] = {
+    "unica": {
+        "slug": "unica",
+        "label": "Striscia unica",
+        "description": (
+            "Una sola tavola: 1 vignetta grande in alto con titolo/autore "
+            "integrati come poster + 2+2 vignette per la mini-storia"
+        ),
+        "grid_distribution": ["1+2+2"],
+    },
+}
+
+
 ALL_VARIANTS: dict[str, dict[str, GridVariant]] = {
+    "striscia": STRISCIA_VARIANTS,
     "breve": BREVE_VARIANTS,
     "lungo": LUNGO_VARIANTS,
 }

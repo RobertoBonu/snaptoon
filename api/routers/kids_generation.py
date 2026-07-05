@@ -606,6 +606,24 @@ def generate_stream(
         style_preset_id = project.style_id
         project_name = project.name
 
+        # Length target del progetto ("striscia" = 1 tavola con title card
+        # dentro la prima vignetta, no cover separata)
+        _lt = project.length_target
+        length_target_str = (
+            _lt.value if hasattr(_lt, "value") else str(_lt)
+        ) if _lt is not None else "breve"
+        is_striscia = length_target_str == "striscia"
+
+        # Metadati cover (titolo/sottotitolo/autore) — usati come overlay
+        # sulla prima vignetta nel caso striscia
+        cover_meta_title = ""
+        cover_meta_subtitle = ""
+        cover_meta_author = ""
+        if project.cover is not None:
+            cover_meta_title = (project.cover.title or "").strip()
+            cover_meta_subtitle = (project.cover.subtitle or "").strip()
+            cover_meta_author = (project.cover.author or "").strip()
+
         try:
             pyd_script = scripts_repo.load_pydantic(project.script)
         except Exception as e:
@@ -625,7 +643,9 @@ def generate_stream(
             (v.page_number, v.panel_number)
             for v in vignettes_repo.list_for_project(s, project)
         }
-        cover_already = object_exists(cover_illustration_key(pid))
+        # Per la striscia (1 tavola) NON si genera una cover separata:
+        # titolo/sottotitolo/autore vanno dentro la prima vignetta.
+        cover_already = True if is_striscia else object_exists(cover_illustration_key(pid))
 
         # Scene distribution: per ora MVP usiamo defaults se non c'è
         # (le scene specifiche le mette pages/06_KIDS.py via template)
@@ -799,8 +819,18 @@ def generate_stream(
                 grid_id = page_layouts.get(page_num, "2x2")
                 size_str, aspect_key, fmt_label = panel_size_for(grid_id, panel.number)
                 scene_params = {}  # MVP: defaults
+                # Striscia 1-tavola: la 1a vignetta di pagina 1 fa da
+                # title card (titolo/sottotitolo/autore integrati)
+                overlay = None
+                if is_striscia and page_num == 1 and panel.number == 1:
+                    overlay = {
+                        "title": cover_meta_title,
+                        "subtitle": cover_meta_subtitle,
+                        "author": cover_meta_author,
+                    }
                 prompt = build_panel_prompt(
-                    panel, cast, style_preset_id, scene_params, panel_format=fmt_label,
+                    panel, cast, style_preset_id, scene_params,
+                    panel_format=fmt_label, title_overlay=overlay,
                 )
                 # Reference temp
                 tmp_refs = []
@@ -1104,6 +1134,20 @@ def generate_single_page(
         page_layouts = {pl.page_number: pl.grid_id for pl in project.page_layouts}
         grid_id = page_layouts.get(page_num, "2x2")
 
+        # Length target + cover metadata per striscia (title overlay panel 1)
+        _lt = project.length_target
+        length_target_str = (
+            _lt.value if hasattr(_lt, "value") else str(_lt)
+        ) if _lt is not None else "breve"
+        is_striscia = length_target_str == "striscia"
+        cover_meta_title = ""
+        cover_meta_subtitle = ""
+        cover_meta_author = ""
+        if project.cover is not None:
+            cover_meta_title = (project.cover.title or "").strip()
+            cover_meta_subtitle = (project.cover.subtitle or "").strip()
+            cover_meta_author = (project.cover.author or "").strip()
+
         cast = [
             {"name": cs.name, "description": cs.visual_description, "id": str(cs.id)}
             for cs in project.character_sheets
@@ -1153,8 +1197,16 @@ def generate_single_page(
                 size_str, aspect_key, fmt_label = panel_size_for(
                     grid_id, panel.number
                 )
+                overlay = None
+                if is_striscia and page_num == 1 and panel.number == 1:
+                    overlay = {
+                        "title": cover_meta_title,
+                        "subtitle": cover_meta_subtitle,
+                        "author": cover_meta_author,
+                    }
                 prompt = build_panel_prompt(
                     panel, cast, style_preset_id, {}, panel_format=fmt_label,
+                    title_overlay=overlay,
                 )
                 img_bytes = generator._generate_bytes(
                     prompt=prompt, size=size_str,
@@ -1304,6 +1356,21 @@ def regenerate_vignette(
 
         page_layouts = {pl.page_number: pl.grid_id for pl in project.page_layouts}
         grid_id = page_layouts.get(page_num, "2x2")
+
+        # Length target + cover metadata per striscia (title overlay panel 1)
+        _lt = project.length_target
+        length_target_str = (
+            _lt.value if hasattr(_lt, "value") else str(_lt)
+        ) if _lt is not None else "breve"
+        is_striscia = length_target_str == "striscia"
+        cover_meta_title = ""
+        cover_meta_subtitle = ""
+        cover_meta_author = ""
+        if project.cover is not None:
+            cover_meta_title = (project.cover.title or "").strip()
+            cover_meta_subtitle = (project.cover.subtitle or "").strip()
+            cover_meta_author = (project.cover.author or "").strip()
+
         cast = [
             {"name": cs.name, "description": cs.visual_description, "id": str(cs.id)}
             for cs in project.character_sheets
@@ -1355,8 +1422,16 @@ def regenerate_vignette(
                 tmp_refs.append(Path(tmp.name))
 
         size_str, aspect_key, fmt_label = panel_size_for(grid_id, panel_num)
+        overlay = None
+        if is_striscia and page_num == 1 and panel_num == 1:
+            overlay = {
+                "title": cover_meta_title,
+                "subtitle": cover_meta_subtitle,
+                "author": cover_meta_author,
+            }
         prompt = build_panel_prompt(
             target_panel, cast, style_preset_id, {}, panel_format=fmt_label,
+            title_overlay=overlay,
         )
         img_bytes = generator._generate_bytes(
             prompt=prompt, size=size_str,
