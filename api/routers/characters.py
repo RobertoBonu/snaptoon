@@ -204,7 +204,11 @@ def generate_reference(
             detail="Scegli prima uno stile per il progetto.",
         )
 
-    # Charge
+    # Charge + risolvi qualità utente
+    from api.utils.quality import resolve_user_quality
+    with session_scope() as _s:
+        _u = users_repo.get_by_id(_s, user_id)
+        user_quality = resolve_user_quality(_u)
     cost = cost_for_operation("generate_reference")
     try:
         with session_scope() as s:
@@ -232,7 +236,7 @@ def generate_reference(
             prompt=prompt,
             size="1024x1024",
             reference_images=None,
-            quality="medium",
+            quality=user_quality,
         )
     except Exception as e:
         with session_scope() as s:

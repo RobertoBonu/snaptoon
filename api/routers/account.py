@@ -10,7 +10,7 @@ from pydantic import BaseModel, Field
 
 from api.routers.auth import require_user
 from auth import hash_password
-from billing.plans import plan_config
+from billing.plans import ROLE_CONFIG, plan_config
 from db.repos import credits as credits_repo
 from db.repos import users as users_repo
 from db.session import session_scope
@@ -37,10 +37,16 @@ class AccountOut(BaseModel):
     max_projects: int  # 0 = illimitato
     created_at: datetime
     must_change_password: bool
+    # Preferenze utente per la generazione immagine
+    preferred_quality: str = "medium"
+    allowed_qualities: list[str] = []
 
 
 class UpdateProfileIn(BaseModel):
-    pseudonym: str = Field(default="", max_length=80)
+    pseudonym: Optional[str] = Field(default=None, max_length=80)
+    preferred_quality: Optional[str] = Field(
+        default=None, pattern="^(auto|low|medium|high)$"
+    )
 
 
 class CreditEntryOut(BaseModel):
@@ -73,6 +79,15 @@ def get_account(user: dict = Depends(require_user)) -> AccountOut:
             raise HTTPException(status_code=404, detail="User not found")
         cfg = plan_config(u.plan)
         remaining = max(0, u.credits_total_this_period - u.credits_used_this_period)
+        # Qualità permesse in base al ruolo (le stringhe raw come "low",
+        # "medium", "high"). "auto" è concesso a tutti come override
+        # esplicito dell'utente: se il ruolo non supporta "high", ma
+        # l'utente sceglie "auto", si paga come medium (vedi
+        # api.utils.quality.cost_for_generation).
+        allowed = list(ROLE_CONFIG[u.role].allowed_qualities)
+        if "auto" not in allowed:
+            allowed = allowed + ["auto"]
+
         return AccountOut(
             id=str(u.id),
             email=u.email,
@@ -87,6 +102,8 @@ def get_account(user: dict = Depends(require_user)) -> AccountOut:
             max_projects=cfg.max_projects,
             created_at=u.created_at,
             must_change_password=u.must_change_password,
+            preferred_quality=u.preferred_quality or "medium",
+            allowed_qualities=allowed,
         )
 
 
@@ -94,13 +111,27 @@ def get_account(user: dict = Depends(require_user)) -> AccountOut:
 def update_profile(
     payload: UpdateProfileIn, user: dict = Depends(require_user)
 ) -> AccountOut:
-    """Aggiorna il profilo utente (per ora solo pseudonimo/brand)."""
+    """Aggiorna il profilo utente (pseudonimo, qualità preferita)."""
     user_id = uuid.UUID(user["id"])
     with session_scope() as s:
         u = users_repo.get_by_id(s, user_id)
         if u is None:
             raise HTTPException(status_code=404, detail="User not found")
-        u.pseudonym = payload.pseudonym.strip()[:80]
+        if payload.pseudonym is not None:
+            u.pseudonym = payload.pseudonym.strip()[:80]
+        if payload.preferred_quality is not None:
+            requested = payload.preferred_quality
+            # Verifica ruolo: high non ammesso su ruoli restrittivi
+            allowed = set(ROLE_CONFIG[u.role].allowed_qualities) | {"auto"}
+            if requested not in allowed:
+                raise HTTPException(
+                    status_code=403,
+                    detail=(
+                        f"Qualità '{requested}' non disponibile per il tuo "
+                        f"ruolo. Consentite: {sorted(allowed)}."
+                    ),
+                )
+            u.preferred_quality = requested
     return get_account(user)
 
 

@@ -183,6 +183,8 @@ def _generate_and_save_reference(
     entry_id: uuid.UUID,
     prompt: str,
     reference_photo: Optional[bytes],
+    *,
+    quality: str = "medium",
 ) -> str:
     """Chiama gpt-image-2 e salva la PNG in object storage.
 
@@ -211,7 +213,7 @@ def _generate_and_save_reference(
             # e i piedi senza dover ricorrere a crop stretti.
             size="1024x1536",
             reference_images=ref_list,
-            quality="medium",
+            quality=quality,
         )
     finally:
         # CRITICO: cancella la foto temporanea IMMEDIATAMENTE
@@ -279,7 +281,11 @@ def create_my_character(
             )
         entry_id = entry.id
 
-    # 2. Charge crediti
+    # 2. Charge crediti + risolvi qualità utente
+    from api.utils.quality import resolve_user_quality
+    with session_scope() as _s:
+        _u = users_repo.get_by_id(_s, user_id)
+        user_quality = resolve_user_quality(_u)
     cost = cost_for_operation("generate_reference")
     try:
         with session_scope() as s:
@@ -307,9 +313,7 @@ def create_my_character(
         payload.name, payload.visual_description
     )
     try:
-        key = _generate_and_save_reference(
-            user_id, entry_id, prompt, reference_photo=None
-        )
+        key = _generate_and_save_reference(user_id, entry_id, prompt, reference_photo=None, quality=user_quality)
     except Exception as e:
         with session_scope() as s:
             u = users_repo.get_by_id(s, user_id)
@@ -398,7 +402,11 @@ async def create_my_character_from_photo(
             )
         entry_id = entry.id
 
-    # 2. Charge
+    # 2. Charge + risolvi qualità utente
+    from api.utils.quality import resolve_user_quality
+    with session_scope() as _s:
+        _u = users_repo.get_by_id(_s, user_id)
+        user_quality = resolve_user_quality(_u)
     cost = cost_for_operation("generate_reference")
     try:
         with session_scope() as s:
@@ -423,9 +431,7 @@ async def create_my_character_from_photo(
     # 3. Genera con foto (che viene cancellata subito dopo)
     prompt = _build_photo_to_reference_prompt(name, visual_description)
     try:
-        key = _generate_and_save_reference(
-            user_id, entry_id, prompt, reference_photo=photo_bytes
-        )
+        key = _generate_and_save_reference(user_id, entry_id, prompt, reference_photo=photo_bytes, quality=user_quality)
     except Exception as e:
         with session_scope() as s:
             u = users_repo.get_by_id(s, user_id)
@@ -542,7 +548,11 @@ def regenerate_my_character(
         except Exception as e:
             logger.warning("Delete old ref my-char fallito: %s", e)
 
-    # Charge
+    # Charge + risolvi qualità utente
+    from api.utils.quality import resolve_user_quality
+    with session_scope() as _s:
+        _u = users_repo.get_by_id(_s, user_id)
+        user_quality = resolve_user_quality(_u)
     cost = cost_for_operation("generate_reference")
     try:
         with session_scope() as s:
@@ -562,9 +572,7 @@ def regenerate_my_character(
     # Genera
     prompt = _build_neutral_reference_prompt(name, description)
     try:
-        key = _generate_and_save_reference(
-            user_id, eid, prompt, reference_photo=None,
-        )
+        key = _generate_and_save_reference(user_id, eid, prompt, reference_photo=None, quality=user_quality)
     except Exception as e:
         with session_scope() as s:
             u = users_repo.get_by_id(s, user_id)

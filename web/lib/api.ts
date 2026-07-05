@@ -44,6 +44,8 @@ export interface Account {
   max_projects: number;
   created_at: string;
   must_change_password: boolean;
+  preferred_quality: string;
+  allowed_qualities: string[];
 }
 
 export interface CreditEntry {

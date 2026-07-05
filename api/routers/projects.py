@@ -347,8 +347,12 @@ def generate_pro_cover(
     if object_exists(cover_key):
         return GenerateCoverOut(ok=True, detail="Cover già presente")
 
-    # Charge crediti (analogo KIDS: uso medium quality)
-    cost = cost_for_operation("generate_panel", quality="medium")
+    # Charge crediti (qualità = preferenza utente rispettando il ruolo)
+    from api.utils.quality import resolve_user_quality, cost_for_generation
+    with session_scope() as _s:
+        _u = users_repo.get_by_id(_s, user_id)
+        user_quality = resolve_user_quality(_u)
+    cost = cost_for_generation("generate_panel", user_quality)
     try:
         with session_scope() as s:
             u = users_repo.get_by_id(s, user_id)
@@ -383,7 +387,7 @@ def generate_pro_cover(
             prompt=prompt,
             size="1024x1536",
             reference_images=tmp_refs if tmp_refs else None,
-            quality="medium",
+            quality=user_quality,
         )
         upload_bytes(cover_key, img_bytes, content_type="image/png")
 

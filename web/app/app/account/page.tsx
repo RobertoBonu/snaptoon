@@ -22,6 +22,55 @@ export default function AccountPage() {
   const [pseudMsg, setPseudMsg] = useState<{ ok: boolean; msg: string } | null>(
     null,
   );
+  const [quality, setQuality] = useState<string>("medium");
+  const [savingQuality, setSavingQuality] = useState(false);
+  const [qualityMsg, setQualityMsg] = useState<{ ok: boolean; msg: string } | null>(
+    null,
+  );
+
+  async function handleSaveQuality(newQuality: string) {
+    setSavingQuality(true);
+    setQualityMsg(null);
+    try {
+      const acc = await apiFetch<Account>("/api/account/me", {
+        method: "PATCH",
+        body: JSON.stringify({ preferred_quality: newQuality }),
+      });
+      setAccount(acc);
+      setQuality(acc.preferred_quality || "medium");
+      setQualityMsg({ ok: true, msg: "Qualità aggiornata." });
+    } catch (e) {
+      setQualityMsg({
+        ok: false,
+        msg: e instanceof Error ? e.message : String(e),
+      });
+    } finally {
+      setSavingQuality(false);
+    }
+  }
+
+  const QUALITY_LABELS: Record<string, { label: string; cost: string; desc: string }> = {
+    auto: {
+      label: "Auto (consigliato)",
+      cost: "≈ come Medium",
+      desc: "OpenAI sceglie la qualità in base al soggetto. Costo prevedibile.",
+    },
+    low: {
+      label: "Low",
+      cost: "1 credito",
+      desc: "Più veloce ed economica. Dettagli semplificati.",
+    },
+    medium: {
+      label: "Medium",
+      cost: "1 credito",
+      desc: "Equilibrio qualità/costo. Consigliata per la maggior parte dei fumetti.",
+    },
+    high: {
+      label: "High",
+      cost: "4 crediti",
+      desc: "Massima qualità. Dettagli ricchi, testi più nitidi.",
+    },
+  };
 
   async function handleSavePseudonym(e: React.FormEvent) {
     e.preventDefault();
@@ -50,6 +99,7 @@ export default function AccountPage() {
       const acc = await apiFetch<Account>("/api/account/me");
       setAccount(acc);
       setPseudonym(acc.pseudonym || "");
+      setQuality(acc.preferred_quality || "medium");
       const h = await apiFetch<CreditHistory>("/api/account/credits-history");
       setHistory(h.entries);
     } catch (e) {
@@ -174,6 +224,72 @@ export default function AccountPage() {
                 {pseudMsg.msg}
               </p>
             )}
+          </section>
+
+          {/* Qualità immagini AI */}
+          <section className="bg-[var(--color-bg-elev)] border border-[var(--color-border)] rounded-xl p-6 mb-6">
+            <h2 className="text-lg font-semibold mb-2">
+              🎨 Qualità immagini
+            </h2>
+            <p className="text-sm text-[var(--color-fg-muted)] mb-4">
+              Scegli la qualità che sarà usata per tutte le generazioni AI
+              (personaggi, copertine, vignette, figurine). Il costo in crediti
+              varia in base alla qualità scelta.
+            </p>
+            <div className="space-y-2">
+              {(account.allowed_qualities || ["medium"]).map((q) => {
+                const meta = QUALITY_LABELS[q] || {
+                  label: q,
+                  cost: "",
+                  desc: "",
+                };
+                const selected = quality === q;
+                return (
+                  <label
+                    key={q}
+                    className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
+                      selected
+                        ? "border-[var(--color-accent)] bg-[var(--color-accent)]/10"
+                        : "border-[var(--color-border)] hover:border-[var(--color-accent)]/50"
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="quality"
+                      value={q}
+                      checked={selected}
+                      onChange={() => handleSaveQuality(q)}
+                      disabled={savingQuality}
+                      className="mt-1"
+                    />
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="font-medium">{meta.label}</span>
+                        <span className="text-xs text-[var(--color-accent)] font-semibold">
+                          {meta.cost}
+                        </span>
+                      </div>
+                      <p className="text-xs text-[var(--color-fg-muted)] mt-0.5">
+                        {meta.desc}
+                      </p>
+                    </div>
+                  </label>
+                );
+              })}
+            </div>
+            {qualityMsg && (
+              <p
+                className={`text-sm mt-3 ${
+                  qualityMsg.ok ? "text-green-400" : "text-red-400"
+                }`}
+              >
+                {qualityMsg.msg}
+              </p>
+            )}
+            <p className="text-xs text-[var(--color-fg-muted)] mt-3">
+              Nota: la qualità &quot;High&quot; è riservata ai piani superiori.
+              Se non appare tra le opzioni, il tuo piano non la supporta.
+            </p>
           </section>
 
           {/* Cambio password */}

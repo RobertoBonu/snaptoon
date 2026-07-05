@@ -586,6 +586,12 @@ def generate_stream(
     user_id = uuid.UUID(user["id"])
     pid = _project_or_404(project_id, user_id)
 
+    # Risolvi qualità preferita utente (usata per tutte le generazioni SSE)
+    from api.utils.quality import resolve_user_quality, cost_for_generation
+    with session_scope() as _s:
+        _u = users_repo.get_by_id(_s, user_id)
+        user_quality = resolve_user_quality(_u)
+
     # Carica subito i dati necessari (no lazy nei generatori per evitare problemi
     # con session scope async)
     with session_scope() as s:
@@ -673,7 +679,7 @@ def generate_stream(
                     prompt=prompt,
                     size="1024x1024",
                     reference_images=None,
-                    quality="medium",
+                    quality=user_quality,
                 )
                 upload_bytes(ref_storage, img_bytes, content_type="image/png")
                 # Salva su DB
@@ -709,7 +715,7 @@ def generate_stream(
                 "current": step, "total": total_steps,
             })
             try:
-                cost = cost_for_operation("generate_panel", quality="medium")
+                cost = cost_for_generation("generate_panel", user_quality)
                 with session_scope() as s:
                     u = users_repo.get_by_id(s, user_id)
                     credits_repo.charge(
@@ -742,7 +748,7 @@ def generate_stream(
                     prompt=prompt,
                     size="1024x1536",
                     reference_images=tmp_refs if tmp_refs else None,
-                    quality="medium",
+                    quality=user_quality,
                 )
                 ck = cover_illustration_key(pid)
                 upload_bytes(ck, img_bytes, content_type="image/png")
@@ -781,7 +787,7 @@ def generate_stream(
                 "current": step, "total": total_steps,
             })
             try:
-                cost = cost_for_operation("generate_panel", quality="medium")
+                cost = cost_for_generation("generate_panel", user_quality)
                 with session_scope() as s:
                     u = users_repo.get_by_id(s, user_id)
                     credits_repo.charge(
@@ -809,7 +815,7 @@ def generate_stream(
                     prompt=prompt,
                     size=size_str,
                     reference_images=tmp_refs if tmp_refs else None,
-                    quality="medium",
+                    quality=user_quality,
                 )
                 vk = vignette_key(pid, page_num, panel.number)
                 upload_bytes(vk, img_bytes, content_type="image/png")
@@ -820,7 +826,7 @@ def generate_stream(
                         page_number=page_num, panel_number=panel.number,
                         storage_key=vk,
                         prompt_hash=_hash_prompt(prompt),
-                        quality="medium",
+                        quality=user_quality,
                         aspect_ratio_key=aspect_key,
                         provider="openai",
                         model="gpt-image-2",
@@ -899,6 +905,12 @@ def generate_cover_only(
     user_id = uuid.UUID(user["id"])
     pid = _project_or_404(project_id, user_id)
 
+    # Risolvi qualità preferita utente
+    from api.utils.quality import resolve_user_quality, cost_for_generation
+    with session_scope() as _s:
+        _u = users_repo.get_by_id(_s, user_id)
+        user_quality = resolve_user_quality(_u)
+
     # Se la cover esiste già → skip
     cover_key_ = cover_illustration_key(pid)
     if object_exists(cover_key_):
@@ -954,7 +966,7 @@ def generate_cover_only(
             )
             img_bytes_ref = generator._generate_bytes(
                 prompt=prompt_ref, size="1024x1024",
-                reference_images=None, quality="medium",
+                reference_images=None, quality=user_quality,
             )
             upload_bytes(ref_key, img_bytes_ref, content_type="image/png")
             with session_scope() as s:
@@ -983,7 +995,7 @@ def generate_cover_only(
             )
 
     # Charge cover
-    cost = cost_for_operation("generate_panel", quality="medium")
+    cost = cost_for_generation("generate_panel", user_quality)
     try:
         with session_scope() as s:
             u = users_repo.get_by_id(s, user_id)
@@ -1018,7 +1030,7 @@ def generate_cover_only(
             prompt=cover_prompt,
             size="1024x1536",
             reference_images=tmp_refs if tmp_refs else None,
-            quality="medium",
+            quality=user_quality,
         )
         upload_bytes(cover_key_, img_bytes, content_type="image/png")
 
@@ -1065,6 +1077,12 @@ def generate_single_page(
 
     user_id = uuid.UUID(user["id"])
     pid = _project_or_404(project_id, user_id)
+
+    # Risolvi qualità preferita utente
+    from api.utils.quality import resolve_user_quality, cost_for_generation
+    with session_scope() as _s:
+        _u = users_repo.get_by_id(_s, user_id)
+        user_quality = resolve_user_quality(_u)
 
     with session_scope() as s:
         project = projects_repo.get_by_id(s, pid)
@@ -1115,7 +1133,7 @@ def generate_single_page(
             if key_tup in existing_vigs:
                 continue  # già generata, skip
 
-            cost = cost_for_operation("generate_panel", quality="medium")
+            cost = cost_for_generation("generate_panel", user_quality)
             try:
                 with session_scope() as s:
                     u = users_repo.get_by_id(s, user_id)
@@ -1141,7 +1159,7 @@ def generate_single_page(
                 img_bytes = generator._generate_bytes(
                     prompt=prompt, size=size_str,
                     reference_images=tmp_refs if tmp_refs else None,
-                    quality="medium",
+                    quality=user_quality,
                 )
                 vk = vignette_key(pid, page_num, panel.number)
                 upload_bytes(vk, img_bytes, content_type="image/png")
@@ -1153,7 +1171,7 @@ def generate_single_page(
                         page_number=page_num, panel_number=panel.number,
                         storage_key=vk,
                         prompt_hash=_hash_prompt(prompt),
-                        quality="medium",
+                        quality=user_quality,
                         aspect_ratio_key=aspect_key,
                         provider="openai",
                         model="gpt-image-2",
@@ -1250,6 +1268,12 @@ def regenerate_vignette(
     user_id = uuid.UUID(user["id"])
     pid = _project_or_404(project_id, user_id)
 
+    # Risolvi qualità preferita utente
+    from api.utils.quality import resolve_user_quality, cost_for_generation
+    with session_scope() as _s:
+        _u = users_repo.get_by_id(_s, user_id)
+        user_quality = resolve_user_quality(_u)
+
     # 1. Load context + delete existing vignette
     with session_scope() as s:
         project = projects_repo.get_by_id(s, pid)
@@ -1302,7 +1326,7 @@ def regenerate_vignette(
                            page_num, panel_num, e)
 
     # 2. Charge crediti
-    cost = cost_for_operation("generate_panel", quality="medium")
+    cost = cost_for_generation("generate_panel", user_quality)
     try:
         with session_scope() as s:
             u = users_repo.get_by_id(s, user_id)
@@ -1337,7 +1361,7 @@ def regenerate_vignette(
         img_bytes = generator._generate_bytes(
             prompt=prompt, size=size_str,
             reference_images=tmp_refs if tmp_refs else None,
-            quality="medium",
+            quality=user_quality,
         )
         upload_bytes(vk, img_bytes, content_type="image/png")
 
@@ -1348,7 +1372,7 @@ def regenerate_vignette(
                 page_number=page_num, panel_number=panel_num,
                 storage_key=vk,
                 prompt_hash=_hash_prompt(prompt),
-                quality="medium",
+                quality=user_quality,
                 aspect_ratio_key=aspect_key,
                 provider="openai",
                 model="gpt-image-2",

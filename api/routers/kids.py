@@ -428,7 +428,11 @@ def generate_kids_character_reference(
         char_name = cs.name
         char_desc = cs.visual_description
 
-    # Charge
+    # Charge + risolvi qualità utente
+    from api.utils.quality import resolve_user_quality
+    with session_scope() as _s:
+        _u = users_repo.get_by_id(_s, user_id)
+        user_quality = resolve_user_quality(_u)
     cost = cost_for_operation("generate_reference")
     try:
         with session_scope() as s:
@@ -451,7 +455,7 @@ def generate_kids_character_reference(
         prompt = build_reference_prompt(char_name, char_desc, style_preset_id)
         img_bytes = generator._generate_bytes(
             prompt=prompt, size="1024x1024",
-            reference_images=None, quality="medium",
+            reference_images=None, quality=user_quality,
         )
     except Exception as e:
         with session_scope() as s:

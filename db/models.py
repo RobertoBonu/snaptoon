@@ -124,6 +124,14 @@ class User(UUIDPrimaryKeyMixin, TimestampMixin, Base):
         String(80), nullable=False, default="", server_default=""
     )
 
+    # Preferenza qualità AI: "auto" | "low" | "medium" | "high".
+    # Applicata come default a tutte le generazioni immagine dell'utente.
+    # Deve rispettare allowed_qualities del suo ruolo (validato in API):
+    # es. autore_base non può salvare "high".
+    preferred_quality: Mapped[str] = mapped_column(
+        String(10), nullable=False, default="medium", server_default="medium"
+    )
+
     # Ruolo (autoritativo per permessi/qualità). is_admin resta come flag
     # legacy ma è derivabile da role == Role.admin.
     role: Mapped[Role] = mapped_column(

@@ -259,6 +259,7 @@ def _generate_card_image(
     progressive_number: int,
     reference_bytes: Optional[bytes],
     style_preset_id: Optional[str] = None,
+    quality: str = "medium",
 ) -> tuple[str, Optional[str]]:
     """Genera l'immagine AI + salva. Ritorna (rendered_key, reference_key).
 
@@ -295,7 +296,7 @@ def _generate_card_image(
             prompt=prompt,
             size="1024x1536",  # 2:3 portrait, closest to 9:16 supported
             reference_images=ref_list,
-            quality="medium",
+            quality=quality,
         )
     finally:
         if tmp_ref_path is not None:
@@ -371,15 +372,20 @@ async def create_card(
         card_id = card.id
         card_number = card.progressive_number
 
-    # 2. Charge crediti
-    cost = cost_for_operation("generate_panel", quality="medium")
+    # 2. Charge crediti (usa preferred_quality dell'utente)
+    from api.utils.quality import cost_for_generation, resolve_user_quality
+
+    with session_scope() as s:
+        u = users_repo.get_by_id(s, user_id)
+        user_quality = resolve_user_quality(u)
+    cost = cost_for_generation("generate_panel", user_quality)
     try:
         with session_scope() as s:
             u = users_repo.get_by_id(s, user_id)
             credits_repo.charge(
                 s, u, cost=cost,
                 operation=CreditOperation.generate_panel,
-                reason=f"Card figurina #{card_number}",
+                reason=f"Card figurina #{card_number} ({user_quality})",
                 reference_id=str(card_id),
             )
     except InsufficientCreditsError as e:
@@ -405,6 +411,7 @@ async def create_card(
             progressive_number=card_number,
             reference_bytes=ref_bytes,
             style_preset_id=style_preset_id or None,
+            quality=user_quality,
         )
     except Exception as e:
         # Refund + cancella
@@ -543,15 +550,20 @@ def regenerate_card(
         except Exception:
             pass
 
-    # Charge
-    cost = cost_for_operation("generate_panel", quality="medium")
+    # Charge (preferred_quality dell'utente)
+    from api.utils.quality import cost_for_generation, resolve_user_quality
+
+    with session_scope() as s:
+        u = users_repo.get_by_id(s, user_id)
+        user_quality = resolve_user_quality(u)
+    cost = cost_for_generation("generate_panel", user_quality)
     try:
         with session_scope() as s:
             u = users_repo.get_by_id(s, user_id)
             credits_repo.charge(
                 s, u, cost=cost,
                 operation=CreditOperation.generate_panel,
-                reason=f"Regen card figurina #{number}",
+                reason=f"Regen card figurina #{number} ({user_quality})",
                 reference_id=str(cid),
             )
     except InsufficientCreditsError as e:
@@ -571,6 +583,7 @@ def regenerate_card(
             progressive_number=number,
             reference_bytes=ref_bytes,
             style_preset_id=style_id,
+            quality=user_quality,
         )
     except Exception as e:
         with session_scope() as s:
