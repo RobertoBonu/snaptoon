@@ -45,13 +45,22 @@ from .base import Base, TimestampMixin, UUIDPrimaryKeyMixin, UpdatedAtMixin, utc
 
 
 class Plan(str, enum.Enum):
-    """LEGACY — piano abbonamento. Manteniamo per backward compat
-    e come traccia commerciale, ma le decisioni di permessi e qualità
-    sono ora basate su Role."""
+    """Piano commerciale dell'utente.
+
+    Note storiche: free_trial/creator/pro sono i piani legacy (mantenuti
+    per non rompere gli utenti esistenti). I piani NUOVI dal 2026-07:
+    - free_to_play : gratuito, 1 striscia + 1 figurina + 1 cover (poi bloccato)
+    - base         : ex creator, €19/mese
+    - premium      : ex pro, €49/mese
+    """
 
     free_trial = "free_trial"
     creator = "creator"
     pro = "pro"
+    # Nuovi (2026-07)
+    free_to_play = "free_to_play"
+    base = "base"
+    premium = "premium"
 
 
 class Role(str, enum.Enum):
@@ -152,6 +161,40 @@ class User(UUIDPrimaryKeyMixin, TimestampMixin, Base):
         DateTime(timezone=True), default=utcnow, nullable=False
     )
     period_ends_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    # === Free-To-Play counters (piano free_to_play) ===
+    # Ogni utente FTP ha esattamente 1 tavola KIDS striscia, 1 figurina,
+    # 1 cover. Dopo aver consumato ciascuna il popup redirige agli abbonamenti.
+    ftp_striscia_used: Mapped[int] = mapped_column(
+        Integer, default=0, nullable=False, server_default="0"
+    )
+    ftp_card_used: Mapped[int] = mapped_column(
+        Integer, default=0, nullable=False, server_default="0"
+    )
+    ftp_cover_used: Mapped[int] = mapped_column(
+        Integer, default=0, nullable=False, server_default="0"
+    )
+
+    # === Subscription lifecycle ===
+    # "pending_approval" : appena registrato o dopo checkout mock, in attesa di admin
+    # "active"           : approvato dall'admin, l'utente può generare
+    # "cancelled"        : disdetto dall'utente (mantiene account, ma niente crediti)
+    # "rejected"         : rifiutato dall'admin (motivo in subscription_rejection_reason)
+    subscription_status: Mapped[str] = mapped_column(
+        String(30), nullable=False, default="pending_approval",
+        server_default="pending_approval",
+    )
+    # Piano richiesto (potrebbe differire da .plan finché admin non approva)
+    subscription_plan_requested: Mapped[Plan | None] = mapped_column(
+        Enum(Plan, name="plan_enum", values_callable=lambda x: [e.value for e in x]),
+        nullable=True,
+    )
+    subscription_activated_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    subscription_rejection_reason: Mapped[str] = mapped_column(
+        Text, nullable=False, default="", server_default=""
+    )
 
     last_login_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 

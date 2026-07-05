@@ -13,10 +13,11 @@ from fastapi import APIRouter, Cookie, Depends, HTTPException, Response, status
 from jose import JWTError, jwt
 from pydantic import BaseModel, EmailStr
 
-from auth import login as auth_login
-from db.models import Role
+from auth import hash_password, login as auth_login
+from db.models import Plan, Role
 from db.repos import users as users_repo
 from db.session import session_scope
+from mail.sender import send_registration_confirmation
 
 router = APIRouter()
 
@@ -70,12 +71,31 @@ class LoginRequest(BaseModel):
     password: str
 
 
+class RegisterRequest(BaseModel):
+    email: EmailStr
+    password: str
+    # Piano scelto in fase di registrazione
+    # free_to_play viene approvato quasi automaticamente,
+    # base/premium richiedono checkout mock + approvazione admin
+    plan: str  # "free_to_play" | "base" | "premium"
+    pseudonym: str = ""
+
+
+class RegisterResponse(BaseModel):
+    id: str
+    email: str
+    subscription_status: str
+    plan_requested: str
+    message: str
+
+
 class UserOut(BaseModel):
     id: str
     email: str
     role: str
     is_admin: bool
     must_change_password: bool
+    subscription_status: str = "active"
 
 
 def _create_access_token(user_id: str) -> str:
@@ -121,7 +141,80 @@ def require_user(snaptoon_token: str | None = Cookie(default=None, alias=COOKIE_
             # solo `role`), causando "role=admin ma niente accesso admin".
             "is_admin": user.role == Role.admin,
             "must_change_password": user.must_change_password,
+            "subscription_status": getattr(user, "subscription_status", "active"),
         }
+
+
+_ALLOWED_REGISTRATION_PLANS = {"free_to_play", "base", "premium"}
+
+
+@router.post("/register", response_model=RegisterResponse, status_code=status.HTTP_201_CREATED)
+def register_endpoint(req: RegisterRequest) -> RegisterResponse:
+    """Registra un nuovo utente. Lo status parte da 'pending_approval'
+    e diventa 'active' solo dopo che un admin approva."""
+    from billing.plans import plan_config
+
+    if req.plan not in _ALLOWED_REGISTRATION_PLANS:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Piano non valido. Consenti: {sorted(_ALLOWED_REGISTRATION_PLANS)}",
+        )
+    if len(req.password) < 8:
+        raise HTTPException(
+            status_code=400, detail="Password troppo corta (min 8 caratteri)"
+        )
+
+    try:
+        plan_enum = Plan(req.plan)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Piano non riconosciuto")
+    cfg = plan_config(plan_enum)
+
+    with session_scope() as s:
+        existing = users_repo.get_by_email(s, req.email)
+        if existing is not None:
+            raise HTTPException(
+                status_code=409,
+                detail="Email già registrata. Prova a fare login.",
+            )
+        user = users_repo.create_user(
+            s,
+            email=str(req.email),
+            password_hash=hash_password(req.password),
+            plan=plan_enum,
+            initial_credits=cfg.monthly_credits,
+            is_admin=False,
+            must_change_password=False,
+        )
+        # Ruolo iniziale: autore_base per tutti i piani a pagamento,
+        # autore_base anche per free_to_play (i limiti FTP sono nei counter)
+        user.role = Role.autore_base
+        # Subscription: pending_approval, richiede admin approve
+        user.subscription_status = "pending_approval"
+        user.subscription_plan_requested = plan_enum
+        if req.pseudonym.strip():
+            user.pseudonym = req.pseudonym.strip()[:80]
+        user_id_str = str(user.id)
+        user_email = user.email
+        plan_label = cfg.label
+
+    # Invio email di conferma registrazione (best-effort, non blocca)
+    try:
+        send_registration_confirmation(user_email, plan_label)
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).error("send_registration failed: %s", e)
+
+    return RegisterResponse(
+        id=user_id_str,
+        email=user_email,
+        subscription_status="pending_approval",
+        plan_requested=req.plan,
+        message=(
+            "Registrazione ricevuta. Riceverai un'email quando "
+            "l'abbonamento sarà attivo."
+        ),
+    )
 
 
 @router.post("/login", response_model=UserOut)
@@ -137,6 +230,7 @@ def login_endpoint(req: LoginRequest, response: Response) -> UserOut:
             role=user.role.value if hasattr(user.role, "value") else str(user.role),
             is_admin=user.role == Role.admin,
             must_change_password=user.must_change_password,
+            subscription_status=getattr(user, "subscription_status", "active"),
         )
     response.set_cookie(
         COOKIE_NAME,

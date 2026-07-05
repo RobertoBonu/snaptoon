@@ -2,6 +2,7 @@ import { cookies } from "next/headers";
 import Link from "next/link";
 import LogoutButton from "@/components/LogoutButton";
 import AppSidebarNav from "@/components/AppSidebarNav";
+import FreeToPlayPopup from "@/components/FreeToPlayPopup";
 
 /**
  * Layout per la zona autenticata (/app/*).
@@ -57,6 +58,7 @@ export default async function AppLayout({
       </aside>
 
       <main className="flex-1 overflow-auto">{children}</main>
+      <FreeToPlayPopup />
     </div>
   );
 }

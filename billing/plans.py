@@ -32,9 +32,60 @@ class PlanConfig:
 
 
 PLAN_CONFIG: dict[Plan, PlanConfig] = {
+    Plan.free_to_play: PlanConfig(
+        plan=Plan.free_to_play,
+        label="Free-To-Play",
+        # Budget crediti dimensionato per 1 striscia + 1 figurina +
+        # 1 cover (con margine). Il vero enforcement è però nei counter
+        # ftp_*_used: NON si può creare una 2a striscia/figurina/cover
+        # anche se i crediti sarebbero teoricamente sufficienti.
+        # 1 striscia ~= 5 pannelli+3 ref+5 adapt = ~13cr, +1 figurina +
+        # 1 cover = ~15cr. Diamo 25 di margine.
+        monthly_credits=25,
+        max_projects=1,  # 1 striscia
+        allowed_qualities=("medium",),
+        monthly_price_eur=0,
+        features=(
+            "1 libretto striscia (1 tavola)",
+            "1 figurina collezionabile",
+            "1 cover standalone",
+            "Qualità Media",
+            "Provalo gratis, senza carta di credito",
+        ),
+    ),
+    Plan.base: PlanConfig(
+        plan=Plan.base,
+        label="Base",
+        monthly_credits=200,
+        max_projects=5,
+        allowed_qualities=("low", "medium"),
+        monthly_price_eur=19,
+        features=(
+            "200 crediti al mese",
+            "5 progetti",
+            "Qualità Bassa + Media",
+            "Export PDF",
+        ),
+    ),
+    Plan.premium: PlanConfig(
+        plan=Plan.premium,
+        label="Premium",
+        monthly_credits=600,
+        max_projects=0,
+        allowed_qualities=("low", "medium", "high"),
+        monthly_price_eur=49,
+        features=(
+            "600 crediti al mese",
+            "Progetti illimitati",
+            "Qualità Bassa + Media + Alta",
+            "Export PDF",
+            "Priorità di generazione",
+        ),
+    ),
+    # === Legacy (mantenuti per utenti esistenti) ===
     Plan.free_trial: PlanConfig(
         plan=Plan.free_trial,
-        label="Free Trial",
+        label="Free Trial (legacy)",
         monthly_credits=30,
         max_projects=1,
         allowed_qualities=("medium",),
@@ -49,7 +100,7 @@ PLAN_CONFIG: dict[Plan, PlanConfig] = {
     ),
     Plan.creator: PlanConfig(
         plan=Plan.creator,
-        label="Creator",
+        label="Creator (legacy)",
         monthly_credits=200,
         max_projects=5,
         allowed_qualities=("low", "medium"),
@@ -63,9 +114,9 @@ PLAN_CONFIG: dict[Plan, PlanConfig] = {
     ),
     Plan.pro: PlanConfig(
         plan=Plan.pro,
-        label="Pro",
+        label="Pro (legacy)",
         monthly_credits=600,
-        max_projects=0,  # illimitato
+        max_projects=0,
         allowed_qualities=("low", "medium", "high"),
         monthly_price_eur=49,
         features=(
@@ -77,6 +128,61 @@ PLAN_CONFIG: dict[Plan, PlanConfig] = {
         ),
     ),
 }
+
+
+# ============================================================
+# FREE-TO-PLAY: enforcement per azione (non per credito)
+# ============================================================
+
+class FreeToPlayLimitError(Exception):
+    """L'utente free_to_play ha esaurito il quota di un'azione FTP."""
+
+    def __init__(self, action: str):
+        self.action = action
+        super().__init__(f"Free-to-play quota esaurita per '{action}'")
+
+
+# Le azioni tracciate: chiave = tipo, valore = nome campo counter su User
+FTP_ACTIONS = {
+    "striscia": "ftp_striscia_used",
+    "card": "ftp_card_used",
+    "cover": "ftp_cover_used",
+}
+
+FTP_LIMIT_PER_ACTION = 1  # 1 utilizzo per tipo
+
+
+def is_free_to_play(user) -> bool:
+    return user.plan == Plan.free_to_play
+
+
+def check_free_to_play_quota(user, action: str) -> None:
+    """Solleva FreeToPlayLimitError se l'utente FTP ha già usato l'azione.
+
+    Chiamare PRIMA di fare la generazione. Se l'utente NON è FTP,
+    è un no-op.
+    """
+    if not is_free_to_play(user):
+        return
+    field = FTP_ACTIONS.get(action)
+    if field is None:
+        return
+    used = int(getattr(user, field, 0) or 0)
+    if used >= FTP_LIMIT_PER_ACTION:
+        raise FreeToPlayLimitError(action)
+
+
+def consume_free_to_play(user, action: str) -> None:
+    """Incrementa il contatore per l'azione. Chiamare DOPO successo generazione.
+
+    No-op per utenti non FTP.
+    """
+    if not is_free_to_play(user):
+        return
+    field = FTP_ACTIONS.get(action)
+    if field is None:
+        return
+    setattr(user, field, int(getattr(user, field, 0) or 0) + 1)
 
 
 def plan_config(plan: Plan) -> PlanConfig:

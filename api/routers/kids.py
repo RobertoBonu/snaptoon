@@ -225,12 +225,47 @@ def create_kids_project(
                 ),
             )
 
-        # Length target dal template (lungo/breve)
+        # Length target dal template (lungo/breve/striscia)
         length_str = tpl.length_target if isinstance(tpl.length_target, str) else tpl.length_target.value
         try:
             length_target = LengthTarget(length_str)
         except ValueError:
             length_target = LengthTarget.breve
+
+        # Free-To-Play: solo la striscia è consentita. Se l'utente FTP
+        # sceglie un template non-striscia (breve/lungo), blocca subito.
+        # Se sceglie striscia, verifica di non aver già usato la quota.
+        from billing.plans import (
+            FreeToPlayLimitError,
+            check_free_to_play_quota,
+            consume_free_to_play,
+            is_free_to_play,
+        )
+        if is_free_to_play(u):
+            if length_target != LengthTarget.striscia:
+                raise HTTPException(
+                    status_code=402,
+                    detail={
+                        "code": "free_to_play_plan_locked",
+                        "action": "kids_project",
+                        "message": (
+                            "Con il piano gratuito Free-To-Play puoi creare "
+                            "solo la 'Striscia (1 tavola)'. Passa a un piano "
+                            "superiore per libretti Brevi o Lunghi."
+                        ),
+                    },
+                )
+            try:
+                check_free_to_play_quota(u, "striscia")
+            except FreeToPlayLimitError:
+                raise HTTPException(
+                    status_code=402,
+                    detail={
+                        "code": "free_to_play_exhausted",
+                        "action": "striscia",
+                        "message": "Hai già usato la tua striscia gratuita.",
+                    },
+                )
 
         # Nome del progetto: il titolo dato dall'utente
         project_name = payload.title.strip()
@@ -286,6 +321,10 @@ def create_kids_project(
             except ValueError:
                 # Personaggio già esistente con quel nome → skip
                 pass
+
+        # Free-To-Play: consuma il counter striscia (la quota è ora usata)
+        if length_target == LengthTarget.striscia:
+            consume_free_to_play(u, "striscia")
 
         return _proj_to_out(project)
 

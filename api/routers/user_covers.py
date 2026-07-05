@@ -25,6 +25,11 @@ from pydantic import BaseModel, Field
 from api.routers.admin import require_admin
 from api.routers.auth import require_user
 from api.utils.quality import cost_for_generation, resolve_user_quality
+from billing.plans import (
+    FreeToPlayLimitError,
+    check_free_to_play_quota,
+    consume_free_to_play,
+)
 from db.models import CreditOperation
 from db.repos import bookshop_categories as bookshop_repo
 from db.repos import cast_archive as cast_archive_repo
@@ -228,6 +233,19 @@ def create_cover(
         user_quality = resolve_user_quality(u)
         author_display = (u.pseudonym or u.email.split("@")[0] or "").strip()
 
+        # Free-To-Play: verifica quota cover
+        try:
+            check_free_to_play_quota(u, "cover")
+        except FreeToPlayLimitError:
+            raise HTTPException(
+                status_code=402,
+                detail={
+                    "code": "free_to_play_exhausted",
+                    "action": "cover",
+                    "message": "Hai usato la tua cover gratuita.",
+                },
+            )
+
         # 1. Charge
         cost = cost_for_generation("generate_panel", user_quality)
         try:
@@ -295,10 +313,12 @@ def create_cover(
             except OSError:
                 pass
 
-    # 5. Salva lo storage_key
+    # 5. Salva lo storage_key + consuma FTP se applicabile
     with session_scope() as s:
         cov = s.get(UserCover, cover_id)
         cov.rendered_image_key = storage_key
+        u = users_repo.get_by_id(s, user_id)
+        consume_free_to_play(u, "cover")
         return _to_out(cov)
 
 

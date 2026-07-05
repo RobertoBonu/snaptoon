@@ -22,6 +22,7 @@ from api.routers import admin_style_test as admin_style_test_router
 from api.routers import bookshop as bookshop_router
 from api.routers import user_cards as user_cards_router
 from api.routers import user_covers as user_covers_router
+from api.routers import subscriptions as subscriptions_router
 from api.routers import auth as auth_router
 from api.routers import characters as characters_router
 from api.routers import crea as crea_router
@@ -95,6 +96,14 @@ app.include_router(
     tags=["cards-admin"],
 )
 app.include_router(user_covers_router.router, prefix="/api/covers", tags=["covers"])
+app.include_router(
+    subscriptions_router.router, prefix="/api/subscription", tags=["subscription"]
+)
+app.include_router(
+    subscriptions_router.admin_router,
+    prefix="/api/admin/subscriptions",
+    tags=["subscription-admin"],
+)
 app.include_router(
     user_covers_router.public_router,
     prefix="/api/bookshop/covers",

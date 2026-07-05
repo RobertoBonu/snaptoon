@@ -199,6 +199,12 @@ export default function AdminPage() {
           >
             🎴 Figurine BookShop
           </a>
+          <a
+            href="/app/admin/subscriptions"
+            className="border border-[var(--color-border)] hover:bg-[var(--color-bg-elev)] text-[var(--color-fg)] font-semibold px-5 py-2.5 rounded-lg"
+          >
+            💳 Abbonamenti
+          </a>
           <button
             onClick={() => setShowCreate(!showCreate)}
             className="bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] text-[var(--color-bg)] font-semibold px-5 py-2.5 rounded-lg"

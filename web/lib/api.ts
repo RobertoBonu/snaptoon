@@ -419,11 +419,26 @@ export async function apiFetch<T = unknown>(
   }
   if (!res.ok) {
     let detail = `HTTP ${res.status}`;
+    let detailObj: unknown = null;
     try {
       const data = await res.json();
-      if (data?.detail) detail = data.detail;
+      detailObj = data?.detail;
+      if (typeof data?.detail === "string") detail = data.detail;
+      else if (data?.detail?.message) detail = data.detail.message;
     } catch {
       /* ignore */
+    }
+    if (
+      res.status === 402 &&
+      typeof detailObj === "object" &&
+      detailObj !== null &&
+      typeof window !== "undefined"
+    ) {
+      const code = (detailObj as { code?: string }).code;
+      if (code === "free_to_play_exhausted" || code === "free_to_play_plan_locked") {
+        const evt = new CustomEvent("snaptoon:ftp_exhausted", { detail: detailObj });
+        window.dispatchEvent(evt);
+      }
     }
     throw new Error(detail);
   }

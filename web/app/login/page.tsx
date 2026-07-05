@@ -101,7 +101,13 @@ export default function LoginPage() {
           </button>
         </form>
 
-        <p className="text-center mt-6">
+        <p className="text-center text-sm text-[var(--color-fg-muted)] mt-6">
+          Non hai un account?{" "}
+          <Link href="/register" className="text-[var(--color-accent)] hover:underline">
+            Registrati gratis
+          </Link>
+        </p>
+        <p className="text-center mt-3">
           <Link
             href="/"
             className="text-[var(--color-fg-muted)] text-sm hover:text-[var(--color-fg)] transition-colors"
