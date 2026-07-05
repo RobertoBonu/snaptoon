@@ -73,6 +73,14 @@ class ShareCoverIn(BaseModel):
     author_role: str = Field(default="", max_length=80)
 
 
+class ShareWebtoonIn(BaseModel):
+    caption: str = Field(default="", max_length=500)
+    author_role: str = Field(default="", max_length=80)
+    # Categoria BookShop obbligatoria per i webtoon (l'admin la crea; l'utente
+    # deve sceglierla). UUID string della BookshopCategory.
+    bookshop_category_id: Optional[str] = None
+
+
 class ShareTavolaIn(BaseModel):
     caption: str = Field(default="", max_length=500)
     author_role: str = Field(default="", max_length=80)
@@ -297,19 +305,33 @@ def share_cover(
 )
 def share_webtoon(
     project_key: str,
-    payload: ShareCoverIn,
+    payload: ShareWebtoonIn,
     user: dict = Depends(require_user),
 ) -> ProjectShareOut:
     """Pubblica il progetto come WebToon (fumetto verticale scrollabile).
 
-    A differenza di share_cover/share_tavola non compone una nuova
-    immagine: il lettore pubblico (/w/{share_id}) assembla al volo
-    cover + vignette in un layout verticale.
+    Il lettore pubblico (/w/{share_id}) assembla al volo cover + vignette.
+    storage_key del record punta alla cover (thumbnail per BookShop).
 
-    storage_key del record punta alla cover (thumbnail per admin +
-    BookShop). Se la cover non esiste ancora, l'endpoint restituisce 400.
+    Preconditions:
+      - cover esistente
+      - script generato
+      - bookshop_category_id valido (categoria attiva)
     """
+    from db.repos import bookshop_categories as bookshop_repo
+
     user_id = uuid.UUID(user["id"])
+
+    # Valida la categoria (se passata) — deve esistere e essere attiva
+    category_uuid: Optional[uuid.UUID] = None
+    if payload.bookshop_category_id:
+        try:
+            category_uuid = uuid.UUID(payload.bookshop_category_id)
+        except ValueError:
+            raise HTTPException(
+                status_code=400, detail="bookshop_category_id non valido"
+            )
+
     with session_scope() as s:
         u = users_repo.get_by_id(s, user_id)
         if u is None:
@@ -329,6 +351,15 @@ def share_webtoon(
                 status_code=400,
                 detail="Genera prima la storia, poi pubblica il webtoon.",
             )
+
+        if category_uuid is not None:
+            cat = bookshop_repo.get_by_id(s, category_uuid)
+            if cat is None or not cat.is_active:
+                raise HTTPException(
+                    status_code=400,
+                    detail="Categoria BookShop non valida o non attiva",
+                )
+
         share = shares_repo.submit(
             s,
             project=project,
@@ -340,6 +371,7 @@ def share_webtoon(
             caption=payload.caption,
             author_role=payload.author_role,
         )
+        share.bookshop_category_id = category_uuid
         return _to_out(share)
 
 

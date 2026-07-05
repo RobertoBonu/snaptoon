@@ -182,11 +182,53 @@ export default function ImpaginaPage({
           </button>
           <button
             onClick={async () => {
+              // Prima carico le categorie disponibili
+              let categories: Array<{
+                macro: string;
+                label: string;
+                categories: Array<{ id: string; label: string }>;
+              }> = [];
+              try {
+                const res = await fetch("/api/bookshop/categories");
+                if (res.ok) {
+                  const d = (await res.json()) as { macros: typeof categories };
+                  categories = d.macros;
+                }
+              } catch {
+                /* continua senza categorie */
+              }
+              const flat = categories.flatMap((m) =>
+                m.categories.map((c) => ({
+                  id: c.id,
+                  label: `[${m.label.split(" ")[0]}] ${c.label}`,
+                })),
+              );
+              if (flat.length === 0) {
+                alert(
+                  "Non ci sono ancora categorie BookShop. Chiedi a un admin di crearne.",
+                );
+                return;
+              }
+              const options = flat
+                .map((c, i) => `${i + 1}. ${c.label}`)
+                .join("\n");
+              const catStr = prompt(
+                `Categoria BookShop (numero):\n\n${options}`,
+                "1",
+              );
+              if (catStr === null) return;
+              const idx = parseInt(catStr, 10) - 1;
+              if (isNaN(idx) || idx < 0 || idx >= flat.length) {
+                alert("Categoria non valida.");
+                return;
+              }
+              const categoryId = flat[idx].id;
+
               const caption = prompt(
                 "Didascalia breve per il webtoon (facoltativa):",
                 "",
               );
-              if (caption === null) return; // cancel
+              if (caption === null) return;
               const role = prompt(
                 "Il tuo ruolo (es. Illustratore, facoltativo):",
                 "",
@@ -199,10 +241,11 @@ export default function ImpaginaPage({
                   body: JSON.stringify({
                     caption: caption || "",
                     author_role: role || "",
+                    bookshop_category_id: categoryId,
                   }),
                 });
                 alert(
-                  "Richiesta inviata! Un admin la esaminerà a breve. Se approvata, il webtoon sarà pubblico su /w/<id>.",
+                  "Richiesta inviata! Un admin la esaminerà a breve. Se approvata, il webtoon sarà pubblico nel BookShop.",
                 );
               } catch (e) {
                 setError(e instanceof Error ? e.message : String(e));

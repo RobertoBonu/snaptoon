@@ -574,6 +574,35 @@ class EsploraAsset(UUIDPrimaryKeyMixin, TimestampMixin, UpdatedAtMixin, Base):
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
 
 
+class BookshopCategory(UUIDPrimaryKeyMixin, TimestampMixin, UpdatedAtMixin, Base):
+    """Categoria del BookShop (libreria pubblica dei webtoon degli utenti).
+
+    Struttura a due livelli:
+      - macro: hardcoded 3 valori (kids | young | kidult) — target di età
+      - categoria specifica: es. "Fiabe magiche", "Superheroes", "Slice of
+        life", "Fantasy dark", "Sci-fi" — gestita interamente dall'admin.
+
+    Le sotto-categorie sono libere: l'admin crea/rinomina/riordina.
+    """
+
+    __tablename__ = "bookshop_categories"
+    __table_args__ = (
+        UniqueConstraint("slug", name="uq_bookshop_category_slug"),
+        Index("ix_bookshop_category_macro", "macro"),
+    )
+
+    macro: Mapped[str] = mapped_column(String(20), nullable=False)
+    # ^ "kids" | "young" | "kidult"
+    slug: Mapped[str] = mapped_column(String(64), nullable=False)
+    label: Mapped[str] = mapped_column(String(120), nullable=False)
+    description: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    position: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    deleted_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+
+
 class StyleTestImage(UUIDPrimaryKeyMixin, TimestampMixin, UpdatedAtMixin, Base):
     """Immagine di test di uno stile preset, generata dall'admin.
 
@@ -675,6 +704,14 @@ class ProjectAssetShare(UUIDPrimaryKeyMixin, TimestampMixin, UpdatedAtMixin, Bas
     )
     share_rejection_reason: Mapped[str] = mapped_column(
         Text, nullable=False, default="", server_default=""
+    )
+    # Categoria BookShop scelta dall'utente alla pubblicazione (solo per
+    # asset_kind='webtoon'). Nullable: gli share cover/tavola non hanno
+    # categoria.
+    bookshop_category_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("bookshop_categories.id", ondelete="SET NULL"),
+        nullable=True,
     )
     deleted_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True

@@ -1,10 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { SiteShell, MediaFrame } from "@/components/site";
-import { books, formatPrice, type Book, type BookCategory } from "@/data/bookshop";
+import { SiteShell } from "@/components/site";
 
-// Card dinamica per i webtoon della community (dati reali via API)
 interface WebtoonCard {
   id: string;
   title: string;
@@ -16,316 +14,476 @@ interface WebtoonCard {
   read_url: string;
   panels_count: number;
   published_at: string | null;
+  category_id: string | null;
+  category_label: string | null;
+  category_macro: string | null;
 }
 
-function WebtoonSection() {
-  const [items, setItems] = useState<WebtoonCard[] | null>(null);
+interface Category {
+  id: string;
+  slug: string;
+  label: string;
+  description: string;
+}
+
+interface MacroGroup {
+  macro: string;
+  label: string;
+  categories: Category[];
+}
+
+interface CategoriesData {
+  macros: MacroGroup[];
+}
+
+const MACRO_LABELS: Record<string, string> = {
+  kids: "KIDS",
+  young: "YOUNG",
+  kidult: "KIDULT",
+};
+const MACRO_ORDER = ["kids", "young", "kidult"];
+
+type MacroFilter = "all" | "kids" | "young" | "kidult";
+
+export default function BookshopPage() {
+  const [webtoons, setWebtoons] = useState<WebtoonCard[] | null>(null);
+  const [categories, setCategories] = useState<CategoriesData | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [macroFilter, setMacroFilter] = useState<MacroFilter>("all");
+  const [categoryFilter, setCategoryFilter] = useState<string>("");
 
   useEffect(() => {
-    fetch("/api/webtoons?limit=24")
-      .then(async (res) => {
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        return res.json() as Promise<{ webtoons: WebtoonCard[] }>;
+    fetch("/api/webtoons?limit=120")
+      .then(async (r) => {
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        return r.json() as Promise<{ webtoons: WebtoonCard[] }>;
       })
-      .then((d) => setItems(d.webtoons))
+      .then((d) => setWebtoons(d.webtoons))
       .catch((e) =>
         setError(e instanceof Error ? e.message : String(e)),
       );
+
+    fetch("/api/bookshop/categories")
+      .then(async (r) => (r.ok ? r.json() : null))
+      .then((d: CategoriesData | null) => setCategories(d))
+      .catch(() => {});
   }, []);
 
-  return (
-    <section className="section" style={{ paddingTop: "40px", paddingBottom: "20px", background: "linear-gradient(180deg, rgba(124,58,237,0.05) 0%, rgba(13,16,23,0) 100%)", borderTop: "1px solid rgba(124,58,237,0.15)" }}>
-      <div className="lp-container">
-        <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 16, flexWrap: "wrap", marginBottom: 16 }}>
-          <div>
-            <div style={{ display: "inline-flex", alignItems: "center", gap: 8, background: "rgba(124,58,237,0.12)", border: "1px solid rgba(124,58,237,0.3)", padding: "4px 10px", borderRadius: 100, color: "#A78BFA", fontSize: 12, fontWeight: 700, marginBottom: 10 }}>
-              🌐 Novità
-            </div>
-            <h2 style={{ fontSize: "1.5rem", fontWeight: 700, color: "#F1F5F9", marginBottom: 6 }}>
-              WebToon della community
-            </h2>
-            <p style={{ fontSize: "0.95rem", color: "#94A3B8", maxWidth: 620 }}>
-              Fumetti verticali scrollabili, pensati per la lettura mobile.
-              Creati dagli utenti SnapToon, approvati dalla redazione.
-              Gratuiti per tutti.
-            </p>
-          </div>
-          {items && items.length > 0 && (
-            <span style={{ fontSize: 13, color: "#64748B" }}>
-              {items.length} webtoon{items.length !== 1 ? "s" : ""}
-            </span>
-          )}
-        </div>
-
-        {error && (
-          <p style={{ color: "#FCA5A5", fontSize: 13, textAlign: "center", padding: "40px 0" }}>
-            Errore caricamento webtoon: {error}
-          </p>
-        )}
-
-        {!error && items === null && (
-          <p style={{ color: "#64748B", textAlign: "center", padding: "40px 0" }}>
-            Caricamento webtoon...
-          </p>
-        )}
-
-        {!error && items !== null && items.length === 0 && (
-          <div style={{ background: "#161B26", border: "1px solid #1E2436", borderRadius: 16, padding: "48px 24px", textAlign: "center" }}>
-            <div style={{ fontSize: 48, marginBottom: 12, opacity: 0.4 }}>📭</div>
-            <p style={{ color: "#94A3B8", fontSize: 14, marginBottom: 20 }}>
-              Nessun webtoon pubblicato ancora. Sii il primo!
-            </p>
-            <a href="/login" className="btn btn-primary" style={{ padding: "10px 20px", fontSize: 13 }}>
-              Crea il tuo webtoon →
-            </a>
-          </div>
-        )}
-
-        {items && items.length > 0 && (
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 20 }}>
-            {items.map((w) => (
-              <a
-                key={w.id}
-                href={w.read_url}
-                className="lift"
-                style={{
-                  background: "#161B26",
-                  border: "1px solid #1E2436",
-                  borderRadius: 16,
-                  overflow: "hidden",
-                  display: "flex",
-                  flexDirection: "column",
-                  textDecoration: "none",
-                }}
-              >
-                <div style={{ position: "relative", aspectRatio: "2 / 3", background: "#0D1017", overflow: "hidden" }}>
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={w.cover_url}
-                    alt={w.title}
-                    loading="lazy"
-                    style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
-                  />
-                  <span style={{ position: "absolute", top: 10, left: 10, background: "rgba(13,16,23,0.85)", border: "1px solid rgba(124,58,237,0.5)", borderRadius: 100, color: "#A78BFA", fontSize: 10, fontWeight: 700, padding: "3px 8px", letterSpacing: "0.06em", textTransform: "uppercase" }}>
-                    🌐 WebToon
-                  </span>
-                  <span style={{ position: "absolute", bottom: 10, right: 10, background: "rgba(13,16,23,0.85)", border: "1px solid #1E2436", borderRadius: 100, color: "#CBD5E1", fontSize: 11, fontWeight: 600, padding: "3px 8px" }}>
-                    {w.panels_count} vignette
-                  </span>
-                </div>
-                <div style={{ padding: 14, display: "flex", flexDirection: "column", flex: 1 }}>
-                  <div style={{ fontSize: 15, fontWeight: 700, color: "#F1F5F9", lineHeight: 1.3, marginBottom: 4, overflow: "hidden", textOverflow: "ellipsis", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>
-                    {w.title}
-                  </div>
-                  <div style={{ fontSize: 12, color: "#94A3B8", marginBottom: 10, display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
-                    <span>di {w.author_name}</span>
-                    {w.author_role && (
-                      <span style={{ fontSize: 10, color: "#A78BFA", border: "1px solid rgba(124,58,237,0.4)", borderRadius: 100, padding: "1px 6px" }}>
-                        {w.author_role}
-                      </span>
-                    )}
-                  </div>
-                  <div style={{ marginTop: "auto", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
-                    <span style={{ fontSize: 13, fontWeight: 700, color: "#10B981" }}>Gratis</span>
-                    <span className="btn btn-primary" style={{ padding: "6px 12px", fontSize: 12 }}>
-                      Leggi →
-                    </span>
-                  </div>
-                </div>
-              </a>
-            ))}
-          </div>
-        )}
-      </div>
-    </section>
-  );
-}
-
-type CategoryFilter = "Tutti" | BookCategory;
-type PriceFilter = "Tutti" | "Gratuiti" | "A pagamento";
-type SortKey = "recenti" | "venduti" | "prezzo";
-
-function ProductCard({ book, onBuy }: { book: Book; onBuy: () => void }) {
-  return (
-    <div className="product-card">
-      <MediaFrame src={book.cover} label={book.title} aspect="2 / 3" rounded={0} />
-      <div style={{ padding: "16px", display: "flex", flexDirection: "column", flex: 1 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "6px" }}>
-          <span style={{ fontSize: "11px", color: "#64748B", textTransform: "uppercase", letterSpacing: "0.04em" }}>{book.category}</span>
-          {book.bestseller && <span style={{ fontSize: "10px", color: "#F59E0B", border: "1px solid rgba(245,158,11,0.3)", borderRadius: "100px", padding: "1px 8px" }}>Più venduto</span>}
-        </div>
-        <div style={{ fontSize: "15px", fontWeight: 700, color: "#F1F5F9", lineHeight: 1.3, marginBottom: "6px" }}>{book.title}</div>
-        <div style={{ fontSize: "13px", color: "#94A3B8", marginBottom: "14px", display: "flex", alignItems: "center", gap: "6px" }}>
-          {book.author}
-          {book.isPublisher && <span style={{ fontSize: "10px", color: "#7C3AED", border: "1px solid rgba(124,58,237,0.4)", borderRadius: "100px", padding: "1px 6px" }}>Editore</span>}
-        </div>
-        <div style={{ marginTop: "auto", display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px" }}>
-          <span style={{ fontSize: "16px", fontWeight: 700, color: book.price === 0 ? "#10B981" : "#F1F5F9" }}>{formatPrice(book.price)}</span>
-          <div style={{ display: "flex", gap: "6px" }}>
-            <button className="btn btn-ghost" style={{ padding: "6px 10px", fontSize: "12px" }} onClick={onBuy}>Anteprima</button>
-            <button className="btn btn-primary" style={{ padding: "6px 12px", fontSize: "12px" }} onClick={onBuy}>Acquista</button>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function Pill({ active, children, onClick }: { active: boolean; children: React.ReactNode; onClick: () => void }) {
-  return (
-    <button
-      onClick={onClick}
-      style={{
-        fontSize: "13px", fontWeight: 600, padding: "7px 14px", borderRadius: "100px", cursor: "pointer",
-        border: active ? "1px solid #F59E0B" : "1px solid #2D3748",
-        background: active ? "rgba(245,158,11,0.12)" : "transparent",
-        color: active ? "#F59E0B" : "#94A3B8", transition: "all 0.2s",
-      }}
-    >
-      {children}
-    </button>
-  );
-}
-
-function ThemedSection({ title, caption, items, onBuy }: { title: string; caption: string; items: Book[]; onBuy: () => void }) {
-  return (
-    <section className="section" style={{ paddingTop: "40px", paddingBottom: "20px" }}>
-      <div className="lp-container">
-        <h2 style={{ fontSize: "1.5rem", fontWeight: 700, color: "#F1F5F9", marginBottom: "6px" }}>{title}</h2>
-        <p style={{ fontSize: "0.95rem", color: "#94A3B8", marginBottom: "24px" }}>{caption}</p>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))", gap: "24px" }}>
-          {items.slice(0, 3).map((b) => <ProductCard key={b.id} book={b} onBuy={onBuy} />)}
-        </div>
-      </div>
-    </section>
-  );
-}
-
-export default function BookshopPage() {
-  const [category, setCategory] = useState<CategoryFilter>("Tutti");
-  const [price, setPrice] = useState<PriceFilter>("Tutti");
-  const [sort, setSort] = useState<SortKey>("recenti");
-  const [toastOpen, setToastOpen] = useState(false);
-  const [email, setEmail] = useState("");
-  const [subscribed, setSubscribed] = useState(false);
-
+  // Filtro
   const filtered = useMemo(() => {
-    let list = [...books];
-    if (category !== "Tutti") list = list.filter((b) => b.category === category);
-    if (price === "Gratuiti") list = list.filter((b) => b.price === 0);
-    if (price === "A pagamento") list = list.filter((b) => b.price > 0);
-    if (sort === "recenti") list.sort((a, b) => b.publishedAt - a.publishedAt);
-    if (sort === "venduti") list.sort((a, b) => Number(b.bestseller || 0) - Number(a.bestseller || 0));
-    if (sort === "prezzo") list.sort((a, b) => a.price - b.price);
+    if (!webtoons) return null;
+    let list = webtoons;
+    if (macroFilter !== "all")
+      list = list.filter((w) => w.category_macro === macroFilter);
+    if (categoryFilter)
+      list = list.filter((w) => w.category_id === categoryFilter);
     return list;
-  }, [category, price, sort]);
+  }, [webtoons, macroFilter, categoryFilter]);
 
-  const openToast = () => { setSubscribed(false); setToastOpen(true); };
+  // Raggruppamento per macro (mostrato se macroFilter === "all")
+  const byMacro = useMemo(() => {
+    if (!filtered) return null;
+    const g: Record<string, WebtoonCard[]> = {
+      kids: [],
+      young: [],
+      kidult: [],
+      _uncategorized: [],
+    };
+    for (const w of filtered) {
+      const m = w.category_macro || "_uncategorized";
+      (g[m] ||= []).push(w);
+    }
+    return g;
+  }, [filtered]);
+
+  // Categorie disponibili per il filtro (filtrate su macroFilter)
+  const availableCategories = useMemo(() => {
+    if (!categories) return [];
+    if (macroFilter === "all") {
+      return categories.macros.flatMap((m) => m.categories);
+    }
+    const g = categories.macros.find((m) => m.macro === macroFilter);
+    return g ? g.categories : [];
+  }, [categories, macroFilter]);
 
   return (
     <SiteShell active="/bookshop">
       {/* Hero */}
-      <section className="section" style={{ paddingTop: "100px", paddingBottom: "40px", textAlign: "center" }}>
+      <section
+        className="section"
+        style={{
+          paddingTop: "100px",
+          paddingBottom: "40px",
+          textAlign: "center",
+        }}
+      >
         <div className="lp-container">
-          <h1 style={{ fontSize: "clamp(1.75rem, 6vw, 3.75rem)", fontWeight: 800, color: "#F1F5F9", lineHeight: 1.1, letterSpacing: "-0.03em", marginBottom: "20px" }}>Bookshop SnapToon</h1>
-          <p style={{ fontSize: "1.125rem", color: "#94A3B8", lineHeight: 1.6, maxWidth: "720px", margin: "0 auto" }}>
-            Fumetti, graphic novel, libri illustrati e libretti KIDS firmati da autori e editori indipendenti. Tutto creato con SnapToon.
+          <h1
+            style={{
+              fontSize: "clamp(1.75rem, 6vw, 3.75rem)",
+              fontWeight: 800,
+              color: "#F1F5F9",
+              lineHeight: 1.1,
+              letterSpacing: "-0.03em",
+              marginBottom: "20px",
+            }}
+          >
+            📚 BookShop SnapToon
+          </h1>
+          <p
+            style={{
+              fontSize: "1.125rem",
+              color: "#94A3B8",
+              lineHeight: 1.6,
+              maxWidth: "720px",
+              margin: "0 auto",
+            }}
+          >
+            La libreria dei WebToon creati dalla community. Storie in stile
+            fumetto verticale, tutte gratuite, tutte generate su SnapToon.
           </p>
         </div>
       </section>
 
-      {/* Filtri sticky */}
-      <div style={{ position: "sticky", top: "72px", zIndex: 50, background: "rgba(13,16,23,0.92)", backdropFilter: "blur(12px)", borderTop: "1px solid #1E2436", borderBottom: "1px solid #1E2436", padding: "16px 0" }}>
-        <div className="lp-container" style={{ display: "flex", flexWrap: "wrap", gap: "20px", alignItems: "center", justifyContent: "space-between" }}>
-          <div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
-            {(["Tutti", "Fumetti", "Graphic Novel", "Libri illustrati", "KIDSToons"] as CategoryFilter[]).map((c) => (
-              <Pill key={c} active={category === c} onClick={() => setCategory(c)}>{c}</Pill>
+      {/* Filtri */}
+      <section style={{ paddingBottom: "32px" }}>
+        <div
+          className="lp-container"
+          style={{
+            display: "flex",
+            gap: "12px",
+            alignItems: "center",
+            flexWrap: "wrap",
+          }}
+        >
+          <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
+            {(["all", ...MACRO_ORDER] as MacroFilter[]).map((m) => (
+              <button
+                key={m}
+                onClick={() => {
+                  setMacroFilter(m);
+                  setCategoryFilter("");
+                }}
+                style={{
+                  fontSize: "13px",
+                  fontWeight: 600,
+                  padding: "7px 14px",
+                  borderRadius: 100,
+                  cursor: "pointer",
+                  border:
+                    macroFilter === m
+                      ? "1px solid #F59E0B"
+                      : "1px solid #2D3748",
+                  background:
+                    macroFilter === m
+                      ? "rgba(245,158,11,0.12)"
+                      : "transparent",
+                  color: macroFilter === m ? "#F59E0B" : "#94A3B8",
+                }}
+              >
+                {m === "all" ? "Tutti" : MACRO_LABELS[m]}
+              </button>
             ))}
           </div>
-          <div style={{ display: "flex", flexWrap: "wrap", gap: "16px", alignItems: "center" }}>
-            <div style={{ display: "flex", gap: "8px" }}>
-              {(["Tutti", "Gratuiti", "A pagamento"] as PriceFilter[]).map((p) => (
-                <Pill key={p} active={price === p} onClick={() => setPrice(p)}>{p}</Pill>
+
+          {availableCategories.length > 0 && (
+            <select
+              value={categoryFilter}
+              onChange={(e) => setCategoryFilter(e.target.value)}
+              style={{
+                fontSize: "13px",
+                padding: "7px 12px",
+                borderRadius: 100,
+                background: "#0F1420",
+                border: "1px solid #2D3748",
+                color: "#F1F5F9",
+              }}
+            >
+              <option value="">Tutte le categorie</option>
+              {availableCategories.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.label}
+                </option>
               ))}
-            </div>
-            <select value={sort} onChange={(e) => setSort(e.target.value as SortKey)} style={{ background: "#161B26", color: "#E2E8F0", border: "1px solid #2D3748", borderRadius: "8px", padding: "8px 12px", fontSize: "13px", cursor: "pointer" }}>
-              <option value="recenti">Più recenti</option>
-              <option value="venduti">Più venduti</option>
-              <option value="prezzo">Prezzo crescente</option>
             </select>
-          </div>
-        </div>
-      </div>
-
-      {/* Grid prodotti */}
-      <section className="section" style={{ paddingTop: "40px", paddingBottom: "20px" }}>
-        <div className="lp-container">
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))", gap: "24px" }}>
-            {filtered.map((b) => <ProductCard key={b.id} book={b} onBuy={openToast} />)}
-          </div>
-          {filtered.length === 0 && <p style={{ color: "#64748B", textAlign: "center", padding: "40px 0" }}>Nessun risultato con questi filtri.</p>}
+          )}
         </div>
       </section>
 
-      {/* Sezioni tematiche */}
-      {/* WebToon della community — dati reali via /api/webtoons */}
-      <WebtoonSection />
-
-      <ThemedSection title="⭐ KIDSToons — Per i più piccoli" caption="Libretti illustrati 5-8 anni, formato 16 pagine + copertina" items={books.filter((b) => b.category === "KIDSToons")} onBuy={openToast} />
-      <ThemedSection title="📕 Graphic Novel" caption="Storie lunghe, narrazione adulta, stile cinematografico" items={books.filter((b) => b.category === "Graphic Novel")} onBuy={openToast} />
-      <ThemedSection title="📚 Fumetti" caption="Episodi 6-16 pagine, perfetti per il binge reading" items={books.filter((b) => b.category === "Fumetti")} onBuy={openToast} />
-      <ThemedSection title="📖 Libri illustrati" caption="Tradizione picture-book con il twist dell'AI" items={books.filter((b) => b.category === "Libri illustrati")} onBuy={openToast} />
-
-      {/* Callout editori */}
-      <section className="section" style={{ paddingTop: "60px", paddingBottom: "40px" }}>
+      {/* Contenuto */}
+      <section style={{ paddingBottom: "80px" }}>
         <div className="lp-container">
-          <div style={{ background: "#0A0E17", border: "1px solid #1E2436", borderRadius: "20px", padding: "40px" }}>
-            <h2 style={{ fontSize: "1.5rem", fontWeight: 700, color: "#F1F5F9", marginBottom: "12px" }}>Sei un editore? Vendi sul Bookshop</h2>
-            <p style={{ fontSize: "1.0625rem", color: "#94A3B8", lineHeight: 1.7, marginBottom: "24px", maxWidth: "760px" }}>
-              Con il piano Editore pubblichi senza commissioni fisse, ricevi report dettagliati sulle vendite e mantieni il 100% del ricavato. SnapToon resta in background.
+          {error && (
+            <p
+              style={{
+                color: "#FCA5A5",
+                textAlign: "center",
+                padding: "40px 0",
+              }}
+            >
+              Errore caricamento: {error}
             </p>
-            <a href="/abbonamenti#editore" className="btn btn-primary" style={{ padding: "12px 22px" }}>Diventa editore →</a>
-          </div>
-        </div>
-      </section>
+          )}
 
-      {/* CTA finale */}
-      <section className="section" style={{ paddingTop: "20px", paddingBottom: "100px" }}>
-        <div className="lp-container" style={{ textAlign: "center" }}>
-          <h2 style={{ fontSize: "clamp(1.75rem, 3vw, 2.25rem)", fontWeight: 800, color: "#F1F5F9", marginBottom: "20px" }}>Hai creato qualcosa di bello? Mettilo in vetrina.</h2>
-          <a href="mailto:info@snaptoon.art" className="btn btn-secondary" style={{ padding: "14px 28px", fontSize: "15px" }}>Pubblica un&apos;opera →</a>
-        </div>
-      </section>
+          {!error && filtered === null && (
+            <p
+              style={{
+                color: "#64748B",
+                textAlign: "center",
+                padding: "40px 0",
+              }}
+            >
+              Caricamento webtoon...
+            </p>
+          )}
 
-      {/* Toast lancio */}
-      {toastOpen && (
-        <div style={{ position: "fixed", bottom: "24px", left: "50%", transform: "translateX(-50%)", zIndex: 200, width: "min(520px, calc(100% - 32px))", background: "#161B26", border: "1px solid #2D3748", borderRadius: "16px", boxShadow: "0 24px 64px rgba(0,0,0,0.5)", padding: "20px" }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "16px" }}>
-            <div style={{ flex: 1 }}>
-              <div style={{ fontSize: "15px", fontWeight: 700, color: "#F1F5F9", marginBottom: "4px" }}>Lancio Bookshop in arrivo 🚀</div>
-              {!subscribed ? (
-                <>
-                  <p style={{ fontSize: "13px", color: "#94A3B8", marginBottom: "12px" }}>Iscriviti alla newsletter per essere avvisato.</p>
-                  <form
-                    onSubmit={(e) => { e.preventDefault(); if (email.trim()) setSubscribed(true); }}
-                    style={{ display: "flex", gap: "8px" }}
-                  >
-                    <input
-                      type="email" required value={email} onChange={(e) => setEmail(e.target.value)} placeholder="La tua email"
-                      style={{ flex: 1, background: "#0D1017", border: "1px solid #2D3748", borderRadius: "8px", padding: "10px 12px", color: "#E2E8F0", fontSize: "13px" }}
-                    />
-                    <button type="submit" className="btn btn-primary" style={{ padding: "10px 16px", fontSize: "13px" }}>Avvisami</button>
-                  </form>
-                </>
+          {!error && filtered !== null && filtered.length === 0 && (
+            <div
+              style={{
+                background: "#161B26",
+                border: "1px solid #1E2436",
+                borderRadius: 16,
+                padding: "60px 24px",
+                textAlign: "center",
+              }}
+            >
+              <div style={{ fontSize: 48, marginBottom: 12, opacity: 0.4 }}>
+                📭
+              </div>
+              <p style={{ color: "#94A3B8", fontSize: 14, marginBottom: 20 }}>
+                {macroFilter === "all" && !categoryFilter
+                  ? "Nessun webtoon pubblicato ancora. Sii il primo!"
+                  : "Nessun webtoon in questo filtro."}
+              </p>
+              <a
+                href="/login"
+                className="btn btn-primary"
+                style={{ padding: "10px 20px", fontSize: 13 }}
+              >
+                Crea il tuo webtoon →
+              </a>
+            </div>
+          )}
+
+          {/* Se macroFilter === all, raggruppa per macro; altrimenti griglia
+              piatta */}
+          {!error && filtered && filtered.length > 0 && byMacro && (
+            <>
+              {macroFilter === "all" ? (
+                MACRO_ORDER.filter((m) => byMacro[m] && byMacro[m].length > 0).map((m) => (
+                  <div key={m} style={{ marginBottom: 40 }}>
+                    <h2
+                      style={{
+                        fontSize: "1.5rem",
+                        fontWeight: 700,
+                        color: "#F1F5F9",
+                        marginBottom: 16,
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 10,
+                      }}
+                    >
+                      <span
+                        style={{
+                          fontSize: 11,
+                          fontWeight: 700,
+                          letterSpacing: "0.12em",
+                          background: "rgba(245,158,11,0.12)",
+                          border: "1px solid rgba(245,158,11,0.3)",
+                          color: "#F59E0B",
+                          padding: "3px 10px",
+                          borderRadius: 100,
+                        }}
+                      >
+                        {MACRO_LABELS[m]}
+                      </span>
+                      <span
+                        style={{
+                          fontSize: 13,
+                          color: "#64748B",
+                          fontWeight: 400,
+                        }}
+                      >
+                        {byMacro[m].length} webtoon
+                        {byMacro[m].length !== 1 ? "" : ""}
+                      </span>
+                    </h2>
+                    <GridWebtoons items={byMacro[m]} />
+                  </div>
+                ))
               ) : (
-                <p style={{ fontSize: "13px", color: "#10B981", marginTop: "4px" }}>Grazie! Ti avviseremo al lancio. 🎉</p>
+                <GridWebtoons items={filtered} />
+              )}
+              {/* uncategorized in fondo se ci sono */}
+              {macroFilter === "all" &&
+                byMacro._uncategorized &&
+                byMacro._uncategorized.length > 0 && (
+                  <div style={{ marginBottom: 40 }}>
+                    <h2
+                      style={{
+                        fontSize: "1.25rem",
+                        fontWeight: 700,
+                        color: "#94A3B8",
+                        marginBottom: 16,
+                      }}
+                    >
+                      Senza categoria
+                      <span
+                        style={{
+                          fontSize: 13,
+                          color: "#64748B",
+                          fontWeight: 400,
+                          marginLeft: 10,
+                        }}
+                      >
+                        {byMacro._uncategorized.length} webtoon
+                      </span>
+                    </h2>
+                    <GridWebtoons items={byMacro._uncategorized} />
+                  </div>
+                )}
+            </>
+          )}
+        </div>
+      </section>
+    </SiteShell>
+  );
+}
+
+function GridWebtoons({ items }: { items: WebtoonCard[] }) {
+  return (
+    <div
+      style={{
+        display: "grid",
+        gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))",
+        gap: 24,
+      }}
+    >
+      {items.map((w) => (
+        <a
+          key={w.id}
+          href={w.read_url}
+          className="product-card"
+          style={{ textDecoration: "none" }}
+        >
+          <div
+            style={{
+              position: "relative",
+              aspectRatio: "2 / 3",
+              background: "#0D1017",
+              overflow: "hidden",
+              borderBottom: "1px solid #1E2436",
+            }}
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={w.cover_url}
+              alt={w.title}
+              loading="lazy"
+              style={{
+                width: "100%",
+                height: "100%",
+                objectFit: "cover",
+                display: "block",
+              }}
+            />
+            {w.category_label && (
+              <span
+                style={{
+                  position: "absolute",
+                  top: 10,
+                  left: 10,
+                  background: "rgba(13,16,23,0.85)",
+                  border: "1px solid rgba(124,58,237,0.5)",
+                  color: "#A78BFA",
+                  fontSize: 10,
+                  fontWeight: 700,
+                  padding: "3px 8px",
+                  borderRadius: 100,
+                  textTransform: "uppercase",
+                  letterSpacing: "0.06em",
+                }}
+              >
+                {w.category_label}
+              </span>
+            )}
+            <span
+              style={{
+                position: "absolute",
+                bottom: 10,
+                right: 10,
+                background: "rgba(13,16,23,0.85)",
+                border: "1px solid #1E2436",
+                color: "#CBD5E1",
+                fontSize: 11,
+                fontWeight: 600,
+                padding: "3px 8px",
+                borderRadius: 100,
+              }}
+            >
+              {w.panels_count} vignette
+            </span>
+          </div>
+          <div
+            style={{
+              padding: 16,
+              display: "flex",
+              flexDirection: "column",
+              flex: 1,
+            }}
+          >
+            <div
+              style={{
+                fontSize: 15,
+                fontWeight: 700,
+                color: "#F1F5F9",
+                lineHeight: 1.3,
+                marginBottom: 6,
+                display: "-webkit-box",
+                WebkitLineClamp: 2,
+                WebkitBoxOrient: "vertical",
+                overflow: "hidden",
+              }}
+            >
+              {w.title}
+            </div>
+            <div
+              style={{
+                fontSize: 13,
+                color: "#94A3B8",
+                marginBottom: 14,
+                display: "flex",
+                alignItems: "center",
+                gap: 6,
+                flexWrap: "wrap",
+              }}
+            >
+              {w.author_name}
+              {w.author_role && (
+                <span
+                  style={{
+                    fontSize: 10,
+                    color: "#A78BFA",
+                    border: "1px solid rgba(124,58,237,0.4)",
+                    borderRadius: 100,
+                    padding: "1px 6px",
+                  }}
+                >
+                  {w.author_role}
+                </span>
               )}
             </div>
-            <button onClick={() => setToastOpen(false)} style={{ background: "transparent", border: "none", color: "#64748B", fontSize: "20px", cursor: "pointer", lineHeight: 1 }} aria-label="Chiudi">×</button>
+            <div style={{ marginTop: "auto" }}>
+              <span
+                className="btn btn-primary"
+                style={{ padding: "6px 12px", fontSize: 12, width: "100%" }}
+              >
+                Leggi →
+              </span>
+            </div>
           </div>
-        </div>
-      )}
-    </SiteShell>
+        </a>
+      ))}
+    </div>
   );
 }

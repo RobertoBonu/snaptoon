@@ -60,6 +60,29 @@ export default function KidsPreviewPage({
   const [shareCaption, setShareCaption] = useState("");
   const [shareAuthorRole, setShareAuthorRole] = useState("");
   const [sharing, setSharing] = useState(false);
+  // Categorie BookShop (per webtoon)
+  const [bookshopCategories, setBookshopCategories] = useState<
+    Array<{ macro: string; label: string; categories: Array<{ id: string; label: string }> }>
+  >([]);
+  const [shareCategoryId, setShareCategoryId] = useState<string>("");
+
+  // Carico categorie BookShop una sola volta (per il picker webtoon)
+  useEffect(() => {
+    fetch("/api/bookshop/categories")
+      .then((r) => (r.ok ? r.json() : null))
+      .then(
+        (d: {
+          macros: Array<{
+            macro: string;
+            label: string;
+            categories: Array<{ id: string; label: string }>;
+          }>;
+        } | null) => {
+          if (d) setBookshopCategories(d.macros);
+        },
+      )
+      .catch(() => {});
+  }, []);
 
   async function submitShare() {
     if (!shareModal) return;
@@ -71,12 +94,20 @@ export default function KidsPreviewPage({
       else if (shareModal.kind === "webtoon")
         url = `/api/project-shares/webtoon/${id}`;
       else url = `/api/project-shares/tavola/${id}/${shareModal.page}`;
+      const body: {
+        caption: string;
+        author_role: string;
+        bookshop_category_id?: string;
+      } = {
+        caption: shareCaption,
+        author_role: shareAuthorRole,
+      };
+      if (shareModal.kind === "webtoon" && shareCategoryId) {
+        body.bookshop_category_id = shareCategoryId;
+      }
       const res = await apiFetch<{ id: string }>(url, {
         method: "POST",
-        body: JSON.stringify({
-          caption: shareCaption,
-          author_role: shareAuthorRole,
-        }),
+        body: JSON.stringify(body),
       });
       const kindLabel =
         shareModal.kind === "webtoon"
@@ -520,6 +551,36 @@ export default function KidsPreviewPage({
               )}
             </p>
             <div className="space-y-3">
+              {shareModal.kind === "webtoon" && (
+                <div>
+                  <label className="block text-sm font-semibold mb-1">
+                    Categoria BookShop *
+                  </label>
+                  <select
+                    value={shareCategoryId}
+                    onChange={(e) => setShareCategoryId(e.target.value)}
+                    required
+                    className="w-full px-3 py-2 bg-[var(--color-bg)] border border-[var(--color-border)] rounded text-sm"
+                  >
+                    <option value="">— Scegli una categoria —</option>
+                    {bookshopCategories.map((m) => (
+                      <optgroup key={m.macro} label={m.label}>
+                        {m.categories.map((c) => (
+                          <option key={c.id} value={c.id}>
+                            {c.label}
+                          </option>
+                        ))}
+                      </optgroup>
+                    ))}
+                  </select>
+                  {bookshopCategories.every((m) => m.categories.length === 0) && (
+                    <p className="text-xs text-yellow-400 mt-1">
+                      Nessuna categoria disponibile. Chiedi a un admin di
+                      crearne.
+                    </p>
+                  )}
+                </div>
+              )}
               <div>
                 <label className="block text-sm font-semibold mb-1">
                   Didascalia breve (facoltativa)
@@ -549,7 +610,10 @@ export default function KidsPreviewPage({
               <div className="flex gap-2 pt-2">
                 <button
                   onClick={submitShare}
-                  disabled={sharing}
+                  disabled={
+                    sharing ||
+                    (shareModal.kind === "webtoon" && !shareCategoryId)
+                  }
                   className="bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] text-[var(--color-bg)] font-semibold px-4 py-2 rounded disabled:opacity-50"
                 >
                   {sharing ? "Invio..." : "🌐 Invia per approvazione"}

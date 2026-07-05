@@ -64,6 +64,10 @@ class WebtoonCardOut(BaseModel):
     read_url: str
     panels_count: int
     published_at: Optional[str] = None
+    # Categoria BookShop (macro + label) se assegnata
+    category_id: Optional[str] = None
+    category_label: Optional[str] = None
+    category_macro: Optional[str] = None
 
 
 class WebtoonListOut(BaseModel):
@@ -71,24 +75,58 @@ class WebtoonListOut(BaseModel):
 
 
 @router.get("", response_model=WebtoonListOut)
-def list_public_webtoons(limit: int = 60) -> WebtoonListOut:
-    """Elenco pubblico dei WebToon approvati, ordinati per data pubblicazione.
+def list_public_webtoons(
+    limit: int = 60,
+    macro: Optional[str] = None,
+    category_id: Optional[str] = None,
+) -> WebtoonListOut:
+    """Elenco pubblico dei WebToon approvati.
 
-    limit: max cards restituite (default 60, safety cap 200).
-    Nessuna autenticazione. Usato dal BookShop /bookshop e potenzialmente
-    da altri consumer (esplora, dashboard).
+    Filtri opzionali:
+      - macro: "kids" | "young" | "kidult"
+      - category_id: UUID di BookshopCategory
     """
     from api.utils.user_display import public_author_name
+    from db.repos import bookshop_categories as bookshop_repo
 
     cap = max(1, min(limit, 200))
+
+    # Parse filtro categoria
+    filter_cat_uuid: Optional[uuid.UUID] = None
+    if category_id:
+        try:
+            filter_cat_uuid = uuid.UUID(category_id)
+        except ValueError:
+            raise HTTPException(status_code=400, detail="category_id non valido")
 
     with session_scope() as s:
         shares = shares_repo.list_published_by_kind(s, "webtoon")
         out: list[WebtoonCardOut] = []
-        for share in shares[:cap]:
+        for share in shares:
+            if len(out) >= cap:
+                break
+            # Filtri
+            if filter_cat_uuid and share.bookshop_category_id != filter_cat_uuid:
+                continue
+
             project = projects_repo.get_by_id(s, share.project_id)
             if project is None or project.script is None:
                 continue
+
+            # Resolve categoria per esporre label + macro (e filtro macro)
+            cat_id_str: Optional[str] = None
+            cat_label: Optional[str] = None
+            cat_macro: Optional[str] = None
+            if share.bookshop_category_id:
+                cat = bookshop_repo.get_by_id(s, share.bookshop_category_id)
+                if cat is not None:
+                    cat_id_str = str(cat.id)
+                    cat_label = cat.label
+                    cat_macro = cat.macro
+
+            if macro and cat_macro != macro:
+                continue
+
             # Metadata da Cover se disponibili
             cover_orm = project.cover
             title = (cover_orm.title if cover_orm else "") or project.name
@@ -121,6 +159,9 @@ def list_public_webtoons(limit: int = 60) -> WebtoonListOut:
                         if share.share_moderated_at
                         else None
                     ),
+                    category_id=cat_id_str,
+                    category_label=cat_label,
+                    category_macro=cat_macro,
                 )
             )
         return WebtoonListOut(webtoons=out)
