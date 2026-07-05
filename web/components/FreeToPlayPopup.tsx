@@ -19,12 +19,18 @@ export default function FreeToPlayPopup() {
       setDetail(custom.detail || null);
       setOpen(true);
     }
+    function esc(e: KeyboardEvent) {
+      if (e.key === "Escape") setOpen(false);
+    }
     window.addEventListener("snaptoon:ftp_exhausted", handler as EventListener);
-    return () =>
+    window.addEventListener("keydown", esc);
+    return () => {
       window.removeEventListener(
         "snaptoon:ftp_exhausted",
         handler as EventListener,
       );
+      window.removeEventListener("keydown", esc);
+    };
   }, []);
 
   if (!open) return null;
@@ -32,8 +38,14 @@ export default function FreeToPlayPopup() {
   const isPlanLock = detail?.code === "free_to_play_plan_locked";
 
   return (
-    <div className="fixed inset-0 bg-black/70 z-[100] flex items-center justify-center p-4">
-      <div className="bg-[var(--color-bg-elev)] border border-[var(--color-border)] rounded-2xl p-8 max-w-md w-full text-center relative">
+    <div
+      className="fixed inset-0 bg-black/70 z-[100] flex items-center justify-center p-4"
+      onClick={() => setOpen(false)}
+    >
+      <div
+        className="bg-[var(--color-bg-elev)] border border-[var(--color-border)] rounded-2xl p-8 max-w-md w-full text-center relative"
+        onClick={(e) => e.stopPropagation()}
+      >
         <button
           onClick={() => setOpen(false)}
           className="absolute top-3 right-3 text-[var(--color-fg-muted)] hover:text-[var(--color-fg)] text-2xl"

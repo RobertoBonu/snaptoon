@@ -423,8 +423,25 @@ export async function apiFetch<T = unknown>(
     try {
       const data = await res.json();
       detailObj = data?.detail;
-      if (typeof data?.detail === "string") detail = data.detail;
-      else if (data?.detail?.message) detail = data.detail.message;
+      // detail può essere: stringa | oggetto {code, message, action} |
+      // array (FastAPI Pydantic errors) | undefined
+      if (typeof detailObj === "string") {
+        detail = detailObj;
+      } else if (detailObj && typeof detailObj === "object") {
+        const asObj = detailObj as { message?: string; msg?: string; code?: string };
+        if (typeof asObj.message === "string" && asObj.message.trim()) {
+          detail = asObj.message;
+        } else if (typeof asObj.msg === "string" && asObj.msg.trim()) {
+          detail = asObj.msg;
+        } else if (Array.isArray(detailObj) && detailObj.length > 0) {
+          // Pydantic validation errors
+          const first = detailObj[0] as { msg?: string };
+          detail = first?.msg || JSON.stringify(detailObj);
+        } else {
+          // Fallback: mai mostrare "[object Object]" all'utente
+          detail = asObj.code || JSON.stringify(detailObj);
+        }
+      }
     } catch {
       /* ignore */
     }

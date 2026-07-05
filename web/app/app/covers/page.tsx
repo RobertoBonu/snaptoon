@@ -184,7 +184,9 @@ export default function MyCoversPage() {
       setRefreshTag(Date.now());
       await loadAll();
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      const msg = e instanceof Error ? e.message : String(e);
+      // Sanitizza "[object Object]" nel caso di apiFetch legacy in cache
+      setError(msg === "[object Object]" ? "Errore durante la generazione della cover. Riprova." : msg);
     } finally {
       setCreating(false);
     }
