@@ -4,9 +4,11 @@ import { useEffect, useState } from "react";
 import { apiFetch } from "@/lib/api";
 
 interface ExtraPackageOption {
+  package_type: string;
   quota_type: string;
   quota_type_label: string;
   quantity: number;
+  quality: string | null;
   price_eur: number;
   unit_price_eur: number;
 }
@@ -53,6 +55,17 @@ const QUOTA_EMOJI: Record<string, string> = {
 
 const QUOTA_ORDER = ["libretti_kids", "progetti_pro", "cover", "card"];
 
+const QUALITY_BADGE: Record<string, { bg: string; color: string; label: string }> = {
+  medium: { bg: "rgba(100,116,139,0.15)", color: "#94A3B8", label: "Medium" },
+  high: { bg: "rgba(245,158,11,0.15)", color: "#FDE047", label: "High ⚡" },
+};
+
+function packageTitle(o: ExtraPackageOption): string {
+  const label = o.quota_type_label;
+  const q = o.quantity;
+  return q === 1 ? `+1 ${label}` : `${q} ${label}`;
+}
+
 export default function PacchettiPage() {
   const [catalog, setCatalog] = useState<Catalog | null>(null);
   const [quotas, setQuotas] = useState<MyQuotas | null>(null);
@@ -78,22 +91,20 @@ export default function PacchettiPage() {
     load();
   }, []);
 
-  async function buy(quotaType: string, quantity: number) {
-    const key = `${quotaType}_${quantity}`;
+  async function buy(packageType: string) {
     if (buying) return;
-    setBuying(key);
+    setBuying(packageType);
     setError(null);
     setSuccess(null);
     try {
       await apiFetch("/api/packages/buy", {
         method: "POST",
         body: JSON.stringify({
-          quota_type: quotaType,
-          quantity,
+          package_type: packageType,
           mock_stripe_token: "mock_" + Math.random().toString(36).slice(2),
         }),
       });
-      setSuccess(`Pacchetto acquistato! ${quantity} × ${quotaType} aggiunti alle tue quote extra.`);
+      setSuccess("Pacchetto acquistato! Le quote sono state aggiunte.");
       await load();
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
@@ -115,7 +126,7 @@ export default function PacchettiPage() {
     <div className="p-8 max-w-6xl mx-auto">
       <h1 className="text-3xl font-bold mb-1">📦 Pacchetti Extra</h1>
       <p className="text-sm text-[var(--color-fg-muted)] mb-6">
-        Aggiungi quote extra al tuo piano <b>{quotas.plan_label}</b>. Le quote extra <b>non scadono</b> e si sommano a quelle mensili.
+        Aggiungi quote extra al tuo piano <b>{quotas.plan_label}</b>. Le quote extra <b>non scadono</b>.
       </p>
 
       {error && (
@@ -166,25 +177,34 @@ export default function PacchettiPage() {
             </h2>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
               {options.map((o) => {
-                const key = `${o.quota_type}_${o.quantity}`;
-                const isBusy = buying === key;
+                const isBusy = buying === o.package_type;
+                const badge = o.quality ? QUALITY_BADGE[o.quality] : null;
                 return (
                   <div
-                    key={key}
+                    key={o.package_type}
                     className="bg-[var(--color-bg-elev)] border border-[var(--color-border)] rounded-xl p-4 flex flex-col"
                   >
-                    <div className="text-sm text-[var(--color-fg-muted)]">Pacchetto</div>
-                    <div className="text-2xl font-bold text-[var(--color-fg)]">
-                      × {o.quantity}
+                    <div className="flex items-center justify-between mb-1">
+                      <div className="text-sm font-medium">{packageTitle(o)}</div>
+                      {badge && (
+                        <span
+                          className="text-[10px] px-1.5 py-0.5 rounded font-bold"
+                          style={{ background: badge.bg, color: badge.color }}
+                        >
+                          {badge.label}
+                        </span>
+                      )}
                     </div>
-                    <div className="text-lg text-[var(--color-accent)] font-bold mt-1">
+                    <div className="text-2xl text-[var(--color-accent)] font-bold mt-2">
                       €{o.price_eur.toFixed(2).replace(".", ",")}
                     </div>
-                    <div className="text-xs text-[var(--color-fg-muted)] mt-1 mb-3">
-                      €{o.unit_price_eur.toFixed(2).replace(".", ",")}/cad
-                    </div>
+                    {o.quantity > 1 && (
+                      <div className="text-xs text-[var(--color-fg-muted)] mt-1 mb-3">
+                        €{o.unit_price_eur.toFixed(2).replace(".", ",")}/cad
+                      </div>
+                    )}
                     <button
-                      onClick={() => buy(o.quota_type, o.quantity)}
+                      onClick={() => buy(o.package_type)}
                       disabled={isBusy}
                       className="mt-auto bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] text-[var(--color-bg)] font-semibold py-2 rounded text-sm disabled:opacity-40"
                     >
@@ -202,7 +222,7 @@ export default function PacchettiPage() {
       <section className="mb-8">
         <h2 className="text-lg font-semibold mb-3">🖨️ Stampa fisica</h2>
         <p className="text-xs text-[var(--color-fg-muted)] mb-3">
-          Ordina copie stampate di un libretto o fumetto. Per 100+ copie contatta info@snaptoon.art
+          Ordina copie stampate di un libretto o fumetto. Per 100+ copie contatta <a href="mailto:info@snaptoon.art" className="underline">info@snaptoon.art</a>
         </p>
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
           {catalog.print_pricing.map((p) => (

@@ -150,8 +150,15 @@ _ALLOWED_REGISTRATION_PLANS = {"free_to_play", "kids_plan", "base"}
 
 @router.post("/register", response_model=RegisterResponse, status_code=status.HTTP_201_CREATED)
 def register_endpoint(req: RegisterRequest) -> RegisterResponse:
-    """Registra un nuovo utente. Lo status parte da 'pending_approval'
-    e diventa 'active' solo dopo che un admin approva."""
+    """Registra un nuovo utente.
+
+    - free_to_play → attivato SUBITO (nessuna approvazione admin necessaria)
+    - kids_plan / base → subscription_status='pending_approval' fino ad admin
+    """
+    import logging
+    import traceback
+
+    logger = logging.getLogger(__name__)
     from billing.plans import plan_config
 
     if req.plan not in _ALLOWED_REGISTRATION_PLANS:
@@ -170,49 +177,80 @@ def register_endpoint(req: RegisterRequest) -> RegisterResponse:
         raise HTTPException(status_code=400, detail="Piano non riconosciuto")
     cfg = plan_config(plan_enum)
 
-    with session_scope() as s:
-        existing = users_repo.get_by_email(s, req.email)
-        if existing is not None:
-            raise HTTPException(
-                status_code=409,
-                detail="Email già registrata. Prova a fare login.",
+    try:
+        with session_scope() as s:
+            existing = users_repo.get_by_email(s, req.email)
+            if existing is not None:
+                raise HTTPException(
+                    status_code=409,
+                    detail="Email già registrata. Prova a fare login.",
+                )
+            user = users_repo.create_user(
+                s,
+                email=str(req.email),
+                password_hash=hash_password(req.password),
+                plan=plan_enum,
+                initial_credits=cfg.monthly_credits,
+                is_admin=False,
+                must_change_password=False,
             )
-        user = users_repo.create_user(
-            s,
-            email=str(req.email),
-            password_hash=hash_password(req.password),
-            plan=plan_enum,
-            initial_credits=cfg.monthly_credits,
-            is_admin=False,
-            must_change_password=False,
+            user.role = Role.autore_base
+            if req.pseudonym.strip():
+                user.pseudonym = req.pseudonym.strip()[:80]
+
+            # Auto-activate free_to_play (piano gratuito, no admin approval)
+            is_free = plan_enum == Plan.free_to_play
+            if is_free:
+                user.subscription_status = "active"
+                user.subscription_activated_at = datetime.now(timezone.utc)
+                user.subscription_plan_requested = None
+                # Applica quote iniziali del piano (per FTP sono 0, i counter
+                # ftp_* sono già a 0 di default)
+                try:
+                    from billing.quotas import reset_monthly_quotas
+                    reset_monthly_quotas(user)
+                except Exception as e:
+                    logger.warning("reset_monthly_quotas fallito (ok se DB non aggiornato): %s", e)
+            else:
+                user.subscription_status = "pending_approval"
+                user.subscription_plan_requested = plan_enum
+
+            user_id_str = str(user.id)
+            user_email = user.email
+            plan_label = cfg.label
+            final_status = user.subscription_status
+    except HTTPException:
+        raise
+    except Exception as e:
+        # Log dettagliato per debug (visibile nei log Replit)
+        logger.error(
+            "REGISTER FAILED plan=%s email=%s: %s\n%s",
+            req.plan, req.email, e, traceback.format_exc(),
         )
-        # Ruolo iniziale: autore_base per tutti i piani a pagamento,
-        # autore_base anche per free_to_play (i limiti FTP sono nei counter)
-        user.role = Role.autore_base
-        # Subscription: pending_approval, richiede admin approve
-        user.subscription_status = "pending_approval"
-        user.subscription_plan_requested = plan_enum
-        if req.pseudonym.strip():
-            user.pseudonym = req.pseudonym.strip()[:80]
-        user_id_str = str(user.id)
-        user_email = user.email
-        plan_label = cfg.label
+        raise HTTPException(
+            status_code=500,
+            detail=(
+                f"Errore registrazione: {type(e).__name__}: {str(e)[:200]}. "
+                "Verifica che le migrazioni DB siano applicate "
+                "(alembic upgrade head)."
+            ),
+        )
 
     # Invio email di conferma registrazione (best-effort, non blocca)
     try:
         send_registration_confirmation(user_email, plan_label)
     except Exception as e:
-        import logging
-        logging.getLogger(__name__).error("send_registration failed: %s", e)
+        logger.error("send_registration email failed: %s", e)
 
     return RegisterResponse(
         id=user_id_str,
         email=user_email,
-        subscription_status="pending_approval",
+        subscription_status=final_status,
         plan_requested=req.plan,
         message=(
-            "Registrazione ricevuta. Riceverai un'email quando "
-            "l'abbonamento sarà attivo."
+            "Registrazione completata! Il tuo piano è già attivo."
+            if final_status == "active"
+            else "Registrazione ricevuta. Riceverai un'email quando l'abbonamento sarà attivo."
         ),
     )
 

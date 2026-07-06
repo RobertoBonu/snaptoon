@@ -236,6 +236,8 @@ def admin_approve_subscription(
             raise HTTPException(status_code=404, detail="Utente non trovato")
         req = u.subscription_plan_requested or u.plan
         cfg = plan_config(req)
+        # Rileva "prima attivazione" PRIMA di sovrascrivere activated_at
+        was_never_activated_before = u.subscription_activated_at is None
         # Applica il piano richiesto e riparte periodo crediti + quote
         u.plan = req
         u.credits_total_this_period = cfg.monthly_credits
@@ -243,9 +245,13 @@ def admin_approve_subscription(
         u.subscription_status = "active"
         u.subscription_activated_at = datetime.now(timezone.utc)
         u.subscription_rejection_reason = ""
-        # Reset quote mensili al valore del piano
+        # Welcome bonus una-tantum: solo se è la primissima attivazione
+        # di un piano a pagamento.
         from billing.quotas import reset_monthly_quotas
-        reset_monthly_quotas(u)
+        is_first_paid_activation = (
+            was_never_activated_before and req in (Plan.kids_plan, Plan.base)
+        )
+        reset_monthly_quotas(u, apply_welcome_bonus=is_first_paid_activation)
         # Se il nuovo piano non è free_to_play, i contatori FTP si
         # azzerano (l'utente ha già "consumato" la sua prova gratis)
         if req != Plan.free_to_play:

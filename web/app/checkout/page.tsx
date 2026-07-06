@@ -4,11 +4,11 @@ import Link from "next/link";
 import { Suspense, useState } from "react";
 import { useSearchParams } from "next/navigation";
 
-const PLAN_INFO: Record<string, { label: string; price: string }> = {
-  free_to_play: { label: "Free-To-Play", price: "GRATIS" },
-  kids_plan: { label: "KIDS", price: "€6,99/mese" },
-  base: { label: "PRO", price: "€19/mese" },
-  premium: { label: "PRO (Premium legacy)", price: "€49/mese" },
+const PLAN_INFO: Record<string, { label: string; price: string; welcome: string }> = {
+  free_to_play: { label: "Free-To-Play", price: "GRATIS", welcome: "" },
+  kids_plan: { label: "KIDS", price: "€6,99/mese", welcome: "🎉 Welcome bonus 1° mese: +5 cover +5 figurine gratis" },
+  base: { label: "PRO", price: "€19/mese", welcome: "🎉 Welcome bonus 1° mese: +10 cover +10 figurine gratis" },
+  premium: { label: "PRO (Premium legacy)", price: "€49/mese", welcome: "" },
 };
 
 function CheckoutInner() {
@@ -102,6 +102,12 @@ function CheckoutInner() {
               <span>Stripe (mock)</span>
             </div>
           </div>
+
+          {info.welcome && (
+            <div className="bg-green-950/30 border border-green-900/50 rounded p-3 mb-4 text-sm text-green-400 font-medium">
+              {info.welcome}
+            </div>
+          )}
 
           {error && (
             <p className="text-red-400 text-sm bg-red-950/30 border border-red-900/50 rounded px-3 py-2 mb-4">

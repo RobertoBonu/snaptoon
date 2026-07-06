@@ -34,10 +34,9 @@ const PLANS: {
     tagline: "Per famiglie, insegnanti, biblioteche",
     features: [
       "1 libretto KIDS/mese",
-      "5 cover/mese",
-      "5 figurine/mese",
+      "2 cover/mese + 2 figurine/mese",
       "Qualità Media",
-      "Modalità KIDS guidata",
+      "🎉 1° mese: +5 cover +5 figurine gratis",
     ],
     cta: "Scegli KIDS",
   },
@@ -47,11 +46,11 @@ const PLANS: {
     price: "€19/mese",
     tagline: "Per autori indie e professionisti",
     features: [
-      "5 progetti Pro/mese",
-      "1 libretto KIDS/mese",
-      "5 cover + 5 figurine/mese",
-      "Qualità Bassa + Media + Alta",
-      "Export PDF stampabile",
+      "1 progetto Pro/mese",
+      "3 cover/mese + 3 figurine/mese",
+      "Qualità Medium o High",
+      "BookShop + editor libero",
+      "🎉 1° mese: +10 cover +10 figurine gratis",
     ],
     cta: "Scegli PRO",
   },
@@ -85,11 +84,20 @@ function RegisterInner() {
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        setError(
-          typeof data.detail === "string"
-            ? data.detail
-            : "Errore nella registrazione. Riprova.",
-        );
+        // Estrai il vero messaggio d'errore, non importa che forma abbia
+        let msg = `Errore ${res.status} durante la registrazione.`;
+        if (typeof data?.detail === "string") {
+          msg = data.detail;
+        } else if (data?.detail?.message) {
+          msg = data.detail.message;
+        } else if (Array.isArray(data?.detail) && data.detail.length > 0) {
+          // Pydantic validation errors: mostra il primo
+          const first = data.detail[0];
+          msg = first?.msg || `Campo non valido: ${JSON.stringify(first?.loc || [])}`;
+        } else if (data?.detail) {
+          msg = JSON.stringify(data.detail);
+        }
+        setError(msg);
         return;
       }
       // Per piani a pagamento redirect a checkout mock

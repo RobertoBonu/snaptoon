@@ -25,6 +25,25 @@ QUOTA_LABELS: dict[str, str] = {
     "card": "figurina",
 }
 
+# Sotto-tipi di quota per Medium/High (V03).
+# I counter DB restano un solo campo per quota_type: quando l'utente
+# compra "cover_high", incrementiamo comunque quota_cover_extra ma
+# tracciamo la qualità nel record ExtraPackagePurchase.package_type.
+QUALITY_PACKAGE_TYPES = {
+    "libretti_kids": ["libretti_kids"],
+    "progetti_pro": ["progetti_pro_medium", "progetti_pro_high"],
+    "cover": ["cover_medium", "cover_high"],
+    "card": ["card_medium", "card_high"],
+}
+
+
+def base_quota_type(pkg_type: str) -> str:
+    """Ritorna il quota_type DB da un package_type (rimuove _medium/_high)."""
+    for base, subs in QUALITY_PACKAGE_TYPES.items():
+        if pkg_type in subs or pkg_type == base:
+            return base
+    return pkg_type
+
 
 @dataclass(frozen=True)
 class PlanQuotas:
@@ -39,24 +58,27 @@ class PlanQuotas:
 # ============================================================
 
 PLAN_QUOTAS: dict[Plan, PlanQuotas] = {
-    # Free-To-Play: 0 quote mensili (usa i counter ftp_*_used per la
-    # dose una-tantum di prova). Vedi billing/plans.py per FTP logic.
+    # V03 (piano commerciale definitivo):
+    #
+    # Free-To-Play (gratis, una-tantum via counter ftp_*_used):
+    #   1 striscia + 1 figurina + 1 cover. Vedi billing/plans.py per FTP logic.
     Plan.free_to_play: PlanQuotas(),
 
-    # KIDS (€6,99/mese): 1 libretto + 5 cover + 5 figurine
+    # KIDS (€6,99/mese): 1 libretto + 2 cover + 2 figurine (tutto Medium)
     Plan.kids_plan: PlanQuotas(
-        libretti_kids=1, progetti_pro=0, cover=5, card=5
+        libretti_kids=1, progetti_pro=0, cover=2, card=2
     ),
 
-    # PRO (€19/mese) — enum 'base' ma label "PRO"
-    # 5 progetti pro + 1 libretto kids + 5 cover + 5 figurine
+    # PRO (€19/mese) — enum 'base' ma label "PRO":
+    # 1 progetto Pro + 3 cover + 3 figurine (Medium o High)
+    # NO libretto KIDS incluso (V03: rimosso).
     Plan.base: PlanQuotas(
-        libretti_kids=1, progetti_pro=5, cover=5, card=5
+        libretti_kids=0, progetti_pro=1, cover=3, card=3
     ),
 
-    # Premium legacy (mantenuto)
+    # Legacy Premium (utenti esistenti): mantenuto generoso
     Plan.premium: PlanQuotas(
-        libretti_kids=2, progetti_pro=10, cover=10, card=10
+        libretti_kids=1, progetti_pro=3, cover=5, card=5
     ),
 
     # Legacy (mantenuti)
@@ -64,6 +86,25 @@ PLAN_QUOTAS: dict[Plan, PlanQuotas] = {
     Plan.creator: PlanQuotas(libretti_kids=1, progetti_pro=5, cover=5, card=5),
     Plan.pro: PlanQuotas(libretti_kids=2, progetti_pro=10, cover=10, card=10),
 }
+
+
+# ============================================================
+# Welcome bonus (1° mese)
+# ============================================================
+#
+# Al primo attivamento di un piano a pagamento (KIDS o PRO), l'utente
+# riceve delle quote EXTRA una tantum come "welcome bonus". Si sommano
+# ai counter *_extra (non scadono, ma sono pensate per esaurirsi nel
+# primo mese come incentivo di conversione).
+
+WELCOME_BONUS: dict[Plan, PlanQuotas] = {
+    Plan.kids_plan: PlanQuotas(libretti_kids=0, progetti_pro=0, cover=5, card=5),
+    Plan.base:      PlanQuotas(libretti_kids=0, progetti_pro=0, cover=10, card=10),
+}
+
+
+def welcome_bonus_for(plan: Plan) -> PlanQuotas:
+    return WELCOME_BONUS.get(plan, PlanQuotas())
 
 
 def quotas_for_plan(plan: Plan) -> PlanQuotas:
@@ -142,14 +183,25 @@ def add_extra(user, quota_type: str, amount: int) -> None:
     setattr(user, extra_field, current + amount)
 
 
-def reset_monthly_quotas(user) -> None:
-    """Riporta i counter *_month ai valori del piano (chiamare al rinnovo)."""
+def reset_monthly_quotas(user, *, apply_welcome_bonus: bool = False) -> None:
+    """Riporta i counter *_month ai valori del piano (chiamare al rinnovo).
+
+    Se apply_welcome_bonus=True (di solito al PRIMO attivamento del piano
+    a pagamento), aggiunge il welcome bonus del piano ai counter *_extra.
+    """
     qs = quotas_for_plan(user.plan)
     user.quota_libretti_kids_month = qs.libretti_kids
     user.quota_progetti_pro_month = qs.progetti_pro
     user.quota_cover_month = qs.cover
     user.quota_card_month = qs.card
     user.period_started_at = datetime.now(timezone.utc)
+
+    if apply_welcome_bonus:
+        wb = welcome_bonus_for(user.plan)
+        user.quota_libretti_kids_extra = int(getattr(user, "quota_libretti_kids_extra", 0) or 0) + wb.libretti_kids
+        user.quota_progetti_pro_extra = int(getattr(user, "quota_progetti_pro_extra", 0) or 0) + wb.progetti_pro
+        user.quota_cover_extra = int(getattr(user, "quota_cover_extra", 0) or 0) + wb.cover
+        user.quota_card_extra = int(getattr(user, "quota_card_extra", 0) or 0) + wb.card
 
 
 # ============================================================
@@ -159,9 +211,21 @@ def reset_monthly_quotas(user) -> None:
 
 @dataclass(frozen=True)
 class ExtraPackageOption:
-    quota_type: QuotaType
+    """Un'opzione di pacchetto extra.
+
+    package_type: identificatore preciso salvato in ExtraPackagePurchase.
+        Es. "libretti_kids", "cover_medium", "cover_high",
+        "progetti_pro_medium", "progetti_pro_high", "card_medium", "card_high".
+    quota_type: quale counter DB (quota_*_extra) viene incrementato.
+        Sempre il "base type" (libretti_kids/progetti_pro/cover/card).
+        La qualità è tracciata solo nel package_type del record purchase.
+    quality: "medium" | "high" | None (per libretti KIDS, sempre medium).
+    """
+    package_type: str
+    quota_type: str
     quantity: int
-    price_eur_cents: int  # es. 1200 = €12,00
+    price_eur_cents: int
+    quality: str | None = None
 
     @property
     def price_eur(self) -> float:
@@ -172,29 +236,32 @@ class ExtraPackageOption:
         return self.price_eur / self.quantity if self.quantity else 0.0
 
 
-# Listino: per ogni tipo, N opzioni con scala volumi (più compri meno costa)
+# Listino V03 — Piano Commerciale definitivo.
+# Solo unità singola per libretti/progetti; +1 o 5x per cover/figurine.
+# Cover e figurine hanno prezzi diversi tra Medium e High.
 EXTRA_PACKAGE_CATALOG: dict[str, list[ExtraPackageOption]] = {
+    # Libretti KIDS extra: solo unità singola, sempre medium
     "libretti_kids": [
-        ExtraPackageOption("libretti_kids", 1, 499),   # €4,99 → €4,99/cad
-        ExtraPackageOption("libretti_kids", 3, 1200),  # €12   → €4,00/cad
-        ExtraPackageOption("libretti_kids", 5, 1800),  # €18   → €3,60/cad
-        ExtraPackageOption("libretti_kids", 10, 3200), # €32   → €3,20/cad
+        ExtraPackageOption("libretti_kids", "libretti_kids", 1, 499),   # +1 €4,99
     ],
+    # Progetti Pro extra: Medium o High, solo unità singola
     "progetti_pro": [
-        ExtraPackageOption("progetti_pro", 1, 999),    # €9,99  → €9,99/cad
-        ExtraPackageOption("progetti_pro", 3, 2400),   # €24    → €8,00/cad
-        ExtraPackageOption("progetti_pro", 5, 3500),   # €35    → €7,00/cad
-        ExtraPackageOption("progetti_pro", 10, 6000),  # €60    → €6,00/cad
+        ExtraPackageOption("progetti_pro_medium", "progetti_pro", 1, 799, "medium"),   # +1 Medium €7,99
+        ExtraPackageOption("progetti_pro_high",   "progetti_pro", 1, 1499, "high"),    # +1 High €14,99
     ],
+    # Cover extra: Medium/High × 1 o 5
     "cover": [
-        ExtraPackageOption("cover", 3, 599),           # €5,99  → €2,00/cad
-        ExtraPackageOption("cover", 5, 900),           # €9,00  → €1,80/cad
-        ExtraPackageOption("cover", 10, 1600),         # €16,00 → €1,60/cad
+        ExtraPackageOption("cover_medium",   "cover", 1, 149, "medium"),   # +1 Medium €1,49
+        ExtraPackageOption("cover_medium_5", "cover", 5, 499, "medium"),   # 5 Medium €4,99
+        ExtraPackageOption("cover_high",     "cover", 1, 399, "high"),     # +1 High €3,99
+        ExtraPackageOption("cover_high_5",   "cover", 5, 1200, "high"),    # 5 High €12,00
     ],
+    # Figurine extra: Medium/High × 1 o 5
     "card": [
-        ExtraPackageOption("card", 3, 499),            # €4,99  → €1,66/cad
-        ExtraPackageOption("card", 5, 700),            # €7,00  → €1,40/cad
-        ExtraPackageOption("card", 10, 1200),          # €12    → €1,20/cad
+        ExtraPackageOption("card_medium",   "card", 1, 129, "medium"),    # +1 Medium €1,29
+        ExtraPackageOption("card_medium_5", "card", 5, 449, "medium"),    # 5 Medium €4,49
+        ExtraPackageOption("card_high",     "card", 1, 299, "high"),      # +1 High €2,99
+        ExtraPackageOption("card_high_5",   "card", 5, 1000, "high"),     # 5 High €10,00
     ],
 }
 

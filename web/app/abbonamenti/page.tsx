@@ -6,7 +6,7 @@ import { SiteShell } from "@/components/site";
 interface Feature { text: string; ok: boolean }
 interface Plan {
   id: string;
-  registerKey: string;  // valore per query ?plan= su /register
+  registerKey: string;
   emoji: string;
   name: string;
   price: string;
@@ -14,6 +14,7 @@ interface Plan {
   popular?: boolean;
   free?: boolean;
   features: Feature[];
+  welcomeBonus?: string;
   cta: string;
 }
 
@@ -46,14 +47,15 @@ const PLANS: Plan[] = [
     tagline: "Per famiglie, insegnanti, biblioteche",
     features: [
       { text: "1 libretto KIDS/mese (breve o lungo)", ok: true },
-      { text: "5 cover/mese", ok: true },
-      { text: "5 figurine/mese", ok: true },
+      { text: "2 cover/mese", ok: true },
+      { text: "2 figurine/mese", ok: true },
       { text: "Qualità Media", ok: true },
       { text: "Modalità KIDS guidata", ok: true },
       { text: "Export PDF stampabile", ok: true },
       { text: "Progetti Pro", ok: false },
       { text: "Qualità High", ok: false },
     ],
+    welcomeBonus: "🎉 1° mese: +5 cover e +5 figurine gratis!",
     cta: "Scegli KIDS →",
   },
   {
@@ -65,40 +67,57 @@ const PLANS: Plan[] = [
     tagline: "Per autori, hobbisti, professionisti",
     popular: true,
     features: [
-      { text: "5 progetti Pro/mese", ok: true },
-      { text: "1 libretto KIDS/mese", ok: true },
-      { text: "5 cover/mese", ok: true },
-      { text: "5 figurine/mese", ok: true },
-      { text: "Qualità Bassa + Media + Alta", ok: true },
-      { text: "Reference image avanzate", ok: true },
+      { text: "1 progetto Pro/mese", ok: true },
+      { text: "3 cover/mese", ok: true },
+      { text: "3 figurine/mese", ok: true },
+      { text: "Qualità Medium o High", ok: true },
+      { text: "BookShop community", ok: true },
+      { text: "Editor impaginazione libera", ok: true },
       { text: "Export PDF stampabile", ok: true },
-      { text: "Supporto prioritario", ok: true },
+      { text: "Libretti KIDS", ok: false },
     ],
+    welcomeBonus: "🎉 1° mese: +10 cover e +10 figurine gratis!",
     cta: "Scegli PRO →",
   },
 ];
 
 const TABLE: { feature: string; values: string[] }[] = [
-  { feature: "Libretti KIDS (breve/lungo)", values: ["❌", "1/mese", "1/mese"] },
-  { feature: "Striscia KIDS (1 tavola)", values: ["1 una tantum", "inclusa", "inclusa"] },
-  { feature: "Progetti Pro (fumetto)", values: ["❌", "❌", "5/mese"] },
-  { feature: "Cover standalone", values: ["1 una tantum", "5/mese", "5/mese"] },
-  { feature: "Figurine collezionabili", values: ["1 una tantum", "5/mese", "5/mese"] },
-  { feature: "Qualità Low + Medium", values: ["Solo Medium", "Solo Medium", "✅"] },
-  { feature: "Qualità High (4× costo)", values: ["❌", "❌", "✅"] },
+  { feature: "Libretti KIDS", values: ["❌ (solo striscia)", "1/mese", "❌"] },
+  { feature: "Striscia KIDS (1 tavola)", values: ["1 tantum", "inclusa", "❌"] },
+  { feature: "Progetti Pro (fumetto)", values: ["❌", "❌", "1/mese"] },
+  { feature: "Cover standalone", values: ["1 tantum", "2/mese", "3/mese"] },
+  { feature: "Figurine collezionabili", values: ["1 tantum", "2/mese", "3/mese"] },
+  { feature: "Qualità Medium", values: ["✅", "✅", "✅"] },
+  { feature: "Qualità High", values: ["❌", "❌", "✅"] },
   { feature: "Export PDF", values: ["✅", "✅", "✅"] },
   { feature: "BookShop pubblicazione", values: ["❌", "✅", "✅"] },
-  { feature: "Supporto", values: ["Community", "Email", "Prioritario"] },
+  { feature: "Editor impaginazione libera", values: ["❌", "❌", "✅"] },
+  { feature: "Welcome bonus 1° mese", values: ["—", "+5 cover +5 fig", "+10 cover +10 fig"] },
+];
+
+const EXTRA_TABLE: { feature: string; kids: string; pro: string }[] = [
+  { feature: "+1 libretto KIDS", kids: "€4,99", pro: "—" },
+  { feature: "+1 progetto Pro Medium", kids: "—", pro: "€7,99" },
+  { feature: "+1 progetto Pro High", kids: "—", pro: "€14,99" },
+  { feature: "+1 cover Medium", kids: "€1,49", pro: "€1,49" },
+  { feature: "5 cover Medium", kids: "€4,99", pro: "€4,99" },
+  { feature: "+1 cover High", kids: "—", pro: "€3,99" },
+  { feature: "5 cover High", kids: "—", pro: "€12,00" },
+  { feature: "+1 figurina Medium", kids: "€1,29", pro: "€1,29" },
+  { feature: "5 figurine Medium", kids: "€4,49", pro: "€4,49" },
+  { feature: "+1 figurina High", kids: "—", pro: "€2,99" },
+  { feature: "5 figurine High", kids: "—", pro: "€10,00" },
 ];
 
 const FAQ: { q: string; a: string }[] = [
-  { q: "Come funzionano le quote mensili?", a: "Ogni piano include un certo numero di libretti/cover/figurine/progetti al mese. Le quote non usate si resettano al rinnovo. Se ne servono di più, acquisti Pacchetti Extra che si sommano." },
-  { q: "Cos'è un Pacchetto Extra?", a: "Sono acquisti una-tantum di quote aggiuntive (es. 5 libretti KIDS a €18). Le quote extra NON scadono e vengono usate quando finiscono quelle del piano. Vedi tutti i pacchetti nella pagina /pacchetti dopo aver fatto login." },
+  { q: "Come funzionano le quote mensili?", a: "Ogni piano include un certo numero di libretti/progetti/cover/figurine al mese. Le quote non usate si resettano al rinnovo. Se ne servono di più, aggiungi Pacchetti Extra a unità singola." },
+  { q: "Cos'è il Welcome Bonus?", a: "Solo al PRIMO mese di attivazione del piano ricevi quote extra gratis: KIDS +5 cover e +5 figurine, PRO +10 cover e +10 figurine. Le quote extra non scadono." },
+  { q: "Cos'è un Pacchetto Extra?", a: "Sono acquisti una-tantum di quote aggiuntive (+1 libretto €4,99, +1 progetto Pro Medium €7,99, ecc.). Le quote extra NON scadono e vengono usate quando finiscono quelle del piano." },
+  { q: "Cos'è la differenza Medium vs High?", a: "Medium è la qualità standard (immagini di alta qualità già molto buone). High è la qualità massima OpenAI (dettagli più fini, testi più nitidi) ma costa di più: da qui i pacchetti separati Medium e High per cover e figurine." },
+  { q: "Il piano PRO include libretti KIDS?", a: "No. PRO è dedicato al workflow Pro (fumetto/webtoon/graphic novel con editor libero). Se vuoi anche libretti KIDS, aggiungi il piano KIDS o compra +1 libretto KIDS come extra." },
   { q: "Cos'è il piano Free-To-Play?", a: "Il piano gratuito di ingresso: 1 striscia KIDS, 1 figurina e 1 cover per capire come funziona SnapToon. Nessuna carta di credito." },
-  { q: "Posso passare da un piano all'altro?", a: "Sì, in qualsiasi momento. Il cambio è immediato e le nuove quote vengono applicate al rinnovo successivo." },
-  { q: "Posso disdire?", a: "Sì, in qualsiasi momento. Resti attivo fino a fine periodo già pagato." },
+  { q: "Posso passare da un piano all'altro?", a: "Sì, in qualsiasi momento. Il cambio è immediato. Il welcome bonus si applica solo al primo attivamento di ciascun piano a pagamento." },
   { q: "Le opere create sono mie?", a: "Sì, al 100%. SnapToon non rivendica diritti su quello che generi." },
-  { q: "Posso stampare o esportare in ePub/Kindle?", a: "Sì, come Servizi Extra a pagamento (stampa fisica da €19/copia, export ePub/Kindle €9,99/formato, export IDML tipografico €19,99). Vedi /pacchetti dopo il login." },
 ];
 
 export default function AbbonamentiPage() {
@@ -111,7 +130,7 @@ export default function AbbonamentiPage() {
         <div className="lp-container">
           <h1 style={{ fontSize: "clamp(1.75rem, 6vw, 3.75rem)", fontWeight: 800, color: "#F1F5F9", lineHeight: 1.1, letterSpacing: "-0.03em", marginBottom: "20px" }}>Scegli il piano giusto per te</h1>
           <p style={{ fontSize: "1.125rem", color: "#94A3B8", lineHeight: 1.6, maxWidth: "720px", margin: "0 auto" }}>
-            Inizia gratis con Free-To-Play. Poi passa a KIDS o PRO — quote mensili chiare + pacchetti extra all&apos;occorrenza. Nessuna sorpresa.
+            Inizia gratis. Passa a KIDS o PRO quando vuoi. Il primo mese ricevi un welcome bonus di cover e figurine extra gratis.
           </p>
         </div>
       </section>
@@ -146,6 +165,11 @@ export default function AbbonamentiPage() {
                   <span style={{ fontSize: "2rem", fontWeight: 800, color: "#F1F5F9" }}>{plan.price}</span>
                   {!plan.free && <span style={{ fontSize: "13px", color: "#64748B" }}>/mese</span>}
                 </div>
+                {plan.welcomeBonus && (
+                  <div style={{ background: "rgba(34,197,94,0.1)", border: "1px solid rgba(34,197,94,0.3)", borderRadius: "8px", padding: "8px 10px", marginBottom: "16px", fontSize: "12px", color: "#86EFAC", fontWeight: 600 }}>
+                    {plan.welcomeBonus}
+                  </div>
+                )}
                 <ul style={{ listStyle: "none", padding: 0, margin: "0 0 24px 0", display: "flex", flexDirection: "column", gap: "10px", flex: 1 }}>
                   {plan.features.map((f) => (
                     <li key={f.text} style={{ display: "flex", alignItems: "flex-start", gap: "8px", fontSize: "13.5px", color: f.ok ? "#CBD5E1" : "#64748B" }}>
@@ -190,35 +214,38 @@ export default function AbbonamentiPage() {
         </div>
       </section>
 
-      {/* Pacchetti Extra promo */}
+      {/* Pacchetti Extra V03 */}
       <section className="section" style={{ paddingTop: "60px", paddingBottom: "40px" }}>
         <div className="lp-container">
           <div style={{ textAlign: "center", marginBottom: "32px" }}>
-            <h2 style={{ fontSize: "clamp(1.5rem, 2.5vw, 2rem)", fontWeight: 700, color: "#F1F5F9", marginBottom: "12px" }}>Ti serve di più? Pacchetti extra</h2>
+            <h2 style={{ fontSize: "clamp(1.5rem, 2.5vw, 2rem)", fontWeight: 700, color: "#F1F5F9", marginBottom: "12px" }}>Pacchetti Extra a unità singola</h2>
             <p style={{ color: "#94A3B8", maxWidth: "640px", margin: "0 auto" }}>
-              Se finisci le quote mensili, aggiungi solo quello che ti serve senza cambiare piano. Più ne prendi, meno costano.
+              Finite le quote del mese? Aggiungi solo quello che ti serve. Le quote extra non scadono.
             </p>
           </div>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "16px" }}>
-            {[
-              { emoji: "📕", name: "Libretti KIDS extra", from: "da €4,99", scale: "10 libretti = €32 (€3,20/cad)" },
-              { emoji: "📗", name: "Progetti Pro extra", from: "da €9,99", scale: "10 progetti = €60 (€6,00/cad)" },
-              { emoji: "🖼️", name: "Cover extra", from: "da €5,99 x3", scale: "10 cover = €16 (€1,60/cad)" },
-              { emoji: "🎴", name: "Figurine extra", from: "da €4,99 x3", scale: "10 figurine = €12 (€1,20/cad)" },
-              { emoji: "🖨️", name: "Stampa fisica", from: "da €19/copia", scale: "50 copie = €329 (€6,58/cad)" },
-              { emoji: "📤", name: "Export ePub / Kindle / IDML", from: "da €9,99", scale: "Bundle Pro tutti i formati = €29,99" },
-            ].map((p) => (
-              <div key={p.name} style={{ background: "#161B26", border: "1px solid #1E2436", borderRadius: "14px", padding: "20px" }}>
-                <div style={{ fontSize: "22px", marginBottom: "8px" }}>{p.emoji}</div>
-                <div style={{ fontWeight: 700, color: "#F1F5F9", marginBottom: "4px" }}>{p.name}</div>
-                <div style={{ fontSize: "13px", color: "#F59E0B", marginBottom: "6px" }}>{p.from}</div>
-                <div style={{ fontSize: "12px", color: "#64748B" }}>{p.scale}</div>
-              </div>
-            ))}
+          <div style={{ overflowX: "auto", border: "1px solid #1E2436", borderRadius: "16px", maxWidth: "820px", margin: "0 auto" }}>
+            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "13.5px" }}>
+              <thead>
+                <tr style={{ background: "#161B26" }}>
+                  <th style={{ textAlign: "left", padding: "14px 18px", color: "#94A3B8", fontWeight: 600 }}>Pacchetto</th>
+                  <th style={{ textAlign: "center", padding: "14px 18px", color: "#22C55E", fontWeight: 700 }}>KIDS</th>
+                  <th style={{ textAlign: "center", padding: "14px 18px", color: "#F59E0B", fontWeight: 700 }}>PRO</th>
+                </tr>
+              </thead>
+              <tbody>
+                {EXTRA_TABLE.map((row, i) => (
+                  <tr key={row.feature} style={{ borderTop: "1px solid #1E2436", background: i % 2 ? "rgba(255,255,255,0.015)" : "transparent" }}>
+                    <td style={{ padding: "12px 18px", color: "#CBD5E1" }}>{row.feature}</td>
+                    <td style={{ padding: "12px 18px", textAlign: "center", color: "#E2E8F0" }}>{row.kids}</td>
+                    <td style={{ padding: "12px 18px", textAlign: "center", color: "#E2E8F0" }}>{row.pro}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
-          <div style={{ textAlign: "center", marginTop: "24px" }}>
-            <a href="/app/pacchetti" style={{ color: "#F59E0B", fontSize: "14px", fontWeight: 600 }}>Vedi listino completo (dopo login) →</a>
-          </div>
+          <p style={{ textAlign: "center", marginTop: "20px", color: "#64748B", fontSize: "13px" }}>
+            Gestisci le tue quote e acquisti da <a href="/app/pacchetti" style={{ color: "#F59E0B" }}>/app/pacchetti</a> (dopo login).
+          </p>
         </div>
       </section>
 
@@ -229,7 +256,7 @@ export default function AbbonamentiPage() {
             <div style={{ fontSize: "40px", marginBottom: "16px" }}>📚</div>
             <h2 style={{ fontSize: "clamp(1.5rem, 2.5vw, 2rem)", fontWeight: 800, color: "#F1F5F9", marginBottom: "12px" }}>Sei un editore?</h2>
             <p style={{ fontSize: "15px", color: "#94A3B8", lineHeight: 1.7, maxWidth: "640px", margin: "0 auto 24px" }}>
-              Case editrici, collettivi, studi creativi: se hai un progetto continuativo, ti costruiamo una convenzione su misura — volumi di crediti dedicati, branding personalizzato, account multi-utente, export IDML tipografico, supporto diretto.
+              Case editrici, collettivi, studi creativi: ti costruiamo una convenzione su misura — volumi dedicati, branding personalizzato, account multi-utente, export IDML tipografico, supporto diretto.
             </p>
             <a href="mailto:info@snaptoon.art?subject=Convenzione%20editore%20SnapToon" className="btn btn-primary" style={{ padding: "14px 28px", fontSize: "15px" }}>
               Mettiamoci in contatto →

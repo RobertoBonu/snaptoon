@@ -53,9 +53,11 @@ admin_router = APIRouter()
 
 
 class ExtraPackageOptionOut(BaseModel):
+    package_type: str
     quota_type: str
     quota_type_label: str
     quantity: int
+    quality: Optional[str] = None
     price_eur: float
     unit_price_eur: float
 
@@ -94,8 +96,8 @@ class MyQuotasOut(BaseModel):
 
 
 class BuyIn(BaseModel):
-    quota_type: str = Field(..., pattern="^(libretti_kids|progetti_pro|cover|card)$")
-    quantity: int = Field(..., gt=0)
+    # Nuovo formato V03: package_type esatto (es. cover_high_5)
+    package_type: str = Field(..., min_length=1)
     mock_stripe_token: str = Field(default="mock_test_token")
 
 
@@ -174,9 +176,11 @@ def _catalog_out() -> CatalogOut:
     for qt, options in EXTRA_PACKAGE_CATALOG.items():
         extra_out[qt] = [
             ExtraPackageOptionOut(
+                package_type=o.package_type,
                 quota_type=o.quota_type,
                 quota_type_label=QUOTA_LABELS.get(o.quota_type, o.quota_type),
                 quantity=o.quantity,
+                quality=o.quality,
                 price_eur=o.price_eur,
                 unit_price_eur=round(o.unit_price_eur, 2),
             )
@@ -204,12 +208,12 @@ def _catalog_out() -> CatalogOut:
     )
 
 
-def _price_for_extra_package(quota_type: str, quantity: int) -> Optional[int]:
-    """Ritorna il prezzo in centesimi per un pacchetto (quota_type, quantity)
-    solo se la combinazione è nel catalogo; None altrimenti."""
-    for opt in EXTRA_PACKAGE_CATALOG.get(quota_type, []):
-        if opt.quantity == quantity:
-            return opt.price_eur_cents
+def _find_package_option(package_type: str):
+    """Ritorna l'ExtraPackageOption dal catalogo, o None se non esiste."""
+    for options in EXTRA_PACKAGE_CATALOG.values():
+        for opt in options:
+            if opt.package_type == package_type:
+                return opt
     return None
 
 
@@ -280,15 +284,14 @@ def buy_package(
 ) -> PurchaseOut:
     """Acquisto MOCK di un pacchetto extra. Non c'è addebito reale.
 
-    Verifica che (quota_type, quantity) sia nel catalogo, poi:
-    1. Registra ExtraPackagePurchase con status=paid
-    2. Incrementa user.quota_<type>_extra di quantity
+    Nuovo formato V03: il client invia package_type preciso (es. cover_high_5).
+    Il backend risale a (quota_type, quantity, prezzo) dal catalogo.
     """
-    price_cents = _price_for_extra_package(payload.quota_type, payload.quantity)
-    if price_cents is None:
+    opt = _find_package_option(payload.package_type)
+    if opt is None:
         raise HTTPException(
             status_code=400,
-            detail=f"Pacchetto non nel catalogo: {payload.quota_type} x{payload.quantity}",
+            detail=f"Pacchetto non nel catalogo: {payload.package_type}",
         )
 
     user_id = uuid.UUID(user["id"])
@@ -298,21 +301,21 @@ def buy_package(
             raise HTTPException(status_code=404, detail="Utente non trovato")
         purchase = ExtraPackagePurchase(
             user_id=user_id,
-            package_type=payload.quota_type,
-            quantity=payload.quantity,
-            price_eur_cents=price_cents,
+            package_type=payload.package_type,
+            quantity=opt.quantity,
+            price_eur_cents=opt.price_eur_cents,
             stripe_payment_id=payload.mock_stripe_token,
             status="paid",
         )
         s.add(purchase)
-        # Incrementa la quota extra
-        add_extra(u, payload.quota_type, payload.quantity)
+        # Incrementa il counter DB (usa il quota_type base, non package_type)
+        add_extra(u, opt.quota_type, opt.quantity)
         s.flush()
         return PurchaseOut(
             id=str(purchase.id),
-            package_type=payload.quota_type,
-            quantity=payload.quantity,
-            price_eur=price_cents / 100,
+            package_type=payload.package_type,
+            quantity=opt.quantity,
+            price_eur=opt.price_eur_cents / 100,
             status="paid",
             created_at=purchase.created_at.isoformat(),
         )
