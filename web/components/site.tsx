@@ -4,7 +4,6 @@ import { ReactNode, useEffect, useState } from "react";
 
 /** Voci del menu pubblico — collegate alle pagine reali. */
 export const NAV: { label: string; href: string }[] = [
-  { label: "Esplora", href: "/esplora" },
   { label: "Autori", href: "/crea" },
   { label: "Kids", href: "/kids" },
   { label: "BookShop", href: "/bookshop" },

@@ -126,7 +126,7 @@ export default function KidsShowcasePage() {
                 margin: "20px 0",
               }}
             >
-              Il fumetto sei TU. In 5 minuti.
+              Mamma, Papà: facciamo un fumetto?
             </h1>
             <p
               style={{
@@ -136,8 +136,8 @@ export default function KidsShowcasePage() {
                 marginBottom: "32px",
               }}
             >
-              SnapToon KIDS trasforma un&apos;idea di 10 parole nel libretto
-              illustrato dei sogni. Nessuna competenza tecnica: il wizard fa
+              In 5 minuti trasforma un&apos;idea di 10 parole in un libretto
+              illustrato. Nessuna competenza tecnica: il wizard fa
               tutto in 6 passaggi. Perfetto per sorprendere tuo figlio,
               organizzare un laboratorio in classe, o creare il regalo di
               compleanno più originale della storia.
