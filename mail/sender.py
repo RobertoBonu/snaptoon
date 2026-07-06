@@ -14,9 +14,11 @@ from __future__ import annotations
 
 import logging
 import os
+import re
 import smtplib
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
+from email.utils import formatdate, make_msgid, parseaddr
 
 logger = logging.getLogger(__name__)
 
@@ -61,17 +63,33 @@ def send_email(
     msg["From"] = cfg["from_addr"]
     msg["To"] = to
     msg["Subject"] = subject
+    # Header standard richiesti dai filtri antispam: senza Date/Message-ID
+    # alcuni provider (es. SMTP di dominio) rifiutano con "550 Spam Rejected".
+    msg["Date"] = formatdate(localtime=True)
+    _from_addr = parseaddr(cfg["from_addr"])[1]
+    _from_domain = _from_addr.split("@")[-1] if "@" in _from_addr else None
+    msg["Message-ID"] = make_msgid(domain=_from_domain)
 
-    if text:
-        msg.attach(MIMEText(text, "plain", "utf-8"))
+    # Parte testo sempre presente (anti-spam): usa `text` se fornito,
+    # altrimenti deriva un fallback testuale dall'HTML.
+    if not text:
+        text = re.sub(r"<[^>]+>", " ", html)
+        text = re.sub(r"\s+", " ", text).strip()
+    msg.attach(MIMEText(text, "plain", "utf-8"))
     msg.attach(MIMEText(html, "html", "utf-8"))
 
     try:
         port = int(cfg["port"])
-        with smtplib.SMTP(cfg["host"], port, timeout=15) as server:
+        # Porta 465 = SSL implicito (SMTP_SSL); 587/25 = STARTTLS su SMTP.
+        if port == 465:
+            server = smtplib.SMTP_SSL(cfg["host"], port, timeout=15)
+        else:
+            server = smtplib.SMTP(cfg["host"], port, timeout=15)
+        with server:
             server.ehlo()
-            server.starttls()
-            server.ehlo()
+            if port != 465:
+                server.starttls()
+                server.ehlo()
             if cfg["user"] and cfg["password"]:
                 server.login(cfg["user"], cfg["password"])
             server.sendmail(cfg["from_addr"], [to], msg.as_string())
