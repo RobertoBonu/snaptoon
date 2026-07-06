@@ -35,6 +35,7 @@ export default function Landing() {
       <HeroSection src={src} />
       <AutoriSection src={src} />
       <KidsSection src={src} />
+      <UtilitySection />
       <EsploraSection src={src} />
       <BookshopSection src={src} />
       <FinalCtaSection src={src} />
@@ -425,6 +426,236 @@ function KidsSection({
           >
             Scopri KIDS <ArrowRight size={18} />
           </a>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+// ============================================================
+// Utility trasversali — Cover standalone + Figurine collezionabili
+// ============================================================
+
+function UtilitySection() {
+  return (
+    <section
+      className="section"
+      style={{
+        paddingTop: "60px",
+        paddingBottom: "80px",
+        background:
+          "linear-gradient(180deg, rgba(245,158,11,0.02) 0%, rgba(139,92,246,0.03) 100%)",
+        borderTop: "1px solid rgba(245,158,11,0.15)",
+        borderBottom: "1px solid rgba(139,92,246,0.15)",
+      }}
+    >
+      <div className="lp-container">
+        <div style={{ textAlign: "center", marginBottom: "40px" }}>
+          <span className="eyebrow">✨ Nuove utility creative</span>
+          <h2
+            style={{
+              fontSize: "clamp(2rem, 3.5vw, 2.75rem)",
+              fontWeight: 800,
+              color: "#F1F5F9",
+              letterSpacing: "-0.02em",
+              lineHeight: 1.1,
+              margin: "20px 0 16px",
+            }}
+          >
+            Cover e Figurine, senza fare un libretto intero.
+          </h2>
+          <p
+            style={{
+              fontSize: "1.0625rem",
+              color: "#94A3B8",
+              lineHeight: 1.7,
+              maxWidth: "680px",
+              margin: "0 auto",
+            }}
+          >
+            Due strumenti standalone per creare in pochi secondi e condividere
+            nel BookShop community.
+          </p>
+        </div>
+
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))",
+            gap: "24px",
+          }}
+        >
+          {/* Card COVER */}
+          <div
+            style={{
+              background: "#161B26",
+              border: "1px solid rgba(245,158,11,0.25)",
+              borderRadius: "18px",
+              padding: "32px",
+              display: "flex",
+              flexDirection: "column",
+            }}
+          >
+            <div style={{ fontSize: "38px", marginBottom: "12px" }}>🖼️</div>
+            <h3
+              style={{
+                fontSize: "1.5rem",
+                fontWeight: 800,
+                color: "#F1F5F9",
+                marginBottom: "8px",
+              }}
+            >
+              Cover standalone
+            </h3>
+            <p
+              style={{
+                fontSize: "14px",
+                color: "#94A3B8",
+                lineHeight: 1.7,
+                marginBottom: "20px",
+              }}
+            >
+              Copertina professionale in formato libretto 2:3 in 30 secondi.
+              Titolo, sottotitolo, autore, personaggi &mdash; l&apos;AI mette insieme
+              tutto. Ideale per libri autopubblicati, quaderni scolastici,
+              regali, portfolio.
+            </p>
+            <ul
+              style={{
+                listStyle: "none",
+                padding: 0,
+                margin: "0 0 24px 0",
+                display: "grid",
+                gap: "8px",
+                flex: 1,
+              }}
+            >
+              {[
+                "Stessi 13 stili del wizard KIDS + Pro",
+                "Personaggi dal tuo archivio o creati al volo (foto o testo)",
+                "Titolo integrato nell'illustrazione, non sovrapposto",
+                "Pubblicabile nel BookShop community",
+              ].map((line) => (
+                <li
+                  key={line}
+                  style={{
+                    fontSize: "14px",
+                    color: "#CBD5E1",
+                    display: "flex",
+                    gap: "8px",
+                    alignItems: "flex-start",
+                  }}
+                >
+                  <span style={{ color: "#F59E0B", marginTop: "2px" }}>✓</span>
+                  <span>{line}</span>
+                </li>
+              ))}
+            </ul>
+            <a
+              href="/register?plan=free_to_play"
+              className="btn btn-primary"
+              style={{ padding: "12px 20px", fontSize: "14px" }}
+            >
+              Prova gratis 1 cover <ArrowRight size={16} />
+            </a>
+          </div>
+
+          {/* Card FIGURINE */}
+          <div
+            style={{
+              background: "#161B26",
+              border: "1px solid rgba(139,92,246,0.3)",
+              borderRadius: "18px",
+              padding: "32px",
+              position: "relative",
+              display: "flex",
+              flexDirection: "column",
+            }}
+          >
+            <span
+              style={{
+                position: "absolute",
+                top: "-12px",
+                left: "24px",
+                background: "linear-gradient(135deg, #8B5CF6 0%, #EC4899 100%)",
+                color: "#FFF",
+                fontSize: "11px",
+                fontWeight: 700,
+                padding: "5px 12px",
+                borderRadius: "100px",
+                whiteSpace: "nowrap",
+              }}
+            >
+              🎴 NOVITÀ COLLECTIBLE
+            </span>
+            <div style={{ fontSize: "38px", marginBottom: "12px" }}>🎴</div>
+            <h3
+              style={{
+                fontSize: "1.5rem",
+                fontWeight: 800,
+                color: "#F1F5F9",
+                marginBottom: "8px",
+              }}
+            >
+              Figurine collezionabili
+            </h3>
+            <p
+              style={{
+                fontSize: "14px",
+                color: "#94A3B8",
+                lineHeight: 1.7,
+                marginBottom: "20px",
+              }}
+            >
+              Card numerate progressivamente in tutta SnapToon: #0001, #0002,
+              #0003... Ogni figurina è unica, con nome, tipo, illustrazione AI
+              e stelle di rarità. Le tue creazioni entrano nel bestiario della
+              community.
+            </p>
+            <ul
+              style={{
+                listStyle: "none",
+                padding: 0,
+                margin: "0 0 24px 0",
+                display: "grid",
+                gap: "8px",
+                flex: 1,
+              }}
+            >
+              {[
+                "Numero seriale globale, non ripetibile",
+                "Layout ispirato alle card sportive/Pokémon",
+                "Da testo o da foto reale (privacy: foto cancellata dopo)",
+                "Pubblicabili nel BookShop → community & scambi futuri",
+              ].map((line) => (
+                <li
+                  key={line}
+                  style={{
+                    fontSize: "14px",
+                    color: "#CBD5E1",
+                    display: "flex",
+                    gap: "8px",
+                    alignItems: "flex-start",
+                  }}
+                >
+                  <span style={{ color: "#EC4899", marginTop: "2px" }}>✓</span>
+                  <span>{line}</span>
+                </li>
+              ))}
+            </ul>
+            <a
+              href="/register?plan=free_to_play"
+              className="btn btn-primary"
+              style={{
+                padding: "12px 20px",
+                fontSize: "14px",
+                background: "linear-gradient(135deg, #8B5CF6 0%, #EC4899 100%)",
+                borderColor: "transparent",
+              }}
+            >
+              Crea la tua figurina <ArrowRight size={16} />
+            </a>
+          </div>
         </div>
       </div>
     </section>

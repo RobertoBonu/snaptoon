@@ -130,6 +130,167 @@ export default function CreaPage() {
         </div>
       </section>
 
+      {/* Utility Autori: Cover + Figurine */}
+      <section
+        className="section"
+        style={{
+          paddingTop: "40px",
+          paddingBottom: "60px",
+          background:
+            "linear-gradient(180deg, rgba(245,158,11,0.02) 0%, rgba(139,92,246,0.04) 100%)",
+          borderTop: "1px solid rgba(245,158,11,0.15)",
+          borderBottom: "1px solid rgba(139,92,246,0.15)",
+        }}
+      >
+        <div className="lp-container">
+          <div style={{ textAlign: "center", marginBottom: "36px" }}>
+            <span className="eyebrow">✨ Extra per gli Autori</span>
+            <h2
+              style={{
+                fontSize: "clamp(1.75rem, 3vw, 2.25rem)",
+                fontWeight: 800,
+                color: "#F1F5F9",
+                margin: "16px 0 12px",
+              }}
+            >
+              Cover e Figurine, standalone o legate ai tuoi progetti
+            </h2>
+            <p
+              style={{
+                fontSize: "1rem",
+                color: "#94A3B8",
+                lineHeight: 1.7,
+                maxWidth: "680px",
+                margin: "0 auto",
+              }}
+            >
+              Non solo tavole. Costruisci il tuo mondo con copertine
+              autonome e figurine collezionabili dei tuoi personaggi.
+            </p>
+          </div>
+
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
+              gap: "24px",
+            }}
+          >
+            <div
+              style={{
+                background: "#161B26",
+                border: "1px solid rgba(245,158,11,0.25)",
+                borderRadius: "16px",
+                padding: "28px",
+              }}
+            >
+              <div style={{ fontSize: "32px", marginBottom: "10px" }}>🖼️</div>
+              <h3
+                style={{
+                  fontSize: "1.25rem",
+                  fontWeight: 700,
+                  color: "#F1F5F9",
+                  marginBottom: "8px",
+                }}
+              >
+                Cover standalone
+              </h3>
+              <p
+                style={{
+                  fontSize: "14px",
+                  color: "#94A3B8",
+                  lineHeight: 1.6,
+                  marginBottom: "12px",
+                }}
+              >
+                Genera copertine 2:3 con qualità High per portfolio, poster
+                promozionali, quarte di copertina alternative, materiale di
+                pitch. Riusa il tuo cast archive per coerenza visiva.
+              </p>
+              <p
+                style={{
+                  fontSize: "13px",
+                  color: "#F59E0B",
+                  fontWeight: 600,
+                }}
+              >
+                Piano PRO: 3 cover/mese in qualità High
+              </p>
+            </div>
+
+            <div
+              style={{
+                background: "#161B26",
+                border: "1px solid rgba(139,92,246,0.3)",
+                borderRadius: "16px",
+                padding: "28px",
+                position: "relative",
+              }}
+            >
+              <span
+                style={{
+                  position: "absolute",
+                  top: "-10px",
+                  left: "20px",
+                  background:
+                    "linear-gradient(135deg, #8B5CF6 0%, #EC4899 100%)",
+                  color: "#FFF",
+                  fontSize: "10px",
+                  fontWeight: 700,
+                  padding: "4px 10px",
+                  borderRadius: "100px",
+                }}
+              >
+                🎴 COLLECTIBLE
+              </span>
+              <div style={{ fontSize: "32px", marginBottom: "10px" }}>🎴</div>
+              <h3
+                style={{
+                  fontSize: "1.25rem",
+                  fontWeight: 700,
+                  color: "#F1F5F9",
+                  marginBottom: "8px",
+                }}
+              >
+                Figurine dei tuoi personaggi
+              </h3>
+              <p
+                style={{
+                  fontSize: "14px",
+                  color: "#94A3B8",
+                  lineHeight: 1.6,
+                  marginBottom: "12px",
+                }}
+              >
+                Trasforma i personaggi del tuo fumetto in card numerate globalmente
+                (#0001, #0002...). Ottimo per marketing, teaser, campagne
+                Kickstarter, community di lettori. In roadmap: scambi e
+                collezioni tematiche.
+              </p>
+              <p
+                style={{
+                  fontSize: "13px",
+                  color: "#EC4899",
+                  fontWeight: 600,
+                }}
+              >
+                Piano PRO: 3 figurine/mese in qualità High
+              </p>
+            </div>
+          </div>
+
+          <div style={{ textAlign: "center", marginTop: "28px" }}>
+            <a
+              href="/abbonamenti"
+              className="btn btn-secondary"
+              style={{ padding: "12px 24px", fontSize: "14px" }}
+            >
+              Vedi il piano PRO
+            </a>
+          </div>
+        </div>
+      </section>
+
       {/* CTA finale */}
       <section className="section" style={{ paddingTop: "20px", paddingBottom: "100px" }}>
         <div className="lp-container" style={{ textAlign: "center" }}>

@@ -297,6 +297,166 @@ export default function KidsShowcasePage() {
         </div>
       </section>
 
+      {/* Utility: Cover + Figurine (angolo KIDS/famiglia) */}
+      <section
+        className="section"
+        style={{
+          paddingTop: "40px",
+          paddingBottom: "60px",
+          background:
+            "linear-gradient(180deg, rgba(139,92,246,0.03) 0%, rgba(245,158,11,0.02) 100%)",
+          borderTop: "1px solid rgba(245,158,11,0.15)",
+        }}
+      >
+        <div className="lp-container">
+          <div style={{ textAlign: "center", marginBottom: "36px" }}>
+            <span className="eyebrow">✨ Bonus KIDS</span>
+            <h2
+              style={{
+                fontSize: "clamp(1.75rem, 3vw, 2.25rem)",
+                fontWeight: 800,
+                color: "#F1F5F9",
+                margin: "16px 0 12px",
+              }}
+            >
+              Non solo libretti: Cover e Figurine per i più piccoli
+            </h2>
+            <p
+              style={{
+                fontSize: "1rem",
+                color: "#94A3B8",
+                lineHeight: 1.7,
+                maxWidth: "620px",
+                margin: "0 auto",
+              }}
+            >
+              Perfetti per compleanni, laboratori scolastici, gadget di classe
+              o come sorpresa quotidiana.
+            </p>
+          </div>
+
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
+              gap: "24px",
+            }}
+          >
+            <div
+              style={{
+                background: "#161B26",
+                border: "1px solid rgba(245,158,11,0.25)",
+                borderRadius: "16px",
+                padding: "28px",
+              }}
+            >
+              <div style={{ fontSize: "32px", marginBottom: "10px" }}>🖼️</div>
+              <h3
+                style={{
+                  fontSize: "1.25rem",
+                  fontWeight: 700,
+                  color: "#F1F5F9",
+                  marginBottom: "8px",
+                }}
+              >
+                Una copertina personalizzata
+              </h3>
+              <p
+                style={{
+                  fontSize: "14px",
+                  color: "#94A3B8",
+                  lineHeight: 1.6,
+                  marginBottom: "16px",
+                }}
+              >
+                Il ritratto di famiglia in stile fumetto, il poster del
+                compleanno, la copertina del quaderno del bambino con lui/lei
+                come protagonista. Formato 2:3 stampabile.
+              </p>
+              <p
+                style={{
+                  fontSize: "13px",
+                  color: "#F59E0B",
+                  fontWeight: 600,
+                }}
+              >
+                Piano KIDS: 2 cover/mese incluse
+              </p>
+            </div>
+
+            <div
+              style={{
+                background: "#161B26",
+                border: "1px solid rgba(139,92,246,0.3)",
+                borderRadius: "16px",
+                padding: "28px",
+                position: "relative",
+              }}
+            >
+              <span
+                style={{
+                  position: "absolute",
+                  top: "-10px",
+                  left: "20px",
+                  background:
+                    "linear-gradient(135deg, #8B5CF6 0%, #EC4899 100%)",
+                  color: "#FFF",
+                  fontSize: "10px",
+                  fontWeight: 700,
+                  padding: "4px 10px",
+                  borderRadius: "100px",
+                }}
+              >
+                🎴 COLLECTIBLE
+              </span>
+              <div style={{ fontSize: "32px", marginBottom: "10px" }}>🎴</div>
+              <h3
+                style={{
+                  fontSize: "1.25rem",
+                  fontWeight: 700,
+                  color: "#F1F5F9",
+                  marginBottom: "8px",
+                }}
+              >
+                Le figurine di famiglia
+              </h3>
+              <p
+                style={{
+                  fontSize: "14px",
+                  color: "#94A3B8",
+                  lineHeight: 1.6,
+                  marginBottom: "16px",
+                }}
+              >
+                Ogni bambino la sua card numerata (#0001, #0002...) con
+                illustrazione AI, stelle di rarità e caption. Colleziona
+                l&apos;intera classe, il tuo team sportivo, la squadra di
+                cugini. In futuro: scambi e collezioni tematiche nella community.
+              </p>
+              <p
+                style={{
+                  fontSize: "13px",
+                  color: "#EC4899",
+                  fontWeight: 600,
+                }}
+              >
+                Piano KIDS: 2 figurine/mese incluse
+              </p>
+            </div>
+          </div>
+
+          <div style={{ textAlign: "center", marginTop: "28px" }}>
+            <a
+              href="/register?plan=kids_plan"
+              className="btn btn-secondary"
+              style={{ padding: "12px 24px", fontSize: "14px" }}
+            >
+              Scopri il piano KIDS
+            </a>
+          </div>
+        </div>
+      </section>
+
       {/* CTA finale */}
       <section
         className="section"
