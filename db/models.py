@@ -128,6 +128,27 @@ class User(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     must_change_password: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     has_seen_onboarding: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
+    # === Anagrafica (2026-07: nome + cognome opzionali) ===
+    first_name: Mapped[str] = mapped_column(
+        String(80), nullable=False, default="", server_default=""
+    )
+    last_name: Mapped[str] = mapped_column(
+        String(80), nullable=False, default="", server_default=""
+    )
+
+    # === Email verification (2026-07: token nel link ricevuto per posta) ===
+    # Gli utenti creati prima di questa migrazione sono considerati verificati
+    # (server_default=true) per retrocompat.
+    email_verified: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default="true"
+    )
+    email_verification_token: Mapped[str | None] = mapped_column(
+        String(120), nullable=True, index=True
+    )
+    email_verified_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+
     # Pseudonimo/brand pubblico usato al posto dell'email nelle card
     # Esplora quando l'utente condivide personaggi/cover/tavole. Default
     # stringa vuota — se vuoto, si ricade sul prefisso dell'email.

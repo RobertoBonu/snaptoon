@@ -7,12 +7,17 @@ export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [emailNotVerified, setEmailNotVerified] = useState(false);
+  const [resending, setResending] = useState(false);
+  const [resent, setResent] = useState(false);
   const [loading, setLoading] = useState(false);
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setLoading(true);
     setError(null);
+    setEmailNotVerified(false);
+    setResent(false);
     try {
       const res = await fetch("/api/auth/login", {
         method: "POST",
@@ -22,15 +27,39 @@ export default function LoginPage() {
       });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
-        setError(data.detail || "Credenziali non valide");
+        // 403 = email non verificata → mostra opzione "rimanda mail"
+        if (res.status === 403) {
+          setEmailNotVerified(true);
+        }
+        const msg =
+          typeof data.detail === "string"
+            ? data.detail
+            : data.detail?.message || "Credenziali non valide";
+        setError(msg);
         setLoading(false);
         return;
       }
-      // Redirect a dashboard
       window.location.href = "/app";
     } catch {
       setError("Errore di connessione. Riprova.");
       setLoading(false);
+    }
+  }
+
+  async function resendVerification() {
+    if (!email) return;
+    setResending(true);
+    try {
+      await fetch("/api/auth/resend-verification", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email }),
+      });
+      setResent(true);
+    } catch {
+      /* silenzioso — la risposta è comunque sempre 200 lato server */
+    } finally {
+      setResending(false);
     }
   }
 
@@ -87,9 +116,27 @@ export default function LoginPage() {
           </div>
 
           {error && (
-            <p className="text-red-400 text-sm bg-red-950/30 border border-red-900/50 rounded px-3 py-2">
-              {error}
-            </p>
+            <div className="text-sm bg-red-950/30 border border-red-900/50 rounded px-3 py-2 text-red-400">
+              <p>{error}</p>
+              {emailNotVerified && (
+                <div className="mt-2 pt-2 border-t border-red-900/50">
+                  {resent ? (
+                    <p className="text-green-400">
+                      ✅ Se il tuo indirizzo esiste, ti abbiamo mandato una nuova email.
+                    </p>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={resendVerification}
+                      disabled={resending || !email}
+                      className="text-[var(--color-accent)] underline hover:text-[var(--color-accent-hover)] disabled:opacity-40"
+                    >
+                      {resending ? "Invio in corso..." : "→ Rimandami l'email di verifica"}
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
           )}
 
           <button

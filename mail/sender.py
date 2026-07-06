@@ -103,8 +103,98 @@ def _wrap_html(body_html: str) -> str:
 """
 
 
+def _public_base_url() -> str:
+    """URL base pubblico per costruire link nelle email.
+
+    Priorità:
+    1. Env var PUBLIC_BASE_URL (es. https://snaptoon.art)
+    2. Env var REPLIT_DEV_DOMAIN (es. xxx-yyy.replit.dev)
+    3. Fallback dev locale
+    """
+    url = os.getenv("PUBLIC_BASE_URL", "").strip()
+    if url:
+        return url.rstrip("/")
+    replit_domain = os.getenv("REPLIT_DEV_DOMAIN", "").strip()
+    if replit_domain:
+        return f"https://{replit_domain}"
+    return "https://snaptoon.art"
+
+
+def send_email_verification(email: str, token: str, display_name: str = "") -> bool:
+    """Prima email: chiede di cliccare il link per verificare l'indirizzo."""
+    verify_url = f"{_public_base_url()}/verify?token={token}"
+    greeting = f"Ciao {display_name}," if display_name.strip() else "Ciao,"
+    body = f"""
+<p>{greeting}</p>
+<h2>Conferma il tuo indirizzo email</h2>
+<p>Grazie per esserti iscritto a SnapToon! Per completare la
+registrazione clicca sul pulsante qui sotto:</p>
+<p style="text-align:center;margin:32px 0">
+  <a href="{verify_url}" style="background:#F59E0B;color:#0D1017;
+     padding:14px 32px;text-decoration:none;border-radius:8px;font-weight:700;
+     display:inline-block">
+    Verifica la mia email →
+  </a>
+</p>
+<p>Oppure copia questo link nel browser:<br>
+<a href="{verify_url}" style="color:#F59E0B;word-break:break-all">{verify_url}</a></p>
+<p style="color:#888;font-size:13px">Se non hai richiesto questa registrazione,
+ignora questo messaggio: il tuo indirizzo non verrà attivato.</p>
+"""
+    return send_email(
+        to=email,
+        subject="Conferma il tuo indirizzo email — SnapToon",
+        html=_wrap_html(body),
+    )
+
+
+def send_welcome_after_verification(
+    email: str,
+    first_name: str,
+    last_name: str,
+    pseudonym: str,
+    plan_label: str,
+) -> bool:
+    """Seconda email: benvenuto post-verifica.
+
+    "Ciao [nome cognome] + [pseudonimo] - Ora sei dei nostri!"
+    """
+    name_full = f"{first_name} {last_name}".strip()
+    if pseudonym.strip() and name_full:
+        greeting = f"Ciao {name_full} · {pseudonym}"
+    elif name_full:
+        greeting = f"Ciao {name_full}"
+    elif pseudonym.strip():
+        greeting = f"Ciao {pseudonym}"
+    else:
+        greeting = "Ciao"
+
+    body = f"""
+<h2>{greeting},<br>ora sei dei nostri! 🎉</h2>
+<p>Il tuo account <b>{plan_label}</b> è attivo!!!</p>
+<p style="text-align:center;margin:32px 0">
+  <a href="{_public_base_url()}/app" style="background:#F59E0B;color:#0D1017;
+     padding:12px 28px;text-decoration:none;border-radius:8px;font-weight:700">
+    Entra in SnapToon →
+  </a>
+</p>
+<p>Buon divertimento con SnapToon! Racconta una scintilla e guarda
+l'AI trasformarla in un fumetto illustrato.</p>
+<p><b>...e non dimenticare di darci un tuo feedback!</b> Rispondi
+direttamente a questa email o scrivi a
+<a href="mailto:info@snaptoon.art">info@snaptoon.art</a>.
+Le prime settimane sono cruciali per capire cosa migliorare.</p>
+"""
+    return send_email(
+        to=email,
+        subject=f"Ora sei dei nostri! Account {plan_label} attivo — SnapToon",
+        html=_wrap_html(body),
+    )
+
+
 def send_registration_confirmation(email: str, plan_label: str) -> bool:
-    """Email inviata immediatamente dopo la registrazione."""
+    """LEGACY (mantenuta): email ricevuta ma non verifica.
+    Usa send_email_verification per il nuovo flusso."""
     body = f"""
 <h2>Grazie per esserti iscritto a SnapToon!</h2>
 <p>Abbiamo ricevuto la tua richiesta di attivazione del piano <b>{plan_label}</b>.</p>

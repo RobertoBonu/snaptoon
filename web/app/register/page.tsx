@@ -64,6 +64,8 @@ function RegisterInner() {
   const [plan, setPlan] = useState<"free_to_play" | "kids_plan" | "base">(initialPlan);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
   const [pseudonym, setPseudonym] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -79,7 +81,10 @@ function RegisterInner() {
       const res = await fetch("/api/auth/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password, plan, pseudonym }),
+        body: JSON.stringify({
+          email, password, plan, pseudonym,
+          first_name: firstName, last_name: lastName,
+        }),
         credentials: "include",
       });
       const data = await res.json().catch(() => ({}));
@@ -118,18 +123,22 @@ function RegisterInner() {
       <main className="min-h-screen flex items-center justify-center px-6 py-12">
         <div className="w-full max-w-md text-center">
           <div className="text-6xl mb-4">✉️</div>
-          <h1 className="text-3xl font-bold mb-4">Registrazione ricevuta!</h1>
+          <h1 className="text-3xl font-bold mb-4">Controlla la tua email</h1>
           <p className="text-[var(--color-fg-muted)] mb-6">
-            Ti abbiamo inviato una email di conferma a{" "}
+            Ti abbiamo inviato un link di verifica a{" "}
             <b className="text-[var(--color-fg)]">{success.email}</b>.
             <br />
-            Ti manderemo un&apos;altra email quando il tuo piano{" "}
-            <b>{success.planLabel}</b> sarà attivo (di solito entro poche
-            ore).
+            Clicca sul link per attivare il tuo account{" "}
+            <b>{success.planLabel}</b>. Se non vedi la mail, controlla
+            anche la cartella Spam.
+          </p>
+          <p className="text-xs text-[var(--color-fg-muted)] mb-6">
+            Dopo la verifica riceverai un&apos;altra email di benvenuto e
+            potrai fare login.
           </p>
           <Link
             href="/login"
-            className="inline-block bg-[var(--color-accent)] hover:bg-[var(--color-accent-hover)] text-[var(--color-bg)] font-semibold px-6 py-3 rounded-lg"
+            className="inline-block border border-[var(--color-border)] text-[var(--color-fg)] hover:border-[var(--color-accent)] font-semibold px-6 py-3 rounded-lg"
           >
             Vai al login
           </Link>
@@ -244,15 +253,42 @@ function RegisterInner() {
                   className="w-full px-3 py-2 bg-[var(--color-bg)] border border-[var(--color-border)] rounded"
                 />
               </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm font-medium mb-1">
+                    Nome <span className="text-[var(--color-fg-muted)]">(opzionale)</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={firstName}
+                    onChange={(e) => setFirstName(e.target.value)}
+                    maxLength={80}
+                    className="w-full px-3 py-2 bg-[var(--color-bg)] border border-[var(--color-border)] rounded"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">
+                    Cognome <span className="text-[var(--color-fg-muted)]">(opzionale)</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={lastName}
+                    onChange={(e) => setLastName(e.target.value)}
+                    maxLength={80}
+                    className="w-full px-3 py-2 bg-[var(--color-bg)] border border-[var(--color-border)] rounded"
+                  />
+                </div>
+              </div>
               <div>
                 <label className="block text-sm font-medium mb-1">
-                  Nome autore / pseudonimo <span className="text-[var(--color-fg-muted)]">(opzionale)</span>
+                  Pseudonimo / brand pubblico <span className="text-[var(--color-fg-muted)]">(opzionale)</span>
                 </label>
                 <input
                   type="text"
                   value={pseudonym}
                   onChange={(e) => setPseudonym(e.target.value)}
                   maxLength={80}
+                  placeholder="Es. Rob Bonu · CreaToon"
                   className="w-full px-3 py-2 bg-[var(--color-bg)] border border-[var(--color-border)] rounded"
                 />
               </div>

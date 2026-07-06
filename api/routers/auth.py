@@ -13,11 +13,16 @@ from fastapi import APIRouter, Cookie, Depends, HTTPException, Response, status
 from jose import JWTError, jwt
 from pydantic import BaseModel, EmailStr
 
+import secrets
+
 from auth import hash_password, login as auth_login
 from db.models import Plan, Role
 from db.repos import users as users_repo
 from db.session import session_scope
-from mail.sender import send_registration_confirmation
+from mail.sender import (
+    send_email_verification,
+    send_welcome_after_verification,
+)
 
 router = APIRouter()
 
@@ -74,11 +79,10 @@ class LoginRequest(BaseModel):
 class RegisterRequest(BaseModel):
     email: EmailStr
     password: str
-    # Piano scelto in fase di registrazione
-    # free_to_play viene approvato quasi automaticamente,
-    # base/premium richiedono checkout mock + approvazione admin
-    plan: str  # "free_to_play" | "base" | "premium"
+    plan: str
     pseudonym: str = ""
+    first_name: str = ""
+    last_name: str = ""
 
 
 class RegisterResponse(BaseModel):
@@ -86,6 +90,17 @@ class RegisterResponse(BaseModel):
     email: str
     subscription_status: str
     plan_requested: str
+    email_verified: bool
+    message: str
+
+
+class VerifyRequest(BaseModel):
+    token: str
+
+
+class VerifyResponse(BaseModel):
+    ok: bool
+    email: str
     message: str
 
 
@@ -177,6 +192,8 @@ def register_endpoint(req: RegisterRequest) -> RegisterResponse:
         raise HTTPException(status_code=400, detail="Piano non riconosciuto")
     cfg = plan_config(plan_enum)
 
+    verification_token = ""
+    display_name_for_email = ""
     try:
         with session_scope() as s:
             existing = users_repo.get_by_email(s, req.email)
@@ -197,20 +214,30 @@ def register_endpoint(req: RegisterRequest) -> RegisterResponse:
             user.role = Role.autore_base
             if req.pseudonym.strip():
                 user.pseudonym = req.pseudonym.strip()[:80]
+            if req.first_name.strip():
+                user.first_name = req.first_name.strip()[:80]
+            if req.last_name.strip():
+                user.last_name = req.last_name.strip()[:80]
+
+            # Email verification: genera token univoco, email NON verificata
+            verification_token = secrets.token_urlsafe(32)
+            user.email_verified = False
+            user.email_verification_token = verification_token
+            user.email_verified_at = None
 
             # Auto-activate free_to_play (piano gratuito, no admin approval)
+            # NB: l'account è attivo ma l'email deve essere comunque verificata
+            # per fare login.
             is_free = plan_enum == Plan.free_to_play
             if is_free:
                 user.subscription_status = "active"
                 user.subscription_activated_at = datetime.now(timezone.utc)
                 user.subscription_plan_requested = None
-                # Applica quote iniziali del piano (per FTP sono 0, i counter
-                # ftp_* sono già a 0 di default)
                 try:
                     from billing.quotas import reset_monthly_quotas
                     reset_monthly_quotas(user)
                 except Exception as e:
-                    logger.warning("reset_monthly_quotas fallito (ok se DB non aggiornato): %s", e)
+                    logger.warning("reset_monthly_quotas fallito: %s", e)
             else:
                 user.subscription_status = "pending_approval"
                 user.subscription_plan_requested = plan_enum
@@ -219,10 +246,14 @@ def register_endpoint(req: RegisterRequest) -> RegisterResponse:
             user_email = user.email
             plan_label = cfg.label
             final_status = user.subscription_status
+            display_name_for_email = (
+                f"{user.first_name} {user.last_name}".strip()
+                or user.pseudonym
+                or user_email.split("@")[0]
+            )
     except HTTPException:
         raise
     except Exception as e:
-        # Log dettagliato per debug (visibile nei log Replit)
         logger.error(
             "REGISTER FAILED plan=%s email=%s: %s\n%s",
             req.plan, req.email, e, traceback.format_exc(),
@@ -236,22 +267,132 @@ def register_endpoint(req: RegisterRequest) -> RegisterResponse:
             ),
         )
 
-    # Invio email di conferma registrazione (best-effort, non blocca)
+    # Invio email di VERIFICA (best-effort, non blocca la registrazione)
+    email_sent = False
     try:
-        send_registration_confirmation(user_email, plan_label)
+        email_sent = send_email_verification(
+            user_email, verification_token, display_name_for_email
+        )
     except Exception as e:
-        logger.error("send_registration email failed: %s", e)
+        logger.error("send_email_verification failed: %s", e)
 
     return RegisterResponse(
         id=user_id_str,
         email=user_email,
         subscription_status=final_status,
         plan_requested=req.plan,
+        email_verified=False,
         message=(
-            "Registrazione completata! Il tuo piano è già attivo."
-            if final_status == "active"
-            else "Registrazione ricevuta. Riceverai un'email quando l'abbonamento sarà attivo."
+            "Registrazione completata! Ti abbiamo mandato un'email con "
+            "il link per verificare il tuo indirizzo."
+            if email_sent else
+            "Registrazione completata, ma l'invio dell'email è fallito. "
+            "Contatta info@snaptoon.art per assistenza."
         ),
+    )
+
+
+class ResendVerificationRequest(BaseModel):
+    email: EmailStr
+
+
+@router.post("/resend-verification")
+def resend_verification_endpoint(req: ResendVerificationRequest) -> dict:
+    """Rispedisce l'email di verifica per un account non ancora verificato."""
+    try:
+        with session_scope() as s:
+            user = users_repo.get_by_email(s, req.email)
+            # Per motivi di privacy rispondiamo sempre 200: non riveliamo se
+            # l'email esiste o meno.
+            if user is None or user.email_verified:
+                return {
+                    "ok": True,
+                    "message": "Se l'account esiste ed è ancora da verificare, ti abbiamo mandato una nuova email.",
+                }
+            # Genera un nuovo token e sostituisci il vecchio
+            new_token = secrets.token_urlsafe(32)
+            user.email_verification_token = new_token
+            display = (
+                f"{user.first_name} {user.last_name}".strip()
+                or user.pseudonym or user.email.split("@")[0]
+            )
+            user_email = user.email
+    except Exception as e:
+        logger.error("resend_verification failed: %s", e)
+        raise HTTPException(status_code=500, detail="Errore interno")
+
+    try:
+        send_email_verification(user_email, new_token, display)
+    except Exception as e:
+        logger.error("send_email_verification (resend) failed: %s", e)
+
+    return {
+        "ok": True,
+        "message": "Se l'account esiste ed è ancora da verificare, ti abbiamo mandato una nuova email.",
+    }
+
+
+@router.post("/verify", response_model=VerifyResponse)
+def verify_email_endpoint(req: VerifyRequest) -> VerifyResponse:
+    """Verifica il token contenuto nel link email.
+
+    Su successo:
+    - Marca user.email_verified=True
+    - Rimuove il token (single-use)
+    - Invia la SECONDA email di benvenuto
+    """
+    from billing.plans import plan_config
+
+    token = req.token.strip()
+    if not token or len(token) < 20:
+        raise HTTPException(status_code=400, detail="Token invalido o mancante.")
+
+    try:
+        from sqlalchemy import select
+        from db.models import User
+
+        with session_scope() as s:
+            stmt = select(User).where(User.email_verification_token == token)
+            user = s.execute(stmt).scalar_one_or_none()
+            if user is None:
+                raise HTTPException(
+                    status_code=404,
+                    detail=(
+                        "Link non valido o già usato. Se hai già verificato "
+                        "l'email, fai login."
+                    ),
+                )
+
+            user.email_verified = True
+            user.email_verified_at = datetime.now(timezone.utc)
+            user.email_verification_token = None
+            user_email = user.email
+            first = user.first_name or ""
+            last = user.last_name or ""
+            pseud = user.pseudonym or ""
+            cfg = plan_config(user.plan)
+            plan_label = cfg.label
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error("VERIFY failed: %s\n%s", e, traceback.format_exc())
+        raise HTTPException(
+            status_code=500,
+            detail=f"Errore verifica: {type(e).__name__}: {str(e)[:150]}",
+        )
+
+    # Seconda email: benvenuto post-verifica
+    try:
+        send_welcome_after_verification(
+            user_email, first, last, pseud, plan_label
+        )
+    except Exception as e:
+        logger.error("send_welcome_after_verification failed: %s", e)
+
+    return VerifyResponse(
+        ok=True,
+        email=user_email,
+        message="Email verificata! Ora puoi fare login.",
     )
 
 
@@ -261,6 +402,17 @@ def login_endpoint(req: LoginRequest, response: Response) -> UserOut:
         user = auth_login(s, email=req.email, password=req.password)
         if user is None:
             raise HTTPException(status_code=401, detail="Credenziali non valide")
+        # Blocco login se email non ancora verificata (utenti creati DOPO
+        # la migrazione d2e3f4a5b6c7). Gli utenti esistenti hanno
+        # email_verified=true di default (server_default retrocompat).
+        if not getattr(user, "email_verified", True):
+            raise HTTPException(
+                status_code=403,
+                detail=(
+                    "Email non ancora verificata. Controlla la tua casella di "
+                    "posta e clicca sul link che ti abbiamo inviato."
+                ),
+            )
         token = _create_access_token(str(user.id))
         user_out = UserOut(
             id=str(user.id),
