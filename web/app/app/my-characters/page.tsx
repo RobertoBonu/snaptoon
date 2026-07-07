@@ -167,7 +167,10 @@ function CharacterCard({
 }) {
   const [width, setWidth] = useState<number>(CARD_H); // 1:1 default per portrait
   const [zoom, setZoom] = useState(false);
-  const imgSrc = `/api/my-characters/${c.id}/image?t=${refreshTag}`;
+  // Thumb per la card (400px, ~50KB) → carica velocissimo.
+  // Il lightbox usa la variante full per zoom pixel-perfect.
+  const imgSrc = `/api/my-characters/${c.id}/image?variant=thumb&t=${refreshTag}`;
+  const imgFullSrc = `/api/my-characters/${c.id}/image?variant=full&t=${refreshTag}`;
 
   return (
     <div
@@ -363,7 +366,7 @@ function CharacterCard({
       </div>
 
       {zoom && c.has_reference && (
-        <Lightbox src={imgSrc} alt={c.name} onClose={() => setZoom(false)} />
+        <Lightbox src={imgFullSrc} alt={c.name} onClose={() => setZoom(false)} />
       )}
     </div>
   );

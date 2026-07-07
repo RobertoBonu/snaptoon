@@ -506,7 +506,7 @@ export default function MyCoversPage() {
                     >
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img
-                        src={`/api/my-characters/${c.id}/image?t=${refreshTag}`}
+                        src={`/api/my-characters/${c.id}/image?variant=thumb&t=${refreshTag}`}
                         alt={c.name}
                         className="w-10 h-10 object-cover rounded"
                       />
@@ -559,7 +559,7 @@ export default function MyCoversPage() {
                   {cov.has_image ? (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img
-                      src={`/api/covers/${cov.id}/image?t=${refreshTag}`}
+                      src={`/api/covers/${cov.id}/image?variant=thumb&t=${refreshTag}`}
                       alt={cov.title}
                       className="w-full aspect-[2/3] object-cover"
                     />

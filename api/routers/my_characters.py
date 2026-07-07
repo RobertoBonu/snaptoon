@@ -224,7 +224,7 @@ def _generate_and_save_reference(
                 pass
 
     key = my_character_reference_key(user_id, entry_id)
-    upload_bytes(key, img_bytes, content_type="image/png")
+    save_with_variants(key, img_bytes)
     return key
 
 
@@ -463,9 +463,14 @@ async def create_my_character_from_photo(
 
 @router.get("/{entry_id}/image")
 def get_my_character_image(
-    entry_id: str, user: dict = Depends(require_user)
+    entry_id: str,
+    user: dict = Depends(require_user),
+    variant: str = "full",
 ) -> Response:
-    """Bytes PNG della reference. Per la preview UI."""
+    """Bytes immagine della reference (variante WebP se disponibile)."""
+    from api.utils.serve_image import serve_image_variant
+    from storage.image_variants import parse_variant, save_with_variants
+
     user_id = uuid.UUID(user["id"])
     try:
         eid = uuid.UUID(entry_id)
@@ -481,7 +486,7 @@ def get_my_character_image(
 
     if not key or not object_exists(key):
         raise HTTPException(status_code=404, detail="Reference non generata")
-    return Response(content=download_bytes(key), media_type="image/png")
+    return serve_image_variant(key, parse_variant(variant))
 
 
 @router.patch("/{entry_id}", response_model=MyCharacterOut)

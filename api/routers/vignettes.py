@@ -23,6 +23,7 @@ from db.repos import vignettes as vignettes_repo
 from db.repos.credits import InsufficientCreditsError
 from db.session import session_scope
 from storage.client import download_bytes, object_exists, upload_bytes
+from storage.image_variants import save_with_variants
 from storage.keys import reference_key, vignette_key
 
 router = APIRouter()
@@ -279,7 +280,7 @@ def generate_vignette(
 
     # 4. Upload + save
     vk = vignette_key(pid, page_num, panel_num)
-    upload_bytes(vk, img_bytes, content_type="image/png")
+    save_with_variants(vk, img_bytes)
     aspect_key = payload.aspect_ratio or "1_1"
     with session_scope() as s:
         project = projects_repo.get_by_slug(s, user_id, slug)

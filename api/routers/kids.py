@@ -379,6 +379,7 @@ def delete_kids_project(project_id: str, user: dict = Depends(require_user)) -> 
 # ============================================================
 
 from storage.client import download_bytes, object_exists, upload_bytes
+from storage.image_variants import save_with_variants
 from storage.keys import reference_key
 from db.repos import characters as characters_repo
 from db.repos import credits as credits_repo
@@ -537,7 +538,7 @@ def generate_kids_character_reference(
 
     # Upload + save
     rk = reference_key(pid, cid, 1)
-    upload_bytes(rk, img_bytes, content_type="image/png")
+    save_with_variants(rk, img_bytes)
     with session_scope() as s:
         project = projects_repo.get_by_id(s, pid)
         cs = next((c for c in project.character_sheets if c.id == cid), None)

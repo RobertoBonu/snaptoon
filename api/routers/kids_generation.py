@@ -530,8 +530,13 @@ def get_project_details(
 
 @router.get("/projects/{project_id}/images/cover")
 def get_cover_image(
-    project_id: str, user: dict = Depends(require_user)
+    project_id: str,
+    user: dict = Depends(require_user),
+    variant: str = "full",
 ) -> Response:
+    from api.utils.serve_image import serve_image_variant
+    from storage.image_variants import parse_variant, save_with_variants
+
     user_id = uuid.UUID(user["id"])
     pid = _project_or_404(project_id, user_id)
     with session_scope() as s:
@@ -541,8 +546,7 @@ def get_cover_image(
     cover_key_ = cover_illustration_key(pid)
     if not object_exists(cover_key_):
         raise HTTPException(status_code=404, detail="Cover not yet generated")
-    data = download_bytes(cover_key_)
-    return Response(content=data, media_type="image/png")
+    return serve_image_variant(cover_key_, parse_variant(variant))
 
 
 @router.get("/projects/{project_id}/images/panel/{page_num}/{panel_num}")
@@ -551,7 +555,11 @@ def get_panel_image(
     page_num: int,
     panel_num: int,
     user: dict = Depends(require_user),
+    variant: str = "full",
 ) -> Response:
+    from api.utils.serve_image import serve_image_variant
+    from storage.image_variants import parse_variant, save_with_variants
+
     user_id = uuid.UUID(user["id"])
     pid = _project_or_404(project_id, user_id)
     with session_scope() as s:
@@ -561,8 +569,7 @@ def get_panel_image(
     vk = vignette_key(pid, page_num, panel_num)
     if not object_exists(vk):
         raise HTTPException(status_code=404, detail="Vignetta non trovata")
-    data = download_bytes(vk)
-    return Response(content=data, media_type="image/png")
+    return serve_image_variant(vk, parse_variant(variant))
 
 
 # ============================================================
@@ -701,7 +708,7 @@ def generate_stream(
                     reference_images=None,
                     quality=user_quality,
                 )
-                upload_bytes(ref_storage, img_bytes, content_type="image/png")
+                save_with_variants(ref_storage, img_bytes)
                 # Salva su DB
                 with session_scope() as s:
                     project = projects_repo.get_by_id(s, pid)
@@ -771,7 +778,7 @@ def generate_stream(
                     quality=user_quality,
                 )
                 ck = cover_illustration_key(pid)
-                upload_bytes(ck, img_bytes, content_type="image/png")
+                save_with_variants(ck, img_bytes)
                 with session_scope() as s:
                     project = projects_repo.get_by_id(s, pid)
                     cover_orm = covers_repo.get_or_create(s, project)
@@ -848,7 +855,7 @@ def generate_stream(
                     quality=user_quality,
                 )
                 vk = vignette_key(pid, page_num, panel.number)
-                upload_bytes(vk, img_bytes, content_type="image/png")
+                save_with_variants(vk, img_bytes)
                 with session_scope() as s:
                     project = projects_repo.get_by_id(s, pid)
                     vignettes_repo.upsert(
@@ -998,7 +1005,7 @@ def generate_cover_only(
                 prompt=prompt_ref, size="1024x1024",
                 reference_images=None, quality=user_quality,
             )
-            upload_bytes(ref_key, img_bytes_ref, content_type="image/png")
+            save_with_variants(ref_key, img_bytes_ref)
             with session_scope() as s:
                 project = projects_repo.get_by_id(s, pid)
                 cs = next(
@@ -1062,7 +1069,7 @@ def generate_cover_only(
             reference_images=tmp_refs if tmp_refs else None,
             quality=user_quality,
         )
-        upload_bytes(cover_key_, img_bytes, content_type="image/png")
+        save_with_variants(cover_key_, img_bytes)
 
         with session_scope() as s:
             project = projects_repo.get_by_id(s, pid)
@@ -1214,7 +1221,7 @@ def generate_single_page(
                     quality=user_quality,
                 )
                 vk = vignette_key(pid, page_num, panel.number)
-                upload_bytes(vk, img_bytes, content_type="image/png")
+                save_with_variants(vk, img_bytes)
 
                 with session_scope() as s:
                     project = projects_repo.get_by_id(s, pid)
@@ -1438,7 +1445,7 @@ def regenerate_vignette(
             reference_images=tmp_refs if tmp_refs else None,
             quality=user_quality,
         )
-        upload_bytes(vk, img_bytes, content_type="image/png")
+        save_with_variants(vk, img_bytes)
 
         with session_scope() as s:
             project = projects_repo.get_by_id(s, pid)
@@ -1483,8 +1490,19 @@ def regenerate_vignette(
 
 
 @router.get("/projects/{project_id}/pdf")
-def export_kids_pdf(
+async def export_kids_pdf(
     project_id: str, user: dict = Depends(require_user)
+) -> Response:
+    """Wrapper async: delega il rendering (PIL, IO-bound + CPU-bound) a un
+    thread separato via asyncio.to_thread, così l'event loop di FastAPI
+    resta libero per servire altre richieste durante i secondi/minuti
+    necessari a comporre il PDF."""
+    import asyncio
+    return await asyncio.to_thread(_export_kids_pdf_sync, project_id, user)
+
+
+def _export_kids_pdf_sync(
+    project_id: str, user: dict
 ) -> Response:
     """Genera il PDF del libretto KIDS con COVER pagina 1 + tavole + QUARTA.
 

@@ -19,6 +19,7 @@ from db.repos import users as users_repo
 from db.repos.credits import InsufficientCreditsError
 from db.session import session_scope
 from storage.client import download_bytes, object_exists, upload_bytes
+from storage.image_variants import save_with_variants
 from storage.keys import reference_key
 
 router = APIRouter()
@@ -249,7 +250,7 @@ def generate_reference(
 
     # Upload + save
     rk = reference_key(pid, cid, 1)
-    upload_bytes(rk, img_bytes, content_type="image/png")
+    save_with_variants(rk, img_bytes)
     with session_scope() as s:
         project = projects_repo.get_by_slug(s, user_id, slug)
         cs = next((c for c in project.character_sheets if c.id == cid), None)

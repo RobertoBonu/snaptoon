@@ -459,7 +459,7 @@ export default function BookshopPage() {
                   >
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
-                      src={c.image_url}
+                      src={`${c.image_url}?variant=thumb`}
                       alt={c.name}
                       loading="lazy"
                       style={{

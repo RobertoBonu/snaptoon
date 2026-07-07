@@ -198,6 +198,7 @@ def get_cover_metadata(
     slug: str, user: dict = Depends(require_user)
 ) -> CoverMetadataOut:
     from storage.client import object_exists
+    from storage.image_variants import save_with_variants
     from storage.keys import cover_illustration_key
 
     user_id = uuid.UUID(user["id"])
@@ -413,7 +414,7 @@ def generate_pro_cover(
             reference_images=tmp_refs if tmp_refs else None,
             quality=user_quality,
         )
-        upload_bytes(cover_key, img_bytes, content_type="image/png")
+        save_with_variants(cover_key, img_bytes)
 
         with session_scope() as s:
             project = projects_repo.get_by_slug(s, user_id, slug)

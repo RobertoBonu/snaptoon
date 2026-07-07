@@ -514,7 +514,7 @@ export default function MyCardsPage() {
                   {c.has_rendered ? (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img
-                      src={`${c.image_url}?t=${refreshTag}`}
+                      src={`${c.image_url}?variant=thumb&t=${refreshTag}`}
                       alt={c.name}
                       loading="lazy"
                       style={{

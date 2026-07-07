@@ -311,7 +311,7 @@ def _generate_card_image(
                 pass
 
     rendered_key = user_card_rendered_key(card_id)
-    upload_bytes(rendered_key, img_bytes, content_type="image/png")
+    save_with_variants(rendered_key, img_bytes)
     return rendered_key, reference_key
 
 
@@ -504,9 +504,16 @@ def list_my_cards(user: dict = Depends(require_user)) -> CardsListOut:
 
 
 @router.get("/{card_id}/image")
-def get_card_image(card_id: str, user: dict = Depends(require_user)) -> Response:
+def get_card_image(
+    card_id: str,
+    user: dict = Depends(require_user),
+    variant: str = "full",
+) -> Response:
     """Preview della propria card (solo owner). Uso pubblico via
     /api/bookshop/cards/{id}/image."""
+    from api.utils.serve_image import serve_image_variant
+    from storage.image_variants import parse_variant, save_with_variants
+
     user_id = uuid.UUID(user["id"])
     try:
         cid = uuid.UUID(card_id)
@@ -521,7 +528,7 @@ def get_card_image(card_id: str, user: dict = Depends(require_user)) -> Response
         key = card.rendered_image_key
     if not key or not object_exists(key):
         raise HTTPException(status_code=404, detail="Immagine non generata")
-    return Response(content=download_bytes(key), media_type="image/png")
+    return serve_image_variant(key, parse_variant(variant))
 
 
 @router.patch("/{card_id}", response_model=CardOut)
@@ -737,8 +744,11 @@ def delete_card(card_id: str, user: dict = Depends(require_user)) -> None:
 
 
 @public_router.get("/cards/{card_id}/image")
-def get_public_card_image(card_id: str) -> Response:
+def get_public_card_image(card_id: str, variant: str = "full") -> Response:
     """Immagine pubblica: solo se la card è pubblicata (moderata)."""
+    from api.utils.serve_image import serve_image_variant
+    from storage.image_variants import parse_variant, save_with_variants
+
     try:
         cid = uuid.UUID(card_id)
     except ValueError:
@@ -752,11 +762,7 @@ def get_public_card_image(card_id: str) -> Response:
 
     if not key or not object_exists(key):
         raise HTTPException(status_code=404, detail="Immagine non trovata")
-    return Response(
-        content=download_bytes(key),
-        media_type="image/png",
-        headers={"Cache-Control": "public, max-age=3600"},
-    )
+    return serve_image_variant(key, parse_variant(variant))
 
 
 @public_router.get("/cards")

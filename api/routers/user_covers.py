@@ -217,7 +217,7 @@ def _generate_cover_image(
         quality=quality,
     )
     storage_key = user_cover_rendered_key(cover_id)
-    upload_bytes(storage_key, img_bytes, content_type="image/png")
+    save_with_variants(storage_key, img_bytes)
     return storage_key
 
 
@@ -371,9 +371,13 @@ def list_my_covers(user: dict = Depends(require_user)) -> CoversListOut:
 
 @router.get("/{cover_id}/image")
 def get_cover_image(
-    cover_id: str, user: dict = Depends(require_user)
+    cover_id: str,
+    user: dict = Depends(require_user),
+    variant: str = "full",
 ) -> Response:
+    from api.utils.serve_image import serve_image_variant
     from db.models import UserCover
+    from storage.image_variants import parse_variant, save_with_variants
 
     user_id = uuid.UUID(user["id"])
     try:
@@ -386,8 +390,8 @@ def get_cover_image(
             raise HTTPException(status_code=404, detail="Cover non trovata")
         if not cov.rendered_image_key or not object_exists(cov.rendered_image_key):
             raise HTTPException(status_code=404, detail="Immagine non disponibile")
-        data = download_bytes(cov.rendered_image_key)
-        return Response(content=data, media_type="image/png")
+        key = cov.rendered_image_key
+    return serve_image_variant(key, parse_variant(variant))
 
 
 @router.patch("/{cover_id}", response_model=CoverOut)
@@ -604,8 +608,10 @@ def delete_cover(cover_id: str, user: dict = Depends(require_user)) -> None:
 
 
 @public_router.get("/{cover_id}/image")
-def get_public_cover_image(cover_id: str) -> Response:
+def get_public_cover_image(cover_id: str, variant: str = "full") -> Response:
+    from api.utils.serve_image import serve_image_variant
     from db.models import UserCover
+    from storage.image_variants import parse_variant, save_with_variants
 
     try:
         cid = uuid.UUID(cover_id)
@@ -621,8 +627,8 @@ def get_public_cover_image(cover_id: str) -> Response:
             or not object_exists(cov.rendered_image_key)
         ):
             raise HTTPException(status_code=404, detail="Cover non trovata")
-        data = download_bytes(cov.rendered_image_key)
-        return Response(content=data, media_type="image/png")
+        key = cov.rendered_image_key
+    return serve_image_variant(key, parse_variant(variant))
 
 
 # ============================================================
